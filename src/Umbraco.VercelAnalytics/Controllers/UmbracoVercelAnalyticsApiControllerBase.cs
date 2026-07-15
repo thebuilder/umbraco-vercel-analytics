@@ -7,7 +7,7 @@ using Umbraco.Cms.Web.Common.Routing;
 namespace Umbraco.VercelAnalytics.Controllers
 {
     [ApiController]
-    [BackOfficeRoute("umbracovercelanalytics/api/v{version:apiVersion}")]
+    [BackOfficeRoute("management/api/v{version:apiVersion}/vercel-analytics")]
     [Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
     [MapToApi(Constants.ApiName)]
     public class UmbracoVercelAnalyticsApiControllerBase : ControllerBase

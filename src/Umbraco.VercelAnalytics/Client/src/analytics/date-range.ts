@@ -11,7 +11,7 @@ export type AnalyticsDateRange = {
 const toDateOnly = (date: Date): string => date.toISOString().slice(0, 10);
 
 export function dateRangeForPreset(
-  preset: Exclude<DatePreset, "custom">,
+  preset: number,
   today = new Date(),
 ): AnalyticsDateRange {
   const to = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));

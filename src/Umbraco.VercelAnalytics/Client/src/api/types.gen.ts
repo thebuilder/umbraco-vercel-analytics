@@ -64,7 +64,7 @@ export type ConnectionsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/umbraco/umbracovercelanalytics/api/v1/connections';
+    url: '/umbraco/management/api/v1/vercel-analytics/connections';
 };
 
 export type ConnectionsErrors = {
@@ -95,7 +95,7 @@ export type DocumentRoutesData = {
     query?: {
         culture?: string;
     };
-    url: '/umbraco/umbracovercelanalytics/api/v1/documents/{documentId}/routes';
+    url: '/umbraco/management/api/v1/vercel-analytics/documents/{documentId}/routes';
 };
 
 export type DocumentRoutesErrors = {
@@ -129,7 +129,7 @@ export type BreakdownData = {
         culture?: string;
         path?: string;
     };
-    url: '/umbraco/umbracovercelanalytics/api/v1/reports/breakdown/{dimension}';
+    url: '/umbraco/management/api/v1/vercel-analytics/reports/breakdown/{dimension}';
 };
 
 export type BreakdownErrors = {
@@ -160,7 +160,7 @@ export type SummaryData = {
         culture?: string;
         path?: string;
     };
-    url: '/umbraco/umbracovercelanalytics/api/v1/reports/summary';
+    url: '/umbraco/management/api/v1/vercel-analytics/reports/summary';
 };
 
 export type SummaryErrors = {

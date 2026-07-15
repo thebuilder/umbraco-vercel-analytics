@@ -27,7 +27,7 @@ export class UmbracoVercelAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/connections',
+            url: '/umbraco/management/api/v1/vercel-analytics/connections',
             ...options
         });
     }
@@ -40,7 +40,7 @@ export class UmbracoVercelAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/documents/{documentId}/routes',
+            url: '/umbraco/management/api/v1/vercel-analytics/documents/{documentId}/routes',
             ...options
         });
     }
@@ -53,7 +53,7 @@ export class UmbracoVercelAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/reports/breakdown/{dimension}',
+            url: '/umbraco/management/api/v1/vercel-analytics/reports/breakdown/{dimension}',
             ...options
         });
     }
@@ -66,7 +66,7 @@ export class UmbracoVercelAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/reports/summary',
+            url: '/umbraco/management/api/v1/vercel-analytics/reports/summary',
             ...options
         });
     }

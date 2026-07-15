@@ -5,7 +5,7 @@ import { createClient, defaultPlugins } from '@hey-api/openapi-ts';
 // Start notifying user we are generating the TypeScript client
 console.log(chalk.green("Generating OpenAPI client..."));
 
-const swaggerUrl = process.argv[2];
+const swaggerUrl = process.argv.slice(2).find((argument) => argument !== '--');
 if (swaggerUrl === undefined) {
   console.error(chalk.red(`ERROR: Missing URL to OpenAPI spec`));
   console.error(`Please provide the URL to the OpenAPI spec as the first argument found in ${chalk.yellow('package.json')}`);

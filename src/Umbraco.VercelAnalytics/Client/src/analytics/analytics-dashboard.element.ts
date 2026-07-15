@@ -54,18 +54,36 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   @state() private _breakdowns: Partial<Record<AnalyticsDimension, BreakdownState>> = {};
   @state() private _metric: "visitors" | "pageViews" = "visitors";
   @state() private _configurationError?: string;
+  #initializationRequest = 0;
+  #reportRequest = 0;
+  #lastScopeKey?: string;
 
   connectedCallback(): void {
     super.connectedCallback();
     void this.#initialize();
   }
 
+  protected updated(changedProperties: Map<PropertyKey, unknown>): void {
+    if ((changedProperties.has("documentId") || changedProperties.has("culture")) &&
+        this.#lastScopeKey !== this.#currentScopeKey()) {
+      void this.#initialize();
+    }
+  }
+
+  #currentScopeKey(): string {
+    return this.documentId ? `${this.documentId}:${this.culture ?? ""}` : "global";
+  }
+
   async #initialize(): Promise<void> {
+    const request = ++this.#initializationRequest;
+    this.#lastScopeKey = this.#currentScopeKey();
+    this._configurationError = undefined;
     if (this.documentId) {
       const { data, error } = await UmbracoVercelAnalyticsService.documentRoutes({
         path: { documentId: this.documentId },
         query: { culture: this.culture },
       });
+      if (request !== this.#initializationRequest) return;
       if (error || !data?.length) {
         this._configurationError = "This document is unpublished, unmapped, or its document type is not enabled for analytics.";
         this._summaryLoading = false;
@@ -76,12 +94,20 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       this._connection = this._route.connection;
     } else {
       const { data, error } = await UmbracoVercelAnalyticsService.connections();
+      if (request !== this.#initializationRequest) return;
       if (error || !data?.enabled) {
         this._configurationError = "Vercel Analytics is disabled or unavailable. Ask an administrator to configure a connection.";
         this._summaryLoading = false;
         return;
       }
       this._connections = data.connections;
+      const defaultDays = data.defaultRangeDays;
+      if ([7, 30, 90, 365].includes(defaultDays)) {
+        this._preset = defaultDays as Exclude<DatePreset, "custom">;
+      } else {
+        this._preset = "custom";
+      }
+      this._range = dateRangeForPreset(defaultDays);
       const stored = localStorage.getItem("umbraco-vercel-analytics:connection");
       this._connection = data.connections.some((item) => item.alias === stored)
         ? stored ?? undefined
@@ -98,6 +124,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   async #loadReports(): Promise<void> {
     if (!this._connection) return;
+    const request = ++this.#reportRequest;
     this._summaryLoading = true;
     this._summaryError = undefined;
     this._summary = undefined;
@@ -105,6 +132,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
     const query = { connection: this._connection, ...this._range, ...this.#scope() };
     const summaryPromise = UmbracoVercelAnalyticsService.summary({ query }).then(({ data, error, response }) => {
+      if (request !== this.#reportRequest) return;
       this._summaryLoading = false;
       if (error) this._summaryError = reportErrorMessage({ status: response.status });
       else this._summary = data;
@@ -115,6 +143,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         path: { dimension },
         query: { ...query, limit: 10 },
       });
+      if (request !== this.#reportRequest) return;
       this._breakdowns = {
         ...this._breakdowns,
         [dimension]: error
@@ -200,6 +229,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       ` : ""}
       ${connection?.warnings.map((warning) => html`<uui-tag color="warning">${warning}</uui-tag>`)}
       ${this._route?.warnings.map((warning) => html`<uui-tag color="warning">${warning}</uui-tag>`)}
+      ${this._connection ? html`<uui-tag color="positive">Connection configured</uui-tag>` : ""}
     `;
   }
 

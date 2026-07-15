@@ -7,6 +7,7 @@ using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
+using Umbraco.Cms.Core.Notifications;
 using Umbraco.Cms.Api.Management.OpenApi;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.VercelAnalytics.Configuration;
@@ -33,6 +34,7 @@ namespace Umbraco.VercelAnalytics.Composers
             });
             builder.Services.AddSingleton<VercelAnalyticsReportService>();
             builder.Services.AddTransient<AnalyticsDocumentRouteService>();
+            builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AnalyticsSectionAccessInitializer>();
             builder.Services.AddSingleton<IOperationIdHandler, CustomOperationHandler>();
 
             builder.Services.Configure<SwaggerGenOptions>(opt =>

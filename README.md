@@ -41,7 +41,7 @@ Document-type enablement has two explicit modes:
 
 Wildcard aliases such as `*Page` are intentionally not supported because aliases are editable and pattern results would be difficult to preview or audit in the picker UI.
 
-Grant the relevant Umbraco user groups access to the **Analytics** section. Document reports additionally require Content-section access and read permission for the document.
+On first package startup, the **Analytics** section is granted to the built-in Administrators group. This happens only once, so removing the section from that group later is respected. Grant other relevant Umbraco user groups access explicitly. Document reports additionally require Content-section access and read permission for the document.
 
 ### Full appsettings configuration
 

@@ -19,6 +19,7 @@ import type {
 } from "../api/types.gen.js";
 import { dateRangeForPreset, normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
 import { reportErrorMessage } from "./report-error.js";
+import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-capability.js";
 import "./history-chart.element.js";
 import "./breakdown-table.element.js";
 
@@ -54,9 +55,11 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   @state() private _breakdowns: Partial<Record<AnalyticsDimension, BreakdownState>> = {};
   @state() private _metric: "visitors" | "pageViews" = "visitors";
   @state() private _configurationError?: string;
+  @state() private _utmCapability: UtmCapability = "unknown";
   #initializationRequest = 0;
   #reportRequest = 0;
   #lastScopeKey?: string;
+  #utmCapabilityByConnection = new Map<string, UtmCapability>();
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -128,22 +131,36 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this._summaryLoading = true;
     this._summaryError = undefined;
     this._summary = undefined;
-    this._breakdowns = Object.fromEntries(BREAKDOWNS.map(({ dimension }) => [dimension, { loading: true }])) as typeof this._breakdowns;
+    this._utmCapability = this.#utmCapabilityByConnection.get(this._connection) ?? "unknown";
+    const requestedBreakdowns = BREAKDOWNS.filter(({ planLimited }) => !planLimited || this._utmCapability !== "unavailable");
+    this._breakdowns = Object.fromEntries(requestedBreakdowns.map(({ dimension }) => [dimension, { loading: true }])) as typeof this._breakdowns;
+    let baselineSucceeded = false;
+    let utmSucceeded = false;
+    const utmStatuses: number[] = [];
 
     const query = { connection: this._connection, ...this._range, ...this.#scope() };
     const summaryPromise = UmbracoVercelAnalyticsService.summary({ query }).then(({ data, error, response }) => {
       if (request !== this.#reportRequest) return;
       this._summaryLoading = false;
       if (error) this._summaryError = reportErrorMessage({ status: response.status });
-      else this._summary = data;
+      else {
+        this._summary = data;
+        baselineSucceeded = true;
+      }
     });
 
-    const breakdownPromises = BREAKDOWNS.map(async ({ dimension }) => {
+    const breakdownPromises = requestedBreakdowns.map(async ({ dimension }) => {
       const { data, error, response } = await UmbracoVercelAnalyticsService.breakdown({
         path: { dimension },
         query: { ...query, limit: 10 },
       });
       if (request !== this.#reportRequest) return;
+      if (isUtmDimension(dimension)) {
+        if (error) utmStatuses.push(response.status);
+        else utmSucceeded = true;
+      } else if (!error) {
+        baselineSucceeded = true;
+      }
       this._breakdowns = {
         ...this._breakdowns,
         [dimension]: error
@@ -152,6 +169,12 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       };
     });
     await Promise.allSettled([summaryPromise, ...breakdownPromises]);
+    if (request !== this.#reportRequest) return;
+    const detectedCapability = detectUtmCapability(baselineSucceeded, utmSucceeded, utmStatuses);
+    if (detectedCapability !== "unknown") {
+      this.#utmCapabilityByConnection.set(this._connection, detectedCapability);
+      this._utmCapability = detectedCapability;
+    }
   }
 
   #selectOptions(items: Array<{ value: string; name: string }>, selected?: string) {
@@ -224,7 +247,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         <div class="custom-range">
           <uui-form-layout-item><uui-label slot="label" for="analytics-from">From</uui-label><uui-input id="analytics-from" type="date" .value=${this._range.from} @change=${(event: Event) => this.#onCustomDate("from", event)}></uui-input></uui-form-layout-item>
           <uui-form-layout-item><uui-label slot="label" for="analytics-to">To</uui-label><uui-input id="analytics-to" type="date" .value=${this._range.to} @change=${(event: Event) => this.#onCustomDate("to", event)}></uui-input></uui-form-layout-item>
-          <uui-button look="secondary" @click=${this.#loadReports}>Apply dates</uui-button>
+          <uui-button look="secondary" label="Apply custom date range" @click=${this.#loadReports}>Apply dates</uui-button>
         </div>
       ` : ""}
       ${connection?.warnings.map((warning) => html`<uui-tag color="warning">${warning}</uui-tag>`)}
@@ -235,7 +258,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   #renderSummary() {
     if (this._summaryLoading) return html`<uui-loader-bar aria-label="Loading summary"></uui-loader-bar>`;
-    if (this._summaryError) return html`<uui-box><umb-empty-state headline="Analytics unavailable"><p>${this._summaryError}</p><uui-button look="secondary" @click=${this.#loadReports}>Retry</uui-button></umb-empty-state></uui-box>`;
+    if (this._summaryError) return html`<uui-box><umb-empty-state headline="Analytics unavailable"><p>${this._summaryError}</p><uui-button look="secondary" label="Retry analytics summary" @click=${this.#loadReports}>Retry</uui-button></umb-empty-state></uui-box>`;
     if (!this._summary) return "";
     return html`
       <section class="summary" aria-label="Traffic summary">
@@ -244,8 +267,8 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       </section>
       <uui-box headline="History" class="history">
         <div slot="header-actions" class="metric-switch" role="group" aria-label="History metric">
-          <uui-button look=${this._metric === "visitors" ? "primary" : "secondary"} @click=${() => (this._metric = "visitors")}>Visitors</uui-button>
-          <uui-button look=${this._metric === "pageViews" ? "primary" : "secondary"} @click=${() => (this._metric = "pageViews")}>Page views</uui-button>
+          <uui-button label="Show visitors history" look=${this._metric === "visitors" ? "primary" : "secondary"} @click=${() => (this._metric = "visitors")}>Visitors</uui-button>
+          <uui-button label="Show page views history" look=${this._metric === "pageViews" ? "primary" : "secondary"} @click=${() => (this._metric = "pageViews")}>Page views</uui-button>
         </div>
         ${this._summary.points.length
           ? html`<vercel-analytics-history-chart .points=${this._summary.points} .metric=${this._metric}></vercel-analytics-history-chart>`
@@ -255,6 +278,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   }
 
   #renderBreakdown(dimension: AnalyticsDimension, headline: string, wide = false, planLimited = false) {
+    if (planLimited && this._utmCapability === "unavailable") return "";
     const state = this._breakdowns[dimension];
     return html`
       <uui-box headline=${headline} class=${wide ? "wide" : ""}>
@@ -264,7 +288,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .headline=${headline}
             .rows=${state?.data?.rows ?? []}
             .unavailable=${state?.error}></vercel-analytics-breakdown-table>
-          ${state?.error ? html`<uui-button look="secondary" @click=${this.#loadReports}>Retry</uui-button>` : ""}
+          ${state?.error ? html`<uui-button look="secondary" label=${`Retry ${headline} report`} @click=${this.#loadReports}>Retry</uui-button>` : ""}
           ${planLimited && state?.error ? html`<p class="hint">UTM reporting availability depends on your Vercel plan and reporting window.</p>` : ""}
         ` : ""}
       </uui-box>

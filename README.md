@@ -2,6 +2,8 @@
 
 `Umbraco.VercelAnalytics` brings Vercel Web Analytics into the Umbraco 17 backoffice. It adds a dedicated Analytics section and an Analytics view on mapped, published documents without sending Vercel credentials to the browser.
 
+UTM panels are shown only when Vercel confirms that the connected project supports them. Projects without Web Analytics Plus do not display unavailable placeholder panels.
+
 ## Requirements
 
 - Umbraco CMS 17.1 or later

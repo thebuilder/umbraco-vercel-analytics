@@ -73,7 +73,10 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
       <div class="chart" role="img" aria-label="${label} history for ${this.points.length} periods">
         <canvas aria-hidden="true"></canvas>
       </div>
-      <uui-button look="secondary" @click=${() => (this._showTable = !this._showTable)}>
+      <uui-button
+        look="secondary"
+        label=${this._showTable ? "Hide history data table" : "View history data table"}
+        @click=${() => (this._showTable = !this._showTable)}>
         ${this._showTable ? "Hide data table" : "View data table"}
       </uui-button>
       ${this._showTable ? html`

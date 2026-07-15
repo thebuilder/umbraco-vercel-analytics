@@ -1,0 +1,23 @@
+import type { AnalyticsDimension } from "../api/types.gen.js";
+
+export type UtmCapability = "unknown" | "available" | "unavailable";
+
+const UTM_DIMENSIONS: ReadonlySet<AnalyticsDimension> = new Set([
+  "UtmSource",
+  "UtmMedium",
+  "UtmCampaign",
+]);
+
+export function isUtmDimension(dimension: AnalyticsDimension): boolean {
+  return UTM_DIMENSIONS.has(dimension);
+}
+
+export function detectUtmCapability(
+  baselineSucceeded: boolean,
+  utmSucceeded: boolean,
+  utmStatuses: ReadonlyArray<number>,
+): UtmCapability {
+  if (baselineSucceeded && utmStatuses.includes(402)) return "unavailable";
+  if (utmSucceeded) return "available";
+  return "unknown";
+}

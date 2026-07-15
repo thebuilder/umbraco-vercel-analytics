@@ -30,15 +30,15 @@ public sealed class UmbracoVercelAnalyticsApiController(
     {
         if (!HasAnalyticsSectionAccess()) return Forbid();
         var response = new AnalyticsConnectionsResponse(
-            registry.Options.Enabled,
-            registry.Options.DefaultConnection,
-            registry.Options.DefaultRangeDays,
+            registry.Settings.Enabled,
+            registry.Settings.DefaultConnection,
+            registry.Settings.DefaultRangeDays,
             registry.Connections.Select(connection => new AnalyticsConnectionSummary(
                 connection.Alias,
                 connection.DisplayName,
-                string.Equals(connection.Alias, registry.Options.DefaultConnection, StringComparison.OrdinalIgnoreCase),
-                true,
-                [])).OrderBy(connection => connection.DisplayName).ToArray());
+                string.Equals(connection.Alias, registry.Settings.DefaultConnection, StringComparison.OrdinalIgnoreCase),
+                connection.IsConfigured,
+                ConnectionWarnings(connection))).OrderBy(connection => connection.DisplayName).ToArray());
         return Ok(response);
     }
 
@@ -117,7 +117,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
         string? path,
         CancellationToken cancellationToken)
     {
-        if (!registry.Options.Enabled) return (null, StatusCode(StatusCodes.Status503ServiceUnavailable));
+        if (!registry.Settings.Enabled) return (null, StatusCode(StatusCodes.Status503ServiceUnavailable));
         if (from > to || to.DayNumber - from.DayNumber > 730)
         {
             return (null, ValidationProblem("The date range must be ordered and no longer than 730 days."));
@@ -175,4 +175,12 @@ public sealed class UmbracoVercelAnalyticsApiController(
 
     private ActionResult NotFoundProblem(string detail) =>
         Problem(statusCode: StatusCodes.Status404NotFound, title: "Analytics configuration was not found.", detail: detail);
+
+    private static IReadOnlyList<string> ConnectionWarnings(VercelAnalyticsConnection connection)
+    {
+        var warnings = new List<string>();
+        if (!connection.IsConfigured) warnings.Add("No server-side access token is configured for this connection alias.");
+        if (!connection.HasMappings) warnings.Add("Global reports only: add a hostname or document root to enable document analytics.");
+        return warnings;
+    }
 }

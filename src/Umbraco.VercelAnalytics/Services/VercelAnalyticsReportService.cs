@@ -14,11 +14,11 @@ public sealed class VercelAnalyticsReportService(
         CancellationToken cancellationToken)
     {
         var connection = registry.Get(query.Connection);
-        if (connection is null) return null;
+        if (connection is null || !connection.IsConfigured) return null;
         var cacheKey = $"vercel-analytics:summary:{Normalize(query)}";
         return await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = registry.Options.CacheDuration;
+            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var totals = client.CountAsync(connection, query, cancellationToken);
             var trend = client.GetTrendAsync(connection, query, cancellationToken);
             await Task.WhenAll(totals, trend);
@@ -33,11 +33,11 @@ public sealed class VercelAnalyticsReportService(
         CancellationToken cancellationToken)
     {
         var connection = registry.Get(query.Connection);
-        if (connection is null) return null;
+        if (connection is null || !connection.IsConfigured) return null;
         var cacheKey = $"vercel-analytics:breakdown:{dimension}:{limit}:{Normalize(query)}";
         return await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = registry.Options.CacheDuration;
+            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, cancellationToken);
             return new AnalyticsBreakdown(dimension, rows);
         });

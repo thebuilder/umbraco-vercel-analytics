@@ -23,6 +23,7 @@ namespace Umbraco.VercelAnalytics.Composers
                 .Bind(builder.Config.GetSection(VercelAnalyticsOptions.SectionName))
                 .ValidateOnStart();
             builder.Services.AddSingleton<IValidateOptions<VercelAnalyticsOptions>, VercelAnalyticsOptionsValidator>();
+            builder.Services.AddSingleton<VercelAnalyticsSettingsStore>();
             builder.Services.AddSingleton<VercelAnalyticsConnectionRegistry>();
             builder.Services.AddMemoryCache();
             builder.Services.AddHttpClient<IVercelAnalyticsClient, VercelAnalyticsClient>(client =>

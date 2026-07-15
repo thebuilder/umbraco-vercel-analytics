@@ -33,4 +33,8 @@ public sealed class VercelAnalyticsConnectionOptions
     public string[] DocumentRootKeys { get; set; } = [];
 
     public string[] EnabledDocumentTypes { get; set; } = [];
+
+    public bool EnableAllDocumentTypes { get; set; }
+
+    public string[] EnabledDocumentTypeKeys { get; set; } = [];
 }

@@ -22,6 +22,16 @@ public sealed class VercelAnalyticsOptionsValidatorTests
     }
 
     [Fact]
+    public void Connection_without_mappings_is_valid_for_global_reports()
+    {
+        var options = CreateOptions();
+        options.Connections["main"].Hostnames = [];
+        options.Connections["main"].DocumentRootKeys = [];
+
+        Assert.True(_sut.Validate(null, options).Succeeded);
+    }
+
+    [Fact]
     public void Duplicate_normalized_hostnames_fail()
     {
         var options = CreateOptions();

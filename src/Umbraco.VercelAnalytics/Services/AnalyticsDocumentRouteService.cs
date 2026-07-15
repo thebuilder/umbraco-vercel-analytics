@@ -42,7 +42,8 @@ public sealed class AnalyticsDocumentRouteService(
             var path = absolute ? uri!.AbsolutePath : NormalizePath(url);
             var hostnameConnection = registry.FindByHostname(hostname);
             var connection = rootConnection ?? hostnameConnection;
-            if (connection is null || !connection.EnabledDocumentTypes.Contains(published.ContentType.Alias)) continue;
+            if (connection is null ||
+                !connection.IsDocumentTypeEnabled(published.ContentType.Alias, published.ContentType.Key)) continue;
 
             var warnings = new List<string>();
             if (rootConnection is not null && hostnameConnection is not null &&

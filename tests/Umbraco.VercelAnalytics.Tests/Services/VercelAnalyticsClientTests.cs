@@ -90,6 +90,8 @@ public sealed class VercelAnalyticsClientTests
         "main", "Main", "secret", "project", teamId, null,
         new HashSet<string> { "example.com" },
         [Guid.Parse("11111111-1111-1111-1111-111111111111")],
+        false,
+        new HashSet<Guid>(),
         new HashSet<string> { "articlePage" });
 
     private sealed class RecordingHandler(string body, HttpStatusCode statusCode = HttpStatusCode.OK) : HttpMessageHandler

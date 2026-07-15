@@ -62,11 +62,6 @@ public sealed class VercelAnalyticsOptionsValidator : IValidateOptions<VercelAna
             failures.Add($"Connection '{alias}' cannot configure both TeamId and TeamSlug.");
         }
 
-        if (connection.Hostnames.Length == 0 && connection.DocumentRootKeys.Length == 0)
-        {
-            failures.Add($"Connection '{alias}' requires at least one hostname or document root key.");
-        }
-
         foreach (var hostname in connection.Hostnames)
         {
             var normalized = VercelAnalyticsConnectionRegistry.NormalizeHostname(hostname);

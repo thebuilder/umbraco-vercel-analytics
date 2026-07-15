@@ -3,6 +3,7 @@
 **/node_modules/
 **/coverage/
 **/.vite/
+artifacts/
 src/Umbraco.VercelAnalytics/wwwroot/App_Plugins/
 samples/Umbraco.VercelAnalytics.Example/umbraco/Data/
 samples/Umbraco.VercelAnalytics.Example/umbraco/Logs/

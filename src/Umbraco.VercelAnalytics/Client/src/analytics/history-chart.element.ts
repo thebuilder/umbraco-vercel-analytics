@@ -44,7 +44,6 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
 
     const style = getComputedStyle(this);
     const color = style.getPropertyValue("--uui-color-interactive").trim() || "#3544b1";
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.#chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -59,7 +58,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
         }],
       },
       options: {
-        animation: reduceMotion ? false : undefined,
+        animation: false,
         maintainAspectRatio: false,
         plugins: { tooltip: { enabled: true } },
         scales: { y: { beginAtZero: true } },

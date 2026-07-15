@@ -10,6 +10,11 @@
     <PackageId>Umbraco.VercelAnalytics</PackageId>
     <Product>Umbraco.VercelAnalytics</Product>
     <Title>Umbraco.VercelAnalytics</Title>
+    <Version>0.1.0</Version>
+    <Description>Vercel Web Analytics reports inside the Umbraco 17 backoffice.</Description>
+    <PackageTags>umbraco;vercel;analytics;backoffice</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
 
@@ -26,6 +31,7 @@
 
     <!-- However make the Umbraco-package.json included for dotnet pack or nuget package and visible to the solution -->
     <None Include="Client\public\umbraco-package.json" Pack="false" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

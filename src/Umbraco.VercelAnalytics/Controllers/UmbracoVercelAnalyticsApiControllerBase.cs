@@ -8,7 +8,7 @@ namespace Umbraco.VercelAnalytics.Controllers
 {
     [ApiController]
     [BackOfficeRoute("umbracovercelanalytics/api/v{version:apiVersion}")]
-    [Authorize(Policy = AuthorizationPolicies.SectionAccessContent)]
+    [Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
     [MapToApi(Constants.ApiName)]
     public class UmbracoVercelAnalyticsApiControllerBase : ControllerBase
     {

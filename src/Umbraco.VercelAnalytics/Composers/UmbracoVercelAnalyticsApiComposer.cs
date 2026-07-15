@@ -31,6 +31,7 @@ namespace Umbraco.VercelAnalytics.Composers
                 client.Timeout = TimeSpan.FromSeconds(15);
             });
             builder.Services.AddSingleton<VercelAnalyticsReportService>();
+            builder.Services.AddTransient<AnalyticsDocumentRouteService>();
             builder.Services.AddSingleton<IOperationIdHandler, CustomOperationHandler>();
 
             builder.Services.Configure<SwaggerGenOptions>(opt =>

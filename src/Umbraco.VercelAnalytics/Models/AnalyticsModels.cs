@@ -56,3 +56,12 @@ public sealed record AnalyticsConnectionsResponse(
     string? DefaultConnection,
     int DefaultRangeDays,
     IReadOnlyList<AnalyticsConnectionSummary> Connections);
+
+public sealed record AnalyticsDocumentRoute(
+    string Connection,
+    string Culture,
+    string Hostname,
+    string Path,
+    string Url,
+    bool IsCurrent,
+    IReadOnlyList<string> Warnings);

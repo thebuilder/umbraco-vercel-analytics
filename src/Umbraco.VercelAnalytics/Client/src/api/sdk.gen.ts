@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { PingData, PingErrors, PingResponses, WhatsMyNameData, WhatsMyNameErrors, WhatsMyNameResponses, WhatsTheTimeMrWolfData, WhatsTheTimeMrWolfErrors, WhatsTheTimeMrWolfResponses, WhoAmIData, WhoAmIErrors, WhoAmIResponses } from './types.gen';
+import type { BreakdownData, BreakdownErrors, BreakdownResponses, ConnectionsData, ConnectionsErrors, ConnectionsResponses, DocumentRoutesData, DocumentRoutesErrors, DocumentRoutesResponses, SummaryData, SummaryErrors, SummaryResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -19,54 +19,54 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 export class UmbracoVercelAnalyticsService {
-    public static ping<ThrowOnError extends boolean = false>(options?: Options<PingData, ThrowOnError>) {
-        return (options?.client ?? client).get<PingResponses, PingErrors, ThrowOnError>({
+    public static connections<ThrowOnError extends boolean = false>(options?: Options<ConnectionsData, ThrowOnError>) {
+        return (options?.client ?? client).get<ConnectionsResponses, ConnectionsErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/ping',
+            url: '/umbraco/umbracovercelanalytics/api/v1/connections',
             ...options
         });
     }
     
-    public static whatsMyName<ThrowOnError extends boolean = false>(options?: Options<WhatsMyNameData, ThrowOnError>) {
-        return (options?.client ?? client).get<WhatsMyNameResponses, WhatsMyNameErrors, ThrowOnError>({
+    public static documentRoutes<ThrowOnError extends boolean = false>(options: Options<DocumentRoutesData, ThrowOnError>) {
+        return (options.client ?? client).get<DocumentRoutesResponses, DocumentRoutesErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/whatsMyName',
+            url: '/umbraco/umbracovercelanalytics/api/v1/documents/{documentId}/routes',
             ...options
         });
     }
     
-    public static whatsTheTimeMrWolf<ThrowOnError extends boolean = false>(options?: Options<WhatsTheTimeMrWolfData, ThrowOnError>) {
-        return (options?.client ?? client).get<WhatsTheTimeMrWolfResponses, WhatsTheTimeMrWolfErrors, ThrowOnError>({
+    public static breakdown<ThrowOnError extends boolean = false>(options: Options<BreakdownData, ThrowOnError>) {
+        return (options.client ?? client).get<BreakdownResponses, BreakdownErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/whatsTheTimeMrWolf',
+            url: '/umbraco/umbracovercelanalytics/api/v1/reports/breakdown/{dimension}',
             ...options
         });
     }
     
-    public static whoAmI<ThrowOnError extends boolean = false>(options?: Options<WhoAmIData, ThrowOnError>) {
-        return (options?.client ?? client).get<WhoAmIResponses, WhoAmIErrors, ThrowOnError>({
+    public static summary<ThrowOnError extends boolean = false>(options?: Options<SummaryData, ThrowOnError>) {
+        return (options?.client ?? client).get<SummaryResponses, SummaryErrors, ThrowOnError>({
             security: [
                 {
                     scheme: 'bearer',
                     type: 'http'
                 }
             ],
-            url: '/umbraco/umbracovercelanalytics/api/v1/whoAmI',
+            url: '/umbraco/umbracovercelanalytics/api/v1/reports/summary',
             ...options
         });
     }

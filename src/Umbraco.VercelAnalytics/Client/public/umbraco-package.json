@@ -1,8 +1,8 @@
 {
   "id": "Umbraco.VercelAnalytics",
   "name": "Umbraco.VercelAnalytics",
-  "version": "0.0.0",
-  "allowTelemetry": true,
+  "version": "0.1.0",
+  "allowTelemetry": false,
   "extensions": [
     {
       "name": "Umbraco Vercel Analytics Bundle",

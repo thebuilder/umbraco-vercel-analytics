@@ -1,0 +1,58 @@
+using System.Text.Json.Serialization;
+
+namespace Umbraco.VercelAnalytics.Models;
+
+[JsonConverter(typeof(JsonStringEnumConverter<AnalyticsInterval>))]
+public enum AnalyticsInterval
+{
+    Day,
+    Week,
+    Month
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<AnalyticsDimension>))]
+public enum AnalyticsDimension
+{
+    RequestPath,
+    Route,
+    ReferrerHostname,
+    Country,
+    DeviceType,
+    BrowserName,
+    OsName,
+    UtmSource,
+    UtmMedium,
+    UtmCampaign
+}
+
+public sealed record AnalyticsQuery(
+    string Connection,
+    DateOnly From,
+    DateOnly To,
+    AnalyticsInterval Interval,
+    string? RequestPath = null);
+
+public sealed record AnalyticsTotals(long PageViews, long Visitors);
+
+public sealed record AnalyticsPoint(DateTimeOffset Timestamp, long PageViews, long Visitors);
+
+public sealed record AnalyticsSummary(AnalyticsTotals Totals, IReadOnlyList<AnalyticsPoint> Points);
+
+public sealed record AnalyticsBreakdownRow(string Value, long PageViews, long Visitors);
+
+public sealed record AnalyticsBreakdown(
+    AnalyticsDimension Dimension,
+    IReadOnlyList<AnalyticsBreakdownRow> Rows);
+
+public sealed record AnalyticsConnectionSummary(
+    string Alias,
+    string DisplayName,
+    bool IsDefault,
+    bool IsConfigured,
+    IReadOnlyList<string> Warnings);
+
+public sealed record AnalyticsConnectionsResponse(
+    bool Enabled,
+    string? DefaultConnection,
+    int DefaultRangeDays,
+    IReadOnlyList<AnalyticsConnectionSummary> Connections);

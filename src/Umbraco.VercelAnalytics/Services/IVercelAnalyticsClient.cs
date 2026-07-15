@@ -1,0 +1,24 @@
+using Umbraco.VercelAnalytics.Configuration;
+using Umbraco.VercelAnalytics.Models;
+
+namespace Umbraco.VercelAnalytics.Services;
+
+public interface IVercelAnalyticsClient
+{
+    Task<AnalyticsTotals> CountAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        AnalyticsDimension dimension,
+        int limit,
+        CancellationToken cancellationToken);
+}

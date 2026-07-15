@@ -10,6 +10,7 @@ using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Api.Management.OpenApi;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.VercelAnalytics.Configuration;
+using Umbraco.VercelAnalytics.Services;
 
 namespace Umbraco.VercelAnalytics.Composers
 {
@@ -23,6 +24,13 @@ namespace Umbraco.VercelAnalytics.Composers
                 .ValidateOnStart();
             builder.Services.AddSingleton<IValidateOptions<VercelAnalyticsOptions>, VercelAnalyticsOptionsValidator>();
             builder.Services.AddSingleton<VercelAnalyticsConnectionRegistry>();
+            builder.Services.AddMemoryCache();
+            builder.Services.AddHttpClient<IVercelAnalyticsClient, VercelAnalyticsClient>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.vercel.com/");
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
+            builder.Services.AddSingleton<VercelAnalyticsReportService>();
             builder.Services.AddSingleton<IOperationIdHandler, CustomOperationHandler>();
 
             builder.Services.Configure<SwaggerGenOptions>(opt =>

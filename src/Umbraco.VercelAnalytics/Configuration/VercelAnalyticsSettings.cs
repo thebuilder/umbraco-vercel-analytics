@@ -84,15 +84,20 @@ public sealed class VercelAnalyticsSettingsStore
     {
         var normalized = Normalize(settings);
         var json = JsonSerializer.Serialize(normalized, SerializerOptions);
-        _keyValueService?.SetValue(StorageKey, json);
-        lock (_lock) _cached = normalized;
-        Interlocked.Increment(ref _revision);
+        lock (_lock)
+        {
+            _keyValueService?.SetValue(StorageKey, json);
+            _cached = normalized;
+            Interlocked.Increment(ref _revision);
+        }
     }
 
     private static VercelAnalyticsSettings FromServerOptions(VercelAnalyticsOptions options) => new()
     {
         Enabled = options.Enabled,
-        DefaultConnection = options.DefaultConnection,
+        DefaultConnection = string.IsNullOrWhiteSpace(options.DefaultConnection)
+            ? options.Connections.Keys.FirstOrDefault()
+            : options.DefaultConnection,
         DefaultRangeDays = options.DefaultRangeDays,
         CacheDuration = options.CacheDuration,
         Connections = options.Connections.Select(pair => new VercelAnalyticsConnectionSettings

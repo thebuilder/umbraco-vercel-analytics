@@ -14,6 +14,18 @@ export const manifests: Array<UmbExtensionManifest> = [
     conditions: [{ alias: "Umb.Condition.SectionAlias", match: "Umbraco.VercelAnalytics.Section" }],
   },
   {
+    type: "dashboard",
+    alias: "Umbraco.VercelAnalytics.SettingsDashboard",
+    name: "Vercel Analytics Settings Dashboard",
+    js: () => import("./settings/settings-dashboard.element.js"),
+    weight: 25,
+    meta: { label: "Vercel Analytics", pathname: "vercel-analytics" },
+    conditions: [
+      { alias: "Umb.Condition.SectionAlias", match: "Umb.Section.Settings" },
+      { alias: "Umb.Condition.CurrentUser.IsAdmin" },
+    ],
+  },
+  {
     type: "condition",
     alias: "Umbraco.VercelAnalytics.Condition.DocumentAnalytics",
     name: "Document Analytics Availability Condition",

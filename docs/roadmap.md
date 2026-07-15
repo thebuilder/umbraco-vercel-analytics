@@ -23,7 +23,8 @@ References: [custom events](https://vercel.com/docs/analytics/custom-events), [W
 
 ## Administration
 
-- **Exploratory:** backoffice-assisted connection setup, connection tests, finer-grained permissions, and secret-provider integrations.
+- **Confirmed and delivered:** administrators can manage non-secret connections, mappings, document-type selection, and connection tests from the Umbraco Settings section.
+- **Exploratory:** finer-grained settings permissions, secret-provider integrations, and secure backoffice-assisted token onboarding without persisting tokens in Umbraco.
 - Tokens must remain in server-side secret storage and must never be returned by a Management API.
 
 Reference: [Vercel authentication](https://vercel.com/docs/rest-api/reference/welcome#authentication).

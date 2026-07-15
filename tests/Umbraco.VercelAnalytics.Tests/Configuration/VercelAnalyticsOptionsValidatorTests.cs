@@ -14,6 +14,27 @@ public sealed class VercelAnalyticsOptionsValidatorTests
     }
 
     [Fact]
+    public void Enabled_configuration_is_valid_before_ui_setup()
+    {
+        Assert.True(_sut.Validate(null, new VercelAnalyticsOptions { Enabled = true }).Succeeded);
+    }
+
+    [Fact]
+    public void Token_only_connection_is_valid_before_ui_setup()
+    {
+        var options = new VercelAnalyticsOptions
+        {
+            Enabled = true,
+            Connections = new Dictionary<string, VercelAnalyticsConnectionOptions>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["main"] = new() { AccessToken = "server-secret" }
+            }
+        };
+
+        Assert.True(_sut.Validate(null, options).Succeeded);
+    }
+
+    [Fact]
     public void Valid_configuration_succeeds()
     {
         var result = _sut.Validate(null, CreateOptions());

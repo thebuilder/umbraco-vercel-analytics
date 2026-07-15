@@ -95,6 +95,18 @@ public sealed class UmbracoVercelAnalyticsSettingsApiController(
             };
             return Ok(new AnalyticsConnectionTestResult(false, message));
         }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Ok(new AnalyticsConnectionTestResult(false, "Vercel Analytics did not respond before the request timed out."));
+        }
+        catch (HttpRequestException)
+        {
+            return Ok(new AnalyticsConnectionTestResult(false, "Vercel Analytics could not be reached."));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return Ok(new AnalyticsConnectionTestResult(false, "Vercel returned an unexpected analytics response."));
+        }
     }
 
     private AnalyticsSettingsResponse CreateResponse()
@@ -116,7 +128,7 @@ public sealed class UmbracoVercelAnalyticsSettingsApiController(
                 connection.DocumentRootKeys,
                 connection.EnableAllDocumentTypes,
                 connection.EnabledDocumentTypeKeys,
-                connections.GetValueOrDefault(connection.Alias)?.IsConfigured is true)).ToArray());
+                connections.GetValueOrDefault(connection.Alias)?.HasAccessToken is true)).ToArray());
     }
 
     private bool IsAdministrator() =>

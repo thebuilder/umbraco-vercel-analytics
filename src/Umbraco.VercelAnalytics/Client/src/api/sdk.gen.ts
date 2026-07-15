@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BreakdownData, BreakdownErrors, BreakdownResponses, ConnectionsData, ConnectionsErrors, ConnectionsResponses, DocumentRoutesData, DocumentRoutesErrors, DocumentRoutesResponses, SummaryData, SummaryErrors, SummaryResponses } from './types.gen';
+import type { BreakdownData, BreakdownErrors, BreakdownResponses, ConnectionsData, ConnectionsErrors, ConnectionsResponses, DocumentRoutesData, DocumentRoutesErrors, DocumentRoutesResponses, SaveSettingsData, SaveSettingsErrors, SaveSettingsResponses, SettingsData, SettingsErrors, SettingsResponses, SummaryData, SummaryErrors, SummaryResponses, TestConnectionData, TestConnectionErrors, TestConnectionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -67,6 +67,49 @@ export class UmbracoVercelAnalyticsService {
                 }
             ],
             url: '/umbraco/management/api/v1/vercel-analytics/reports/summary',
+            ...options
+        });
+    }
+    
+    public static settings<ThrowOnError extends boolean = false>(options?: Options<SettingsData, ThrowOnError>) {
+        return (options?.client ?? client).get<SettingsResponses, SettingsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/management/api/v1/vercel-analytics/settings',
+            ...options
+        });
+    }
+    
+    public static saveSettings<ThrowOnError extends boolean = false>(options?: Options<SaveSettingsData, ThrowOnError>) {
+        return (options?.client ?? client).put<SaveSettingsResponses, SaveSettingsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/management/api/v1/vercel-analytics/settings',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static testConnection<ThrowOnError extends boolean = false>(options: Options<TestConnectionData, ThrowOnError>) {
+        return (options.client ?? client).post<TestConnectionResponses, TestConnectionErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{alias}/test',
             ...options
         });
     }

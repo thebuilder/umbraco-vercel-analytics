@@ -10,7 +10,42 @@
 
 ## Install and configure
 
-Install the NuGet package and add server-side configuration. Keep `AccessToken` in an environment variable, user-secrets, or deployment secret store rather than a committed settings file.
+Install the NuGet package, start Umbraco, and open **Settings → Vercel Analytics** as an administrator. The dashboard stores the non-secret settings in Umbraco:
+
+- Connection alias and display name
+- Vercel project ID and optional team ID or team slug
+- Optional published hostnames and document roots
+- Either all document types or an exact selection from Umbraco's document-type picker
+- Default connection, date range, cache duration, and package status
+
+Keep each access token in an environment variable, user-secrets, or deployment secret store. The alias in the variable must match the alias configured in the dashboard:
+
+```sh
+export VercelAnalytics__Connections__main-site__AccessToken="your_token"
+```
+
+Restart the application after adding or changing a token. The Settings dashboard shows whether a token was found and provides a **Save and test** action. The token is never stored in Umbraco or returned to the browser.
+
+For a personal Vercel project, leave both team fields empty. For a team project, provide either the team ID or team slug, never both.
+
+### Document analytics and mappings
+
+Hostnames and document roots are independently optional, and both may be empty. A connection without either mapping still works in the global Analytics section; it simply does not add analytics to document workspaces.
+
+When page analytics is required, add one or both mapping types. The nearest mapped document root takes precedence over a hostname mapping. Hostnames are exact matches in version 1.
+
+Document-type enablement has two explicit modes:
+
+- **All document types**, including types added later.
+- **Selected document types**, chosen by key through Umbraco's native picker.
+
+Wildcard aliases such as `*Page` are intentionally not supported because aliases are editable and pattern results would be difficult to preview or audit in the picker UI.
+
+Grant the relevant Umbraco user groups access to the **Analytics** section. Document reports additionally require Content-section access and read permission for the document.
+
+### Full appsettings configuration
+
+Existing installations may continue to configure non-secret values in appsettings. The backoffice dashboard is the recommended setup for new installations.
 
 ```json
 {
@@ -28,22 +63,15 @@ Install the NuGet package and add server-side configuration. Keep `AccessToken` 
         "TeamSlug": null,
         "Hostnames": ["www.example.com", "example.com"],
         "DocumentRootKeys": ["11111111-1111-1111-1111-111111111111"],
-        "EnabledDocumentTypes": ["homePage", "contentPage", "articlePage"]
+        "EnableAllDocumentTypes": false,
+        "EnabledDocumentTypeKeys": ["22222222-2222-2222-2222-222222222222"]
       }
     }
   }
 }
 ```
 
-For a personal Vercel project, omit both `TeamId` and `TeamSlug`. For a team project, provide exactly one. A connection must have at least one exact hostname or document-root key. Document-root mappings take precedence over hostname mappings.
-
-Example environment-variable secret:
-
-```sh
-VercelAnalytics__Connections__main-site__AccessToken=your_token
-```
-
-Grant the relevant Umbraco user groups access to the **Analytics** section. Document reports additionally require Content-section access and read permission for the document.
+Alias-based `EnabledDocumentTypes` remains supported for legacy appsettings configuration, but the Settings dashboard stores stable document-type keys.
 
 ## Development
 

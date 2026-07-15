@@ -88,8 +88,9 @@ public sealed record VercelAnalyticsConnection(
     IReadOnlySet<Guid> EnabledDocumentTypeKeys,
     IReadOnlySet<string> EnabledDocumentTypes)
 {
-    public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(AccessToken) && !string.IsNullOrWhiteSpace(ProjectId);
+    public bool HasAccessToken => !string.IsNullOrWhiteSpace(AccessToken);
+
+    public bool IsConfigured => HasAccessToken && !string.IsNullOrWhiteSpace(ProjectId);
 
     public bool HasMappings => Hostnames.Count > 0 || DocumentRootKeys.Count > 0;
 

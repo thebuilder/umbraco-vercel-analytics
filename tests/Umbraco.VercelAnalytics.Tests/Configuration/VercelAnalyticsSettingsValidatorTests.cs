@@ -66,6 +66,22 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         Assert.DoesNotContain("token", System.Text.Json.JsonSerializer.Serialize(connection), StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Store_uses_first_token_alias_as_initial_default_connection()
+    {
+        var options = new VercelAnalyticsOptions
+        {
+            Enabled = true,
+            Connections = new Dictionary<string, VercelAnalyticsConnectionOptions>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["main"] = new() { AccessToken = "server-secret" }
+            }
+        };
+        var store = new VercelAnalyticsSettingsStore(Options.Create(options));
+
+        Assert.Equal("main", store.Get().DefaultConnection);
+    }
+
     private static VercelAnalyticsSettings CreateSettings() => new()
     {
         Enabled = true,

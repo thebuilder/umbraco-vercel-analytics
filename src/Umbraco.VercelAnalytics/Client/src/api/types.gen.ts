@@ -15,12 +15,30 @@ export type AnalyticsBreakdownRow = {
     visitors: number;
 };
 
+export type AnalyticsConnectionSettingsResponse = {
+    alias: string;
+    displayName: string;
+    projectId: string;
+    teamId?: string | null;
+    teamSlug?: string | null;
+    hostnames: Array<string>;
+    documentRootKeys: Array<string>;
+    enableAllDocumentTypes: boolean;
+    enabledDocumentTypeKeys: Array<string>;
+    hasAccessToken: boolean;
+};
+
 export type AnalyticsConnectionSummary = {
     alias: string;
     displayName: string;
     isDefault: boolean;
     isConfigured: boolean;
     warnings: Array<string>;
+};
+
+export type AnalyticsConnectionTestResult = {
+    success: boolean;
+    message: string;
 };
 
 export type AnalyticsConnectionsResponse = {
@@ -50,6 +68,14 @@ export type AnalyticsPoint = {
     visitors: number;
 };
 
+export type AnalyticsSettingsResponse = {
+    enabled: boolean;
+    defaultConnection?: string | null;
+    defaultRangeDays: number;
+    cacheDuration: string;
+    connections: Array<AnalyticsConnectionSettingsResponse>;
+};
+
 export type AnalyticsSummary = {
     totals: AnalyticsTotals;
     points: Array<AnalyticsPoint>;
@@ -58,6 +84,34 @@ export type AnalyticsSummary = {
 export type AnalyticsTotals = {
     pageViews: number;
     visitors: number;
+};
+
+export type EventMessageTypeModel = 'Default' | 'Info' | 'Error' | 'Success' | 'Warning';
+
+export type NotificationHeaderModel = {
+    message: string;
+    category: string;
+    type: EventMessageTypeModel;
+};
+
+export type UpdateAnalyticsConnectionRequest = {
+    alias: string;
+    displayName: string;
+    projectId: string;
+    teamId?: string | null;
+    teamSlug?: string | null;
+    hostnames: Array<string>;
+    documentRootKeys: Array<string>;
+    enableAllDocumentTypes: boolean;
+    enabledDocumentTypeKeys: Array<string>;
+};
+
+export type UpdateAnalyticsSettingsRequest = {
+    enabled: boolean;
+    defaultConnection?: string | null;
+    defaultRangeDays: number;
+    cacheDuration: string;
+    connections: Array<UpdateAnalyticsConnectionRequest>;
 };
 
 export type ConnectionsData = {
@@ -178,3 +232,78 @@ export type SummaryResponses = {
 };
 
 export type SummaryResponse = SummaryResponses[keyof SummaryResponses];
+
+export type SettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/management/api/v1/vercel-analytics/settings';
+};
+
+export type SettingsErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type SettingsResponses = {
+    /**
+     * OK
+     */
+    200: AnalyticsSettingsResponse;
+};
+
+export type SettingsResponse = SettingsResponses[keyof SettingsResponses];
+
+export type SaveSettingsData = {
+    body?: UpdateAnalyticsSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/umbraco/management/api/v1/vercel-analytics/settings';
+};
+
+export type SaveSettingsErrors = {
+    /**
+     * Bad Request
+     */
+    400: unknown;
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type SaveSettingsResponses = {
+    /**
+     * OK
+     */
+    200: AnalyticsSettingsResponse;
+};
+
+export type SaveSettingsResponse = SaveSettingsResponses[keyof SaveSettingsResponses];
+
+export type TestConnectionData = {
+    body?: never;
+    path: {
+        alias: string;
+    };
+    query?: never;
+    url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{alias}/test';
+};
+
+export type TestConnectionErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type TestConnectionResponses = {
+    /**
+     * OK
+     */
+    200: AnalyticsConnectionTestResult;
+};
+
+export type TestConnectionResponse = TestConnectionResponses[keyof TestConnectionResponses];

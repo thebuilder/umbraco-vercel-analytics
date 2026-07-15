@@ -12,11 +12,6 @@ public sealed class VercelAnalyticsOptionsValidator : IValidateOptions<VercelAna
         }
 
         var failures = new List<string>();
-        if (options.Connections.Count == 0)
-        {
-            failures.Add("At least one Vercel Analytics connection is required when the package is enabled.");
-        }
-
         if (options.DefaultRangeDays is < 1 or > 730)
         {
             failures.Add("DefaultRangeDays must be between 1 and 730.");
@@ -35,7 +30,7 @@ public sealed class VercelAnalyticsOptionsValidator : IValidateOptions<VercelAna
             ValidateConnection(alias, connection, failures, hostnames, rootKeys);
         }
 
-        if (string.IsNullOrWhiteSpace(options.DefaultConnection) ||
+        if (!string.IsNullOrWhiteSpace(options.DefaultConnection) &&
             !options.Connections.ContainsKey(options.DefaultConnection))
         {
             failures.Add("DefaultConnection must identify a configured connection.");
@@ -54,9 +49,6 @@ public sealed class VercelAnalyticsOptionsValidator : IValidateOptions<VercelAna
         IDictionary<Guid, string> rootKeys)
     {
         if (string.IsNullOrWhiteSpace(alias)) failures.Add("Connection aliases cannot be empty.");
-        if (string.IsNullOrWhiteSpace(connection.DisplayName)) failures.Add($"Connection '{alias}' requires DisplayName.");
-        if (string.IsNullOrWhiteSpace(connection.AccessToken)) failures.Add($"Connection '{alias}' requires AccessToken.");
-        if (string.IsNullOrWhiteSpace(connection.ProjectId)) failures.Add($"Connection '{alias}' requires ProjectId.");
         if (!string.IsNullOrWhiteSpace(connection.TeamId) && !string.IsNullOrWhiteSpace(connection.TeamSlug))
         {
             failures.Add($"Connection '{alias}' cannot configure both TeamId and TeamSlug.");

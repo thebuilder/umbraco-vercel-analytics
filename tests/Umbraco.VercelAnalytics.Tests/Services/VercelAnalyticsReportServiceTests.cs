@@ -21,8 +21,38 @@ public sealed class VercelAnalyticsReportServiceTests
 
         Assert.NotNull(first);
         Assert.Same(first, second);
-        Assert.Equal(1, client.CountCalls);
+        Assert.Equal(2, client.CountCalls);
         Assert.Equal(1, client.TrendCalls);
+    }
+
+    [Fact]
+    public async Task Summary_compares_with_the_immediately_preceding_range()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        Assert.NotNull(summary);
+        Assert.Contains(client.CountQueries, query =>
+            query.From == new DateOnly(2026, 6, 16) &&
+            query.To == new DateOnly(2026, 6, 30));
+        Assert.NotNull(summary.PreviousTotals);
+    }
+
+    [Fact]
+    public async Task Summary_remains_available_when_the_previous_range_is_unavailable()
+    {
+        var client = new CountingClient { FailPreviousCount = true };
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        Assert.NotNull(summary);
+        Assert.Null(summary.PreviousTotals);
+        Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
     }
 
     [Fact]
@@ -92,11 +122,18 @@ public sealed class VercelAnalyticsReportServiceTests
         public int CountCalls { get; private set; }
         public int TrendCalls { get; private set; }
         public int BreakdownCalls { get; private set; }
+        public bool FailPreviousCount { get; init; }
+        public List<AnalyticsQuery> CountQueries { get; } = [];
 
         public Task<AnalyticsTotals> CountAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             CountCalls++;
+            CountQueries.Add(query);
+            if (FailPreviousCount && query.To < new DateOnly(2026, 7, 1))
+            {
+                throw new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired);
+            }
             return Task.FromResult(new AnalyticsTotals(20, 10));
         }
 

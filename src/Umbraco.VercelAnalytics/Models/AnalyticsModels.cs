@@ -36,7 +36,10 @@ public sealed record AnalyticsTotals(long PageViews, long Visitors);
 
 public sealed record AnalyticsPoint(DateTimeOffset Timestamp, long PageViews, long Visitors);
 
-public sealed record AnalyticsSummary(AnalyticsTotals Totals, IReadOnlyList<AnalyticsPoint> Points);
+public sealed record AnalyticsSummary(
+    AnalyticsTotals Totals,
+    AnalyticsTotals? PreviousTotals,
+    IReadOnlyList<AnalyticsPoint> Points);
 
 public sealed record AnalyticsBreakdownRow(string Value, long PageViews, long Visitors);
 

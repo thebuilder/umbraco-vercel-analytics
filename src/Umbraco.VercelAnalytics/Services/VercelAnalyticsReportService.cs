@@ -20,9 +20,10 @@ public sealed class VercelAnalyticsReportService(
         {
             entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var totals = client.CountAsync(connection, query, cancellationToken);
+            var previousTotals = TryGetPreviousTotalsAsync(connection, query, cancellationToken);
             var trend = client.GetTrendAsync(connection, query, cancellationToken);
-            await Task.WhenAll(totals, trend);
-            return new AnalyticsSummary(await totals, await trend);
+            await Task.WhenAll(totals, previousTotals, trend);
+            return new AnalyticsSummary(await totals, await previousTotals, await trend);
         });
     }
 
@@ -47,4 +48,26 @@ public sealed class VercelAnalyticsReportService(
 
     private static string Normalize(AnalyticsQuery query) =>
         $"{query.Connection.ToLowerInvariant()}:{query.From:yyyyMMdd}:{query.To:yyyyMMdd}:{query.Interval}:{query.RequestPath}";
+
+    private async Task<AnalyticsTotals?> TryGetPreviousTotalsAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        CancellationToken cancellationToken)
+    {
+        var inclusiveDays = query.To.DayNumber - query.From.DayNumber + 1;
+        var previousQuery = query with
+        {
+            From = query.From.AddDays(-inclusiveDays),
+            To = query.From.AddDays(-1)
+        };
+
+        try
+        {
+            return await client.CountAsync(connection, previousQuery, cancellationToken);
+        }
+        catch (VercelAnalyticsApiException)
+        {
+            return null;
+        }
+    }
 }

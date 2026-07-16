@@ -59,8 +59,9 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
 
   static styles = css`
     :host { display: block; overflow-x: auto; }
-    table { border-collapse: collapse; width: 100%; }
+    table { border-collapse: collapse; min-inline-size: 30rem; table-layout: fixed; width: 100%; }
     caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    thead th:nth-child(2), thead th:nth-child(3) { width: 7rem; }
     th, td { border-bottom: 1px solid var(--uui-color-border); padding: var(--uui-size-space-3); text-align: left; }
     td { text-align: right; font-variant-numeric: tabular-nums; }
     tbody th { position: relative; font-weight: 500; min-width: 10rem; }

@@ -33,6 +33,10 @@ export function breakdownMetricValue(row: AnalyticsBreakdownRow, metric: Traffic
   return row[metric];
 }
 
+export function breakdownBarRatio(value: number, maximum: number): number {
+  return maximum > 0 ? Math.min(Math.max(value / maximum, 0), 1) : 0;
+}
+
 export function breakdownPercentage(value: number, total: number): { display: string; precise: string } {
   const percentage = total > 0 ? (value / total) * 100 : 0;
   return {

@@ -3,6 +3,7 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
 import {
   analyticsRowHref,
+  breakdownBarRatio,
   breakdownDisplayValue,
   breakdownMetricValue,
   breakdownPercentage,
@@ -61,9 +62,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
             : breakdownDisplayValue(row.value, this.dimension);
           const metricValue = breakdownMetricValue(row, this.metric);
           const percentage = breakdownPercentage(metricValue, this.total);
-          const barRatio = percentageDimension && this.total > 0
-            ? Math.min(metricValue / this.total, 1)
-            : metricValue / maximum;
+          const barRatio = breakdownBarRatio(metricValue, maximum);
           const tooltipId = `breakdown-value-${index}`;
           return html`
           <tr>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyticsRowHref,
+  breakdownBarRatio,
   breakdownDisplayValue,
   breakdownPercentage,
   isPercentageDimension,
@@ -42,6 +43,12 @@ describe("analytics breakdown rows", () => {
     expect(breakdownPercentage(2, 1_000)).toEqual({ display: "<1%", precise: "0.2%" });
     expect(breakdownDisplayValue("mobile", "DeviceType")).toBe("Mobile");
     expect(breakdownDisplayValue("Mobile Safari", "BrowserName")).toBe("Mobile Safari");
+  });
+
+  it("scales bars relative to the largest contributor", () => {
+    expect(breakdownBarRatio(86, 86)).toBe(1);
+    expect(breakdownBarRatio(7, 86)).toBeCloseTo(0.0814, 4);
+    expect(breakdownBarRatio(0, 0)).toBe(0);
   });
 
   it("builds an encoded Google favicon URL for a referrer hostname", () => {

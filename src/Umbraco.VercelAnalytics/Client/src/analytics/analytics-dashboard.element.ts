@@ -17,11 +17,12 @@ import type {
   AnalyticsDocumentRoute,
   AnalyticsSummary,
 } from "../api/types.gen.js";
-import { dateRangeForPreset, normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
+import { dateRangeForPreset, inclusiveRangeDays, normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
 import { reportErrorMessage } from "./report-error.js";
 import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-capability.js";
 import { topBreakdownRows } from "./breakdown-rows.js";
 import { countrySearchValue } from "./country-display.js";
+import { metricComparison } from "./metric-comparison.js";
 import "./history-chart.element.js";
 import "./breakdown-table.element.js";
 import "./breakdown-dialog.element.js";
@@ -385,6 +386,19 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   #renderSummary() {
     if (this._summaryError) return html`<uui-box><umb-empty-state headline="Analytics unavailable"><p>${this._summaryError}</p><uui-button look="secondary" label="Retry analytics summary" @click=${this.#loadReports}>Retry</uui-button></umb-empty-state></uui-box>`;
+    const periodDays = inclusiveRangeDays(this._range);
+    const visitorsComparison = metricComparison(
+      this._summary?.totals.visitors ?? 0,
+      this._summary?.previousTotals?.visitors,
+      "visitors",
+      periodDays,
+    );
+    const pageViewsComparison = metricComparison(
+      this._summary?.totals.pageViews ?? 0,
+      this._summary?.previousTotals?.pageViews,
+      "page views",
+      periodDays,
+    );
     return html`
       <uui-box class="history" aria-busy=${this._summaryLoading ? "true" : "false"}>
         <div class="metric-tabs" role="tablist" aria-label="Traffic metric">
@@ -401,7 +415,10 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             <span class="eyebrow">Visitors</span>
             ${this._summaryLoading
               ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
-              : html`<strong>${this._summary?.totals.visitors.toLocaleString()}</strong>`}
+              : html`<span class="metric-value">
+                  <strong>${this._summary?.totals.visitors.toLocaleString()}</strong>
+                  ${this.#renderComparison(visitorsComparison)}
+                </span>`}
           </button>
           <button
             id="metric-page-views-tab"
@@ -416,7 +433,10 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             <span class="eyebrow">Page views</span>
             ${this._summaryLoading
               ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
-              : html`<strong>${this._summary?.totals.pageViews.toLocaleString()}</strong>`}
+              : html`<span class="metric-value">
+                  <strong>${this._summary?.totals.pageViews.toLocaleString()}</strong>
+                  ${this.#renderComparison(pageViewsComparison)}
+                </span>`}
           </button>
         </div>
         <div
@@ -435,6 +455,16 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
               : html`<umb-empty-state headline="No history"><p>No traffic was recorded in this period.</p></umb-empty-state>`}
         </div>
       </uui-box>
+    `;
+  }
+
+  #renderComparison(comparison: ReturnType<typeof metricComparison>) {
+    if (!comparison) return "";
+    return html`
+      <span class=${`comparison ${comparison.direction}`} title=${comparison.description}>
+        <span aria-hidden="true">${comparison.display}</span>
+        <span class="visually-hidden">${comparison.description}</span>
+      </span>
     `;
   }
 
@@ -512,11 +542,16 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .metric-tab[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); }
     .metric-tab:hover { background: var(--uui-color-surface-alt); }
     .metric-tab:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    .metric-tab strong { display: block; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; margin-top: var(--uui-size-space-3); font-variant-numeric: tabular-nums; }
+    .metric-value { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-3); }
+    .metric-tab strong { font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .comparison { border-radius: var(--uui-border-radius); font-weight: 700; padding: var(--uui-size-space-2) var(--uui-size-space-3); white-space: nowrap; }
+    .comparison.increase { background: color-mix(in srgb, var(--uui-color-positive-standalone) 14%, var(--uui-color-surface)); color: var(--uui-color-positive-standalone); }
+    .comparison.decrease { background: color-mix(in srgb, var(--uui-color-danger-standalone) 14%, var(--uui-color-surface)); color: var(--uui-color-danger-standalone); }
+    .comparison.unchanged { background: var(--uui-color-surface-alt); color: var(--uui-color-text-alt); }
     .metric-skeleton { background: var(--uui-color-surface-alt); block-size: clamp(2.2rem, 4.4vw, 3.85rem); border-radius: var(--uui-border-radius); display: block; inline-size: 58%; margin-top: var(--uui-size-space-3); max-inline-size: 14rem; }
     .eyebrow { color: var(--uui-color-text-alt); font-weight: 700; }
-    .history { margin-bottom: var(--uui-size-layout-1); }
-    .history-panel { padding-top: var(--uui-size-space-5); }
+    .history { --uui-box-default-padding: 0; margin-bottom: var(--uui-size-layout-1); overflow: hidden; }
+    .history-panel { padding: var(--uui-size-space-5); }
     .chart-skeleton { block-size: 18rem; display: grid; margin-bottom: var(--uui-size-space-4); }
     .chart-skeleton span { border-top: 1px solid var(--uui-color-border); }
     .history-button-skeleton { background: var(--uui-color-surface-alt); block-size: 2.5rem; border-radius: var(--uui-border-radius); display: block; inline-size: 8.5rem; }

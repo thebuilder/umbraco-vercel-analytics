@@ -31,6 +31,12 @@ export function intervalForRange(inclusiveDays: number): AnalyticsInterval {
   return "Month";
 }
 
+export function inclusiveRangeDays(range: Pick<AnalyticsDateRange, "from" | "to">): number {
+  const from = Date.parse(`${range.from}T00:00:00Z`);
+  const to = Date.parse(`${range.to}T00:00:00Z`);
+  return Math.floor((to - from) / 86_400_000) + 1;
+}
+
 export function normalizeCustomRange(from: string, to: string): AnalyticsDateRange | undefined {
   const fromDate = new Date(`${from}T00:00:00Z`);
   const toDate = new Date(`${to}T00:00:00Z`);

@@ -79,6 +79,7 @@ export type AnalyticsSettingsResponse = {
 
 export type AnalyticsSummary = {
     totals: AnalyticsTotals;
+    previousTotals?: AnalyticsTotals | null;
     points: Array<AnalyticsPoint>;
 };
 

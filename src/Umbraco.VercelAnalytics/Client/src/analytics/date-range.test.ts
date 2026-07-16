@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateRangeForPreset, formatAnalyticsDate, intervalForRange, normalizeCustomRange } from "./date-range.js";
+import { dateRangeForPreset, formatAnalyticsDate, inclusiveRangeDays, intervalForRange, normalizeCustomRange } from "./date-range.js";
 
 describe("analytics date ranges", () => {
   it("creates an inclusive 30 day range", () => {
@@ -25,6 +25,10 @@ describe("analytics date ranges", () => {
 
   it("rejects inverted custom ranges", () => {
     expect(normalizeCustomRange("2026-07-15", "2026-07-14")).toBeUndefined();
+  });
+
+  it("counts both ends of a reporting range", () => {
+    expect(inclusiveRangeDays({ from: "2026-06-16", to: "2026-07-15" })).toBe(30);
   });
 
   it("formats chart dates compactly like the Vercel dashboard", () => {

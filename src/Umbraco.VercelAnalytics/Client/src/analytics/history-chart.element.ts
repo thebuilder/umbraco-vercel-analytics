@@ -20,6 +20,7 @@ import {
 import type { Plugin } from "chart.js";
 import type { AnalyticsPoint } from "../api/types.gen.js";
 import type { AnalyticsInterval } from "../api/types.gen.js";
+import { formatChartAxisValue } from "./chart-value.js";
 import { formatAnalyticsDate, formatAnalyticsTooltipDate, isAnalyticsPeriodInProgress } from "./date-range.js";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip);
@@ -124,7 +125,19 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
             enabled: true,
           },
         },
-        scales: { y: { beginAtZero: true } },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { autoSkip: true, maxTicksLimit: 7, maxRotation: 0 },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: (value) => formatChartAxisValue(Number(value)),
+              maxTicksLimit: 5,
+            },
+          },
+        },
       },
       plugins: [hoverGuide],
     });

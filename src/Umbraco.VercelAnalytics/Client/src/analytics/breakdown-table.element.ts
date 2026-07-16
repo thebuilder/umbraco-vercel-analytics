@@ -140,6 +140,8 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     tbody th { position: relative; font-weight: 500; min-width: 10rem; }
     .row-value { align-items: center; display: flex; gap: var(--uui-size-space-3); min-inline-size: 0; position: relative; z-index: 1; }
     .row-label { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row-label a { color: inherit; text-decoration: none; }
+    .row-label a:hover, .row-label a:focus-visible { text-decoration: underline; text-underline-offset: 0.12em; }
     .country-flag { border-radius: 2px; flex: 0 0 auto; object-fit: cover; }
     .referrer-favicon { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: contain; }
     .percentage-value { display: inline-block; font-weight: 700; outline: none; position: relative; }

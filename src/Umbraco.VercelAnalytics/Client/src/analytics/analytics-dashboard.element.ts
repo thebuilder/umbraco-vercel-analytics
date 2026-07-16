@@ -668,22 +668,46 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     return filter.value;
   }
 
+  #filterDimensionLabel(dimension: AnalyticsDimension): string {
+    const labels: Record<AnalyticsDimension, string> = {
+      RequestPath: "Page",
+      Route: "Route",
+      ReferrerHostname: "Referrer",
+      Country: "Country",
+      DeviceType: "Device",
+      BrowserName: "Browser",
+      OsName: "Operating system",
+      UtmSource: "UTM source",
+      UtmMedium: "UTM medium",
+      UtmCampaign: "UTM campaign",
+      EventName: "Event",
+    };
+    return labels[dimension];
+  }
+
   #renderFilters() {
     if (!this._filters.length) return "";
     return html`
-      <div class="active-filters" role="group" aria-label="Active analytics filters">
-        ${this._filters.map((filter) => {
-          const value = this.#filterLabel(filter);
-          return html`
-            <button type="button" class="filter-badge" aria-label=${`Remove ${value} filter`} @click=${() => this.#removeFilter(filter.dimension)}>
-              <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
-              <span>${value}</span>
-              <span aria-hidden="true">×</span>
-            </button>
-          `;
-        })}
-        <uui-button look="secondary" compact label="Clear all analytics filters" @click=${this.#clearFilters}>Clear</uui-button>
-      </div>
+      <section class="active-filters" aria-label="Active analytics filters">
+        <div class="filter-heading">
+          <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
+          <strong>Filters</strong>
+        </div>
+        <div class="filter-list" role="group" aria-label="Applied filters">
+          ${this._filters.map((filter) => {
+            const value = this.#filterLabel(filter);
+            const dimension = this.#filterDimensionLabel(filter.dimension);
+            return html`
+              <button type="button" class="filter-badge" aria-label=${`Remove ${dimension} filter ${value}`} @click=${() => this.#removeFilter(filter.dimension)}>
+                <span class="filter-dimension">${dimension}</span>
+                <span class="filter-value">${value}</span>
+                <span class="filter-remove" aria-hidden="true">×</span>
+              </button>
+            `;
+          })}
+        </div>
+        <uui-button class="clear-filters" look="secondary" compact label="Clear all analytics filters" @click=${this.#clearFilters}>Clear all</uui-button>
+      </section>
     `;
   }
 
@@ -882,11 +906,17 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     .warnings { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); }
     .warnings:empty { display: none; }
-    .active-filters { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-layout-1); }
-    .filter-badge { align-items: center; appearance: none; background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); color: var(--uui-color-text); cursor: pointer; display: inline-flex; font: inherit; gap: var(--uui-size-space-2); min-block-size: 2.5rem; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
-    .filter-badge:hover { background: var(--uui-color-surface-alt); border-color: var(--uui-color-interactive); }
+    .active-filters { align-items: center; background: color-mix(in srgb, var(--uui-color-interactive) 3%, var(--uui-color-surface)); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); display: flex; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); min-inline-size: 0; padding: var(--uui-size-space-2); }
+    .filter-heading { align-items: center; color: var(--uui-color-text-alt); display: flex; flex: 0 0 auto; gap: var(--uui-size-space-2); padding-inline: var(--uui-size-space-2); }
+    .filter-heading uui-icon { color: var(--uui-color-interactive); }
+    .filter-list { align-items: center; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: var(--uui-size-space-2); min-inline-size: 0; }
+    .filter-badge { align-items: center; appearance: none; background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); color: var(--uui-color-text); cursor: pointer; display: inline-flex; font: inherit; gap: var(--uui-size-space-2); max-inline-size: min(32rem, 100%); min-block-size: 2rem; min-inline-size: 0; padding: var(--uui-size-space-1) var(--uui-size-space-2); }
+    .filter-badge:hover { background: color-mix(in srgb, var(--uui-color-interactive) 6%, var(--uui-color-surface)); border-color: var(--uui-color-interactive); }
     .filter-badge:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
-    .filter-badge uui-icon { color: var(--uui-color-text-alt); }
+    .filter-dimension { color: var(--uui-color-text-alt); flex: 0 0 auto; font-size: 0.875em; }
+    .filter-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .filter-remove { color: var(--uui-color-text-alt); flex: 0 0 auto; font-size: 1.1em; line-height: 1; }
+    .clear-filters { flex: 0 0 auto; }
     @container (max-width: 62rem) {
       .project-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -910,6 +940,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       .site-context { flex: 1 1 100%; }
       .controls { align-items: stretch; inline-size: 100%; margin-inline-start: 0; }
       .project-select, vercel-analytics-date-range-picker { box-sizing: border-box; flex: 1 1 100%; inline-size: 100%; max-inline-size: none; }
+      .active-filters { align-items: stretch; flex-wrap: wrap; }
+      .filter-heading { flex: 1 1 auto; }
+      .filter-list { flex-basis: 100%; order: 3; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }
   `];

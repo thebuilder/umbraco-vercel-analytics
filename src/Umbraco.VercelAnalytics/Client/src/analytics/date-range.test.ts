@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateRangeForPreset, formatAnalyticsDate, formatAnalyticsTooltipDate, inclusiveRangeDays, intervalForRange, isAnalyticsPeriodInProgress, normalizeCustomRange } from "./date-range.js";
+import { calendarMonthDays, dateRangeForPreset, formatAnalyticsDate, formatAnalyticsRangeLabel, formatAnalyticsTooltipDate, inclusiveRangeDays, intervalForRange, isAnalyticsPeriodInProgress, normalizeCustomRange, shiftCalendarMonth } from "./date-range.js";
 
 describe("analytics date ranges", () => {
   it("creates an inclusive 30 day range", () => {
@@ -29,6 +29,27 @@ describe("analytics date ranges", () => {
 
   it("counts both ends of a reporting range", () => {
     expect(inclusiveRangeDays({ from: "2026-06-16", to: "2026-07-15" })).toBe(30);
+  });
+
+  it("builds a six-week Monday-first calendar month", () => {
+    const days = calendarMonthDays("2026-07-16", new Date("2026-07-16T12:00:00Z"));
+
+    expect(days).toHaveLength(42);
+    expect(days[0]).toMatchObject({ date: "2026-06-29", outsideMonth: true });
+    expect(days[3]).toMatchObject({ date: "2026-07-02", outsideMonth: false });
+    expect(days[17]).toMatchObject({ date: "2026-07-16", today: true });
+    expect(days[41].date).toBe("2026-08-09");
+  });
+
+  it("moves between calendar months without carrying the day", () => {
+    expect(shiftCalendarMonth("2026-01-31", 1)).toBe("2026-02-01");
+    expect(shiftCalendarMonth("2026-01-31", -1)).toBe("2025-12-01");
+  });
+
+  it("formats preset and custom range labels compactly", () => {
+    expect(formatAnalyticsRangeLabel({ from: "2026-06-17", to: "2026-07-16" }, 30, "en-US")).toBe("Last 30 days");
+    expect(formatAnalyticsRangeLabel({ from: "2026-07-09", to: "2026-07-16" }, "custom", "en-US")).toBe("Jul 9 – 16");
+    expect(formatAnalyticsRangeLabel({ from: "2026-06-17", to: "2026-07-16" }, "custom", "en-US")).toBe("Jun 17 – Jul 16");
   });
 
   it("formats chart dates compactly like the Vercel dashboard", () => {

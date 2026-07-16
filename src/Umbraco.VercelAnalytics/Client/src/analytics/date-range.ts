@@ -8,6 +8,13 @@ export type AnalyticsDateRange = {
   interval: AnalyticsInterval;
 };
 
+export type AnalyticsCalendarDay = {
+  date: string;
+  day: number;
+  outsideMonth: boolean;
+  today: boolean;
+};
+
 const toDateOnly = (date: Date): string => date.toISOString().slice(0, 10);
 
 export function dateRangeForPreset(
@@ -46,6 +53,65 @@ export function normalizeCustomRange(from: string, to: string): AnalyticsDateRan
 
   const days = Math.floor((toDate.valueOf() - fromDate.valueOf()) / 86_400_000) + 1;
   return { from, to, interval: intervalForRange(days) };
+}
+
+export function calendarMonthDays(
+  month: string,
+  today = new Date(),
+): AnalyticsCalendarDay[] {
+  const viewDate = new Date(`${month}T00:00:00Z`);
+  if (Number.isNaN(viewDate.valueOf())) return [];
+
+  const firstOfMonth = new Date(Date.UTC(viewDate.getUTCFullYear(), viewDate.getUTCMonth(), 1));
+  const mondayOffset = (firstOfMonth.getUTCDay() + 6) % 7;
+  const firstVisibleDay = new Date(firstOfMonth);
+  firstVisibleDay.setUTCDate(firstVisibleDay.getUTCDate() - mondayOffset);
+  const todayValue = toDateOnly(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())));
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(firstVisibleDay);
+    date.setUTCDate(firstVisibleDay.getUTCDate() + index);
+    const value = toDateOnly(date);
+    return {
+      date: value,
+      day: date.getUTCDate(),
+      outsideMonth: date.getUTCMonth() !== firstOfMonth.getUTCMonth(),
+      today: value === todayValue,
+    };
+  });
+}
+
+export function shiftCalendarMonth(month: string, offset: number): string {
+  const date = new Date(`${month}T00:00:00Z`);
+  if (Number.isNaN(date.valueOf())) return month;
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + offset);
+  return toDateOnly(date);
+}
+
+export function formatAnalyticsRangeLabel(
+  range: Pick<AnalyticsDateRange, "from" | "to">,
+  preset: DatePreset,
+  locale?: string,
+): string {
+  if (preset !== "custom") return `Last ${preset === 365 ? "12 months" : `${preset} days`}`;
+
+  const from = new Date(`${range.from}T00:00:00Z`);
+  const to = new Date(`${range.to}T00:00:00Z`);
+  if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf())) return "Custom range";
+
+  const sameYear = from.getUTCFullYear() === to.getUTCFullYear();
+  const sameMonth = sameYear && from.getUTCMonth() === to.getUTCMonth();
+  const monthDay = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" });
+  const monthDayYear = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+  if (sameMonth) {
+    const month = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(from);
+    return `${month} ${from.getUTCDate()} – ${to.getUTCDate()}`;
+  }
+
+  if (sameYear) return `${monthDay.format(from)} – ${monthDay.format(to)}`;
+  return `${monthDayYear.format(from)} – ${monthDayYear.format(to)}`;
 }
 
 export function formatAnalyticsDate(

@@ -173,22 +173,43 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
-    public async Task Event_trend_parses_count_and_visitors()
+    public async Task Event_properties_are_discovered_from_bare_event_data_group()
     {
         var handler = new RecordingHandler(
-            """{"data":[{"timestamp":"2026-07-01T00:00:00Z","count":10,"visitors":8}]}""");
+            """{"data":[{"eventData":"plan","count":10,"visitors":8},{"eventData":"Others","count":1,"visitors":1}]}""");
         var client = CreateClient(handler);
         var connection = CreateConnection();
 
-        var result = await client.GetEventTrendAsync(
+        var result = await client.GetEventPropertyNamesAsync(
             connection,
             new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             "Signup",
             CancellationToken.None);
 
-        Assert.Equal(new AnalyticsEventPoint(DateTimeOffset.Parse("2026-07-01T00:00:00Z"), 10, 8), Assert.Single(result));
-        Assert.Contains("by=day", handler.Request!.RequestUri!.Query);
+        Assert.Equal("plan", Assert.Single(result));
+        Assert.Contains("by=eventData", handler.Request!.RequestUri!.Query);
         Assert.Contains("eventName eq 'Signup'", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
+    }
+
+    [Fact]
+    public async Task Event_property_values_parse_metrics_and_quote_dynamic_dimension()
+    {
+        var handler = new RecordingHandler(
+            """{"data":[{"eventData":"Enterprise","count":12,"visitors":10}]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        var result = await client.GetEventPropertyValuesAsync(
+            connection,
+            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            "Signup",
+            "signup-source",
+            100,
+            CancellationToken.None);
+
+        Assert.Equal(new AnalyticsEventPropertyValue("Enterprise", 12, 10), Assert.Single(result));
+        Assert.Contains("by=eventData%2F%27signup-source%27", handler.Request!.RequestUri!.Query);
+        Assert.Contains("limit=100", handler.Request.RequestUri.Query);
     }
 
     [Fact]

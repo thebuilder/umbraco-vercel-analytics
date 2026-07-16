@@ -56,12 +56,16 @@ public sealed record AnalyticsEventRow(string EventName, long Count, long Visito
 
 public sealed record AnalyticsEventsReport(IReadOnlyList<AnalyticsEventRow> Rows);
 
-public sealed record AnalyticsEventPoint(DateTimeOffset Timestamp, long Count, long Visitors);
+public sealed record AnalyticsEventPropertyValue(string Value, long Count, long Visitors);
 
-public sealed record AnalyticsEventHistory(
+public sealed record AnalyticsEventProperty(
+    string Name,
+    IReadOnlyList<AnalyticsEventPropertyValue> Values);
+
+public sealed record AnalyticsEventDetails(
     string EventName,
     AnalyticsEventTotals Totals,
-    IReadOnlyList<AnalyticsEventPoint> Points);
+    IReadOnlyList<AnalyticsEventProperty> Properties);
 
 public sealed record AnalyticsConnectionSummary(
     string Alias,

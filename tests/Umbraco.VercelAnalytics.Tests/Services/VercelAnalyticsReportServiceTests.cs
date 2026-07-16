@@ -117,20 +117,22 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
-    public async Task Event_history_combines_totals_and_trend_and_is_cached_by_name()
+    public async Task Event_details_combine_totals_and_property_values_and_are_cached_by_name()
     {
         var client = new CountingClient();
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
 
-        var first = await service.GetEventHistoryAsync(CreateQuery(), "Signup", CancellationToken.None);
-        var second = await service.GetEventHistoryAsync(CreateQuery(), "Signup", CancellationToken.None);
+        var first = await service.GetEventDetailsAsync(CreateQuery(), "Signup", CancellationToken.None);
+        var second = await service.GetEventDetailsAsync(CreateQuery(), "Signup", CancellationToken.None);
 
         Assert.NotNull(first);
         Assert.Same(first, second);
         Assert.Equal(new AnalyticsEventTotals(30, 12), first.Totals);
+        Assert.Equal("plan", Assert.Single(first.Properties).Name);
         Assert.Equal(1, client.EventCountCalls);
-        Assert.Equal(1, client.EventTrendCalls);
+        Assert.Equal(1, client.EventPropertyNameCalls);
+        Assert.Equal(1, client.EventPropertyValueCalls);
     }
 
     [Fact]
@@ -176,7 +178,8 @@ public sealed class VercelAnalyticsReportServiceTests
         public int BreakdownCalls { get; private set; }
         public int EventCalls { get; private set; }
         public int EventCountCalls { get; private set; }
-        public int EventTrendCalls { get; private set; }
+        public int EventPropertyNameCalls { get; private set; }
+        public int EventPropertyValueCalls { get; private set; }
         public bool FailPreviousCount { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
 
@@ -220,11 +223,18 @@ public sealed class VercelAnalyticsReportServiceTests
             return Task.FromResult<IReadOnlyList<AnalyticsEventRow>>([]);
         }
 
-        public Task<IReadOnlyList<AnalyticsEventPoint>> GetEventTrendAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EventTrendCalls++;
-            return Task.FromResult<IReadOnlyList<AnalyticsEventPoint>>([]);
+            EventPropertyNameCalls++;
+            return Task.FromResult<IReadOnlyList<string>>(["plan"]);
+        }
+
+        public Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, string propertyName, int limit, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EventPropertyValueCalls++;
+            return Task.FromResult<IReadOnlyList<AnalyticsEventPropertyValue>>([new("Pro", 20, 10)]);
         }
     }
 }

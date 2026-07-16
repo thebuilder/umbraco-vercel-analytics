@@ -36,9 +36,17 @@ public interface IVercelAnalyticsClient
         string? search,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<AnalyticsEventPoint>> GetEventTrendAsync(
+    Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        string propertyName,
+        int limit,
         CancellationToken cancellationToken);
 }

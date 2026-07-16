@@ -64,7 +64,7 @@ public sealed class VercelAnalyticsReportService(
         });
     }
 
-    public async Task<AnalyticsEventHistory?> GetEventHistoryAsync(
+    public async Task<AnalyticsEventDetails?> GetEventDetailsAsync(
         AnalyticsQuery query,
         string eventName,
         CancellationToken cancellationToken)
@@ -72,14 +72,19 @@ public sealed class VercelAnalyticsReportService(
         var connection = registry.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedEventName = eventName.Trim();
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-history:{normalizedEventName}:{Normalize(query)}";
+        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-details:{normalizedEventName}:{Normalize(query)}";
         return await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var totals = client.CountEventsAsync(connection, query, normalizedEventName, cancellationToken);
-            var points = client.GetEventTrendAsync(connection, query, normalizedEventName, cancellationToken);
-            await Task.WhenAll(totals, points);
-            return new AnalyticsEventHistory(normalizedEventName, await totals, await points);
+            var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, cancellationToken);
+            await Task.WhenAll(totals, propertyNamesTask);
+            var propertyNames = await propertyNamesTask;
+            var propertyTasks = propertyNames.Select(async propertyName => new AnalyticsEventProperty(
+                propertyName,
+                await client.GetEventPropertyValuesAsync(connection, query, normalizedEventName, propertyName, 100, cancellationToken)));
+            var properties = await Task.WhenAll(propertyTasks);
+            return new AnalyticsEventDetails(normalizedEventName, await totals, properties);
         });
     }
 

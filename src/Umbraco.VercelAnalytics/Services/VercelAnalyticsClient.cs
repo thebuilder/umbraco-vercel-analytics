@@ -10,6 +10,7 @@ namespace Umbraco.VercelAnalytics.Services;
 
 public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyticsClient
 {
+    private const int EventPropertyLimit = 20;
     private const string CountPath = "v1/query/web-analytics/visits/count";
     private const string AggregatePath = "v1/query/web-analytics/visits/aggregate";
     private const string EventCountPath = "v1/query/web-analytics/events/count";
@@ -103,19 +104,44 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
             ?? throw new JsonException("Vercel Analytics event response did not contain data.");
     }
 
-    public async Task<IReadOnlyList<AnalyticsEventPoint>> GetEventTrendAsync(
+    public async Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         CancellationToken cancellationToken)
     {
         var parameters = BuildParameters(connection, query);
-        parameters["by"] = ToApiValue(query.Interval);
+        parameters["by"] = "eventData";
+        parameters["limit"] = EventPropertyLimit.ToString(CultureInfo.InvariantCulture);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
         using var response = await SendAsync(connection, EventAggregatePath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
-        return envelope?.Data.Select(ParseEventPoint).ToArray()
-            ?? throw new JsonException("Vercel Analytics event history response did not contain data.");
+        return envelope?.Data
+            .Select(item => item.TryGetProperty("eventData", out var property) ? property.ToString() : string.Empty)
+            .Where(property => !string.IsNullOrWhiteSpace(property) && property is not "Others" and not "Unknown")
+            .ToArray()
+            ?? throw new JsonException("Vercel Analytics event property response did not contain data.");
+    }
+
+    public async Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        string propertyName,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var parameters = BuildParameters(connection, query);
+        parameters["by"] = ToEventDataDimension(propertyName);
+        parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
+        AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
+        using var response = await SendAsync(connection, EventAggregatePath, parameters, cancellationToken);
+        var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
+        return envelope?.Data
+            .Select(ParseEventPropertyValue)
+            .Where(value => value.Value is not "Others" and not "Unknown")
+            .ToArray()
+            ?? throw new JsonException("Vercel Analytics event property values response did not contain data.");
     }
 
     private async Task<HttpResponseMessage> SendAsync(
@@ -165,6 +191,11 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
 
     internal static string EscapeODataString(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 
+    internal static string ToEventDataDimension(string propertyName) =>
+        propertyName.All(character => char.IsAsciiLetterOrDigit(character) || character == '_')
+            ? $"eventData/{propertyName}"
+            : $"eventData/'{EscapeODataString(propertyName)}'";
+
     private static void AddFilter(IDictionary<string, string?> parameters, string filter) =>
         parameters["filter"] = parameters.TryGetValue("filter", out var existingFilter)
             ? $"{existingFilter} and {filter}"
@@ -208,8 +239,8 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         GetInt64(element, "count"),
         GetInt64(element, "visitors"));
 
-    private static AnalyticsEventPoint ParseEventPoint(JsonElement element) => new(
-        element.GetProperty("timestamp").GetDateTimeOffset(),
+    private static AnalyticsEventPropertyValue ParseEventPropertyValue(JsonElement element) => new(
+        element.TryGetProperty("eventData", out var value) ? value.ToString() : "Unknown",
         GetInt64(element, "count"),
         GetInt64(element, "visitors"));
 

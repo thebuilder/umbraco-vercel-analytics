@@ -142,9 +142,9 @@ public sealed class UmbracoVercelAnalyticsApiController(
         }
     }
 
-    [HttpGet("reports/events/history")]
-    [ProducesResponseType<AnalyticsEventHistory>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<AnalyticsEventHistory>> EventHistory(
+    [HttpGet("reports/events/details")]
+    [ProducesResponseType<AnalyticsEventDetails>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AnalyticsEventDetails>> EventDetails(
         [FromQuery] string connection,
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
@@ -165,7 +165,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
         if (scope.Error is not null) return scope.Error;
         try
         {
-            var report = await reportService.GetEventHistoryAsync(scope.Query!, eventName, cancellationToken);
+            var report = await reportService.GetEventDetailsAsync(scope.Query!, eventName, cancellationToken);
             return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
         }
         catch (VercelAnalyticsApiException exception)

@@ -10,11 +10,17 @@ export function topBreakdownRows(rows: AnalyticsBreakdownRow[], limit = 10): Ana
   return withoutAggregatedOthers(rows).slice(0, limit);
 }
 
-export function filterBreakdownRows(rows: AnalyticsBreakdownRow[], search: string): AnalyticsBreakdownRow[] {
+export function filterBreakdownRows(
+  rows: AnalyticsBreakdownRow[],
+  search: string,
+  displayValue: (value: string) => string = (value) => value,
+): AnalyticsBreakdownRow[] {
   const query = search.trim().toLocaleLowerCase();
   const visibleRows = withoutAggregatedOthers(rows);
   return query
-    ? visibleRows.filter((row) => row.value.toLocaleLowerCase().includes(query))
+    ? visibleRows.filter((row) =>
+      row.value.toLocaleLowerCase().includes(query)
+      || displayValue(row.value).toLocaleLowerCase().includes(query))
     : visibleRows;
 }
 

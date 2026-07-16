@@ -1,13 +1,15 @@
 import { LitElement, css, customElement, html, property } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
-import type { AnalyticsBreakdownRow } from "../api/types.gen.js";
+import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
 import { analyticsRowHref, withoutAggregatedOthers } from "./breakdown-rows.js";
+import { countryDisplayName, countryFlagUrl, normalizeCountryCode } from "./country-display.js";
 
 @customElement("vercel-analytics-breakdown-table")
 export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitElement) {
   @property() headline = "Breakdown";
   @property() unavailable?: string;
   @property() baseUrl?: string;
+  @property() dimension?: AnalyticsDimension;
   @property({ type: Boolean }) loading = false;
   @property({ type: Boolean }) linkValues = false;
   @property({ type: Number }) skeletonRows = 10;
@@ -41,13 +43,18 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
         <thead><tr><th scope="col">Value</th><th scope="col">Visitors</th><th scope="col">Page views</th></tr></thead>
         <tbody>${rows.map((row) => {
           const href = this.linkValues ? analyticsRowHref(this.baseUrl, row.value) : undefined;
+          const countryCode = this.dimension === "Country" ? normalizeCountryCode(row.value) : undefined;
+          const displayValue = countryCode ? countryDisplayName(countryCode, navigator.languages) : row.value || "Unknown";
           return html`
           <tr>
             <th scope="row">
               <span class="bar" style=${`--bar-width:${(row.visitors / maximum) * 100}%`}></span>
-              <span>${href
-                ? html`<a href=${href} target="_blank" rel="noopener noreferrer">${row.value || "Unknown"}<span class="visually-hidden"> (opens in a new tab)</span></a>`
-                : row.value || "Unknown"}</span>
+              <span class="row-value">
+                ${countryCode ? html`<img class="country-flag" src=${countryFlagUrl(countryCode)} alt="" width="20" height="15" loading="lazy" referrerpolicy="no-referrer" @error=${(event: Event) => ((event.currentTarget as HTMLImageElement).style.visibility = "hidden")}>` : ""}
+                <span class="row-label" title=${displayValue}>${href
+                  ? html`<a href=${href} target="_blank" rel="noopener noreferrer">${displayValue}<span class="visually-hidden"> (opens in a new tab)</span></a>`
+                  : displayValue}</span>
+              </span>
             </th>
             <td>${row.visitors.toLocaleString()}</td>
             <td>${row.pageViews.toLocaleString()}</td>
@@ -61,11 +68,13 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     :host { display: block; overflow-x: auto; }
     table { border-collapse: collapse; min-inline-size: 30rem; table-layout: fixed; width: 100%; }
     caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-    thead th:nth-child(2), thead th:nth-child(3) { width: 7rem; }
+    thead th:nth-child(2), thead th:nth-child(3) { text-align: right; width: 7rem; }
     th, td { border-bottom: 1px solid var(--uui-color-border); padding: var(--uui-size-space-3); text-align: left; }
     td { text-align: right; font-variant-numeric: tabular-nums; }
     tbody th { position: relative; font-weight: 500; min-width: 10rem; }
-    tbody th span:last-child { position: relative; }
+    .row-value { align-items: center; display: flex; gap: var(--uui-size-space-3); min-inline-size: 0; position: relative; }
+    .row-label { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .country-flag { border-radius: 2px; flex: 0 0 auto; object-fit: cover; }
     a { color: var(--uui-color-interactive-emphasis); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
     a:hover { text-decoration-thickness: 2px; }
     a:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }

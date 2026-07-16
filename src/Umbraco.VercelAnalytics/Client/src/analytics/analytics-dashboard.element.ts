@@ -376,6 +376,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         ` : ""}
         <vercel-analytics-breakdown-table
           .headline=${headline}
+          .dimension=${dimension}
           .rows=${rows}
           .loading=${loading}
           .baseUrl=${this.#linkBaseUrl()}
@@ -401,6 +402,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         ${this._expanded ? html`
           <vercel-analytics-breakdown-dialog
             .headline=${this._expanded.headline}
+            .dimension=${this._expanded.dimension}
             .rows=${this._expanded.rows}
             .loading=${this._expanded.loading}
             .unavailable=${this._expanded.error}

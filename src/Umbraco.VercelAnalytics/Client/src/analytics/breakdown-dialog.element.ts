@@ -9,8 +9,9 @@ import {
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
-import type { AnalyticsBreakdownRow } from "../api/types.gen.js";
+import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
 import { filterBreakdownRows } from "./breakdown-rows.js";
+import { countryDisplayName } from "./country-display.js";
 import "./breakdown-table.element.js";
 
 @customElement("vercel-analytics-breakdown-dialog")
@@ -19,6 +20,7 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
   @property() loading = false;
   @property() unavailable?: string;
   @property() baseUrl?: string;
+  @property() dimension?: AnalyticsDimension;
   @property({ type: Boolean }) linkValues = false;
   @property({ attribute: false }) rows: AnalyticsBreakdownRow[] = [];
   @state() private _search = "";
@@ -41,7 +43,10 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
   }
 
   render() {
-    const rows = filterBreakdownRows(this.rows, this._search);
+    const displayValue = this.dimension === "Country"
+      ? (value: string) => countryDisplayName(value, navigator.languages)
+      : undefined;
+    const rows = filterBreakdownRows(this.rows, this._search, displayValue);
     return html`
       <dialog aria-label=${this.headline} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
         <uui-dialog-layout headline=${this.headline}>
@@ -61,6 +66,7 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
             ${(this.loading || (!this.unavailable && (!this._search || rows.length > 0))) ? html`
               <vercel-analytics-breakdown-table
                 .headline=${this.headline}
+                .dimension=${this.dimension}
                 .rows=${rows}
                 .loading=${this.loading}
                 .baseUrl=${this.baseUrl}

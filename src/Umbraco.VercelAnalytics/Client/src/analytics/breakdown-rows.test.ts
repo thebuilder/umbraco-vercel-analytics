@@ -20,6 +20,11 @@ describe("analytics breakdown rows", () => {
     expect(filterBreakdownRows(rows, "ABOUT").map((row) => row.value)).toEqual(["/about"]);
   });
 
+  it("can filter expanded results by their formatted display value", () => {
+    expect(filterBreakdownRows(rows, "news page", (value) => value === "/news" ? "News page" : value))
+      .toEqual([rows[0]]);
+  });
+
   it("only creates links for rooted paths on an HTTP origin", () => {
     expect(analyticsRowHref("https://example.com/start", "/news")).toBe("https://example.com/news");
     expect(analyticsRowHref("javascript:alert(1)", "/news")).toBeUndefined();

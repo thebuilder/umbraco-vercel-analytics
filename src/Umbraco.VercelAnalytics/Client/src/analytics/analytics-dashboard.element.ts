@@ -699,7 +699,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             const dimension = this.#filterDimensionLabel(filter.dimension);
             return html`
               <button type="button" class="filter-badge" aria-label=${`Remove ${dimension} filter ${value}`} @click=${() => this.#removeFilter(filter.dimension)}>
-                <span class="filter-dimension">${dimension}</span>
                 <span class="filter-value">${value}</span>
                 <span class="filter-remove" aria-hidden="true">×</span>
               </button>
@@ -913,7 +912,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .filter-badge { align-items: center; appearance: none; background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); color: var(--uui-color-text); cursor: pointer; display: inline-flex; font: inherit; gap: var(--uui-size-space-2); max-inline-size: min(32rem, 100%); min-block-size: 2rem; min-inline-size: 0; padding: var(--uui-size-space-1) var(--uui-size-space-2); }
     .filter-badge:hover { background: color-mix(in srgb, var(--uui-color-interactive) 6%, var(--uui-color-surface)); border-color: var(--uui-color-interactive); }
     .filter-badge:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
-    .filter-dimension { color: var(--uui-color-text-alt); flex: 0 0 auto; font-size: 0.875em; }
     .filter-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .filter-remove { color: var(--uui-color-text-alt); flex: 0 0 auto; font-size: 1.1em; line-height: 1; }
     .clear-filters { flex: 0 0 auto; }

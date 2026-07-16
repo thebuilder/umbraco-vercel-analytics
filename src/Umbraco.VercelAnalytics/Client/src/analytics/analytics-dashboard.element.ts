@@ -553,9 +553,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .metric-tab[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); }
     .metric-tab:hover { background: var(--uui-color-surface-alt); }
     .metric-tab:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    .metric-value { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-3); }
-    .metric-tab strong { font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; font-variant-numeric: tabular-nums; }
-    .comparison { border-radius: var(--uui-border-radius); font-weight: 700; padding: var(--uui-size-space-2) var(--uui-size-space-3); white-space: nowrap; }
+    .metric-value { align-items: center; display: flex; flex-wrap: nowrap; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-3); }
+    .metric-tab strong { font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .comparison { border-radius: var(--uui-border-radius); flex: 0 0 auto; font-weight: 700; padding: var(--uui-size-space-2) var(--uui-size-space-3); white-space: nowrap; }
     .comparison.increase { background: color-mix(in srgb, var(--uui-color-positive-standalone) 14%, var(--uui-color-surface)); color: var(--uui-color-positive-standalone); }
     .comparison.decrease { background: color-mix(in srgb, var(--uui-color-danger-standalone) 14%, var(--uui-color-surface)); color: var(--uui-color-danger-standalone); }
     .comparison.unchanged { background: var(--uui-color-surface-alt); color: var(--uui-color-text-alt); }
@@ -588,6 +588,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     @container (max-width: 40rem) {
       .report-controls, .date-actions { align-items: stretch; flex-direction: column; }
       .report-controls > *, .date-actions > *, .date-control uui-input { box-sizing: border-box; inline-size: 100%; max-inline-size: none; }
+      .metric-tabs { flex-direction: column; }
+      .metric-tab { box-sizing: border-box; flex: 0 0 auto; inline-size: 100%; }
+      .metric-tab + .metric-tab { border-inline-start: 0; border-top: 1px solid var(--uui-color-border); }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }
   `];

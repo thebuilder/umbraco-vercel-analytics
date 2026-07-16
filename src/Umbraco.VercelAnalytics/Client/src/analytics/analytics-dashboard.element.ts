@@ -23,6 +23,7 @@ import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-c
 import { topBreakdownRows } from "./breakdown-rows.js";
 import { countrySearchValue } from "./country-display.js";
 import { metricComparison } from "./metric-comparison.js";
+import { activeDocumentRoute } from "./document-route.js";
 import "./history-chart.element.js";
 import "./breakdown-table.element.js";
 import "./breakdown-dialog.element.js";
@@ -56,7 +57,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   @state() private _connections: AnalyticsConnectionSummary[] = [];
   @state() private _connection?: string;
-  @state() private _routes: AnalyticsDocumentRoute[] = [];
   @state() private _route?: AnalyticsDocumentRoute;
   @state() private _range: AnalyticsDateRange = dateRangeForPreset(30);
   @state() private _preset: DatePreset = 30;
@@ -113,9 +113,14 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         this._summaryLoading = false;
         return;
       }
-      this._routes = data;
-      this._route = data.find((route) => route.isCurrent) ?? data[0];
-      this._connection = this._route.connection;
+      const route = activeDocumentRoute(data, this.culture);
+      if (!route) {
+        this._configurationError = "The active culture does not have a published route configured for analytics.";
+        this._summaryLoading = false;
+        return;
+      }
+      this._route = route;
+      this._connection = route.connection;
     } else {
       const { data, error } = await UmbracoVercelAnalyticsService.connections();
       if (request !== this.#initializationRequest) return;
@@ -289,13 +294,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     void this.#loadReports();
   }
 
-  #onRouteChange(event: Event): void {
-    const path = (event.target as UUISelectElement).value as string;
-    this._route = this._routes.find((route) => `${route.culture}|${route.hostname}|${route.path}` === path);
-    this._connection = this._route?.connection;
-    void this.#loadReports();
-  }
-
   #onPresetChange(event: Event): void {
     const value = (event.target as UUISelectElement).value as string;
     this._preset = value === "custom" ? "custom" : Number(value) as Exclude<DatePreset, "custom">;
@@ -333,16 +331,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     return html`
       <header>
         <div class="controls">
-          ${this.documentId ? html`
-            <uui-select
-              class="route-select"
-              label="Published route"
-              .options=${this.#selectOptions(this._routes.map((route) => ({
-                value: `${route.culture}|${route.hostname}|${route.path}`,
-                name: route.culture ? `${route.culture} · ${route.hostname}${route.path}` : `${route.hostname}${route.path}`,
-              })), this._route ? `${this._route.culture}|${this._route.hostname}|${this._route.path}` : undefined)}
-              @change=${this.#onRouteChange}></uui-select>
-          ` : html`
+          ${this.documentId ? "" : html`
             <uui-select
               class="project-select"
               label="Vercel project"
@@ -546,7 +535,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .date-control uui-input { min-inline-size: 11rem; }
     .project-select { min-inline-size: 10rem; }
     .range-select { min-inline-size: 12rem; }
-    .route-select { max-inline-size: 28rem; min-inline-size: 18rem; }
     .metric-tabs { border-bottom: 1px solid var(--uui-color-border); display: flex; }
     .metric-tab { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text); cursor: pointer; flex: 0 1 20rem; font: inherit; min-inline-size: 12rem; padding: var(--uui-size-space-5); text-align: left; }
     .metric-tab + .metric-tab { border-inline-start: 1px solid var(--uui-color-border); }
@@ -578,7 +566,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .warnings:empty { display: none; }
     @container (max-width: 62rem) {
       .controls { align-items: stretch; flex-direction: column; gap: var(--uui-size-space-4); }
-      .project-select, .route-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }
+      .project-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }
     }
     @container (max-width: 48rem) {
       .grid { grid-template-columns: 1fr; }

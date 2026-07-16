@@ -15,6 +15,9 @@ import type {
   AnalyticsConnectionSummary,
   AnalyticsDimension,
   AnalyticsDocumentRoute,
+  AnalyticsEventHistory,
+  AnalyticsEventRow,
+  AnalyticsEventsReport,
   AnalyticsSummary,
 } from "../api/types.gen.js";
 import { dateRangeForPreset, inclusiveRangeDays, normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
@@ -24,11 +27,16 @@ import { topBreakdownRows, type TrafficMetric } from "./breakdown-rows.js";
 import { countrySearchValue } from "./country-display.js";
 import { metricComparison } from "./metric-comparison.js";
 import { activeDocumentRoute } from "./document-route.js";
+import { topEventRows, visibleEventRows } from "./event-rows.js";
 import "./history-chart.element.js";
 import "./breakdown-table.element.js";
 import "./breakdown-dialog.element.js";
+import "./event-table.element.js";
+import "./event-dialog.element.js";
+import "./event-history-dialog.element.js";
 
 type BreakdownState = { data?: AnalyticsBreakdown; error?: string; loading: boolean };
+type EventState = { data?: AnalyticsEventsReport; loading: boolean };
 type ReportScope = { documentId?: string; culture?: string; path?: string };
 type ExpandedBreakdown = {
   dimension: AnalyticsDimension;
@@ -37,6 +45,8 @@ type ExpandedBreakdown = {
   loading: boolean;
   error?: string;
 };
+type ExpandedEvents = { rows: AnalyticsEventRow[]; loading: boolean; error?: string };
+type SelectedEvent = { eventName: string; history?: AnalyticsEventHistory; loading: boolean; error?: string };
 
 const BREAKDOWNS: ReadonlyArray<{ dimension: AnalyticsDimension; headline: string; wide?: boolean; planLimited?: boolean }> = [
   { dimension: "RequestPath", headline: "Pages and routes", wide: true },
@@ -69,11 +79,17 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   @state() private _configurationError?: string;
   @state() private _utmCapability: UtmCapability = "unknown";
   @state() private _expanded?: ExpandedBreakdown;
+  @state() private _events: EventState = { loading: true };
+  @state() private _expandedEvents?: ExpandedEvents;
+  @state() private _selectedEvent?: SelectedEvent;
   #initializationRequest = 0;
   #reportRequest = 0;
   #expandedRequest = 0;
   #expandedAbort?: AbortController;
   #expandedSearchTimer?: number;
+  #eventAbort?: AbortController;
+  #eventSearchTimer?: number;
+  #eventRequest = 0;
   #lastScopeKey?: string;
   #utmCapabilityByConnection = new Map<string, UtmCapability>();
 
@@ -84,7 +100,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   override disconnectedCallback(): void {
     this.#expandedAbort?.abort();
+    this.#eventAbort?.abort();
     if (this.#expandedSearchTimer !== undefined) window.clearTimeout(this.#expandedSearchTimer);
+    if (this.#eventSearchTimer !== undefined) window.clearTimeout(this.#eventSearchTimer);
     super.disconnectedCallback();
   }
 
@@ -161,6 +179,8 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   async #loadReports(): Promise<void> {
     if (!this._connection) return;
     this._expanded = undefined;
+    this._expandedEvents = undefined;
+    this._selectedEvent = undefined;
     const request = ++this.#reportRequest;
     this._summaryLoading = true;
     this._summaryError = undefined;
@@ -168,6 +188,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this._utmCapability = this.#utmCapabilityByConnection.get(this._connection) ?? "unknown";
     const requestedBreakdowns = this.#availableBreakdowns().filter(({ planLimited }) => !planLimited || this._utmCapability !== "unavailable");
     this._breakdowns = Object.fromEntries(requestedBreakdowns.map(({ dimension }) => [dimension, { loading: true }])) as typeof this._breakdowns;
+    this._events = { loading: true };
     let baselineSucceeded = false;
     let utmSucceeded = false;
     const utmStatuses: number[] = [];
@@ -202,7 +223,11 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           : { loading: false, data },
       };
     });
-    await Promise.allSettled([summaryPromise, ...breakdownPromises]);
+    const eventsPromise = UmbracoVercelAnalyticsService.events({ query: { ...query, limit: 20 } }).then(({ data, error }) => {
+      if (request !== this.#reportRequest) return;
+      this._events = error ? { loading: false } : { loading: false, data };
+    });
+    await Promise.allSettled([summaryPromise, eventsPromise, ...breakdownPromises]);
     if (request !== this.#reportRequest) return;
     const detectedCapability = detectUtmCapability(baselineSucceeded, utmSucceeded, utmStatuses);
     if (detectedCapability !== "unknown") {
@@ -283,6 +308,63 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this.#expandedAbort?.abort();
     this.#expandedRequest++;
     this._expanded = undefined;
+  }
+
+  async #loadExpandedEvents(search = ""): Promise<void> {
+    if (!this._connection) return;
+    this.#eventAbort?.abort();
+    const abort = new AbortController();
+    this.#eventAbort = abort;
+    const request = ++this.#eventRequest;
+    this._expandedEvents = { rows: [], loading: true };
+    try {
+      const { data, error, response } = await UmbracoVercelAnalyticsService.events({
+        query: { connection: this._connection, ...this._range, ...this.#scope(), limit: 100, search: search || undefined },
+        signal: abort.signal,
+      });
+      if (request !== this.#eventRequest) return;
+      this._expandedEvents = error
+        ? { rows: [], loading: false, error: reportErrorMessage({ status: response.status }) }
+        : { rows: visibleEventRows(data?.rows ?? []), loading: false };
+    } catch (error) {
+      if (!abort.signal.aborted && request === this.#eventRequest) {
+        this._expandedEvents = { rows: [], loading: false, error: reportErrorMessage(error) };
+      }
+    }
+  }
+
+  #searchEvents(event: CustomEvent<{ search: string }>): void {
+    this.#eventAbort?.abort();
+    this.#eventRequest++;
+    this._expandedEvents = { rows: [], loading: true };
+    if (this.#eventSearchTimer !== undefined) window.clearTimeout(this.#eventSearchTimer);
+    this.#eventSearchTimer = window.setTimeout(() => void this.#loadExpandedEvents(event.detail.search), 300);
+  }
+
+  #closeEvents(): void {
+    this.#eventAbort?.abort();
+    this.#eventRequest++;
+    this._expandedEvents = undefined;
+  }
+
+  async #selectEvent(event: CustomEvent<{ eventName: string }>): Promise<void> {
+    if (!this._connection) return;
+    this.#closeEvents();
+    const eventName = event.detail.eventName;
+    const request = ++this.#eventRequest;
+    this._selectedEvent = { eventName, loading: true };
+    const { data, error, response } = await UmbracoVercelAnalyticsService.eventHistory({
+      query: { connection: this._connection, ...this._range, ...this.#scope(), eventName },
+    });
+    if (request !== this.#eventRequest || this._selectedEvent?.eventName !== eventName) return;
+    this._selectedEvent = error
+      ? { eventName, loading: false, error: reportErrorMessage({ status: response.status }) }
+      : { eventName, loading: false, history: data };
+  }
+
+  #closeEventHistory(): void {
+    this.#eventRequest++;
+    this._selectedEvent = undefined;
   }
 
   #selectOptions(items: Array<{ value: string; name: string }>, selected?: string) {
@@ -546,6 +628,21 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     return this.#renderBreakdown(item.dimension, item.headline, item.wide, item.planLimited);
   }
 
+  #renderEvents() {
+    const rows = topEventRows(this._events.data?.rows ?? [], 10);
+    if (!this._events.loading && rows.length === 0) return "";
+    return html`
+      <uui-box class="breakdown-card wide">
+        <div class="breakdown-card-layout">
+          <vercel-analytics-event-table .rows=${rows} .loading=${this._events.loading} @select-event=${this.#selectEvent}></vercel-analytics-event-table>
+          <footer class="breakdown-footer">
+            ${!this._events.loading && rows.length ? html`<uui-button look="secondary" label="View all events" @click=${() => this.#loadExpandedEvents()}>View all</uui-button>` : ""}
+          </footer>
+        </div>
+      </uui-box>
+    `;
+  }
+
   render() {
     if (this._configurationError) return html`<main><umb-empty-state headline="Analytics is not available"><p>${this._configurationError}</p></umb-empty-state></main>`;
     return html`
@@ -553,7 +650,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         ${this.#renderHeader()}
         ${this.#renderSummary()}
         <section class="grid" aria-label="Traffic breakdowns">
-          ${this.#availableBreakdowns().map((item) => this.#renderBreakdownItem(item))}
+          ${this.#availableBreakdowns().filter(({ dimension }) => !isUtmDimension(dimension)).map((item) => this.#renderBreakdownItem(item))}
+          ${this.#renderEvents()}
+          ${this.#availableBreakdowns().filter(({ dimension }) => isUtmDimension(dimension)).map((item) => this.#renderBreakdownItem(item))}
         </section>
         ${this._expanded ? html`
           <vercel-analytics-breakdown-dialog
@@ -568,6 +667,24 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .linkValues=${this._expanded.dimension === "RequestPath" || this._expanded.dimension === "Route"}
             @search-breakdown=${this.#searchBreakdown}
             @close-breakdown=${this.#closeBreakdown}></vercel-analytics-breakdown-dialog>
+        ` : ""}
+        ${this._expandedEvents ? html`
+          <vercel-analytics-event-dialog
+            .rows=${this._expandedEvents.rows}
+            .loading=${this._expandedEvents.loading}
+            .unavailable=${this._expandedEvents.error}
+            @search-events=${this.#searchEvents}
+            @select-event=${this.#selectEvent}
+            @close-events=${this.#closeEvents}></vercel-analytics-event-dialog>
+        ` : ""}
+        ${this._selectedEvent ? html`
+          <vercel-analytics-event-history-dialog
+            .eventName=${this._selectedEvent.eventName}
+            .history=${this._selectedEvent.history}
+            .loading=${this._selectedEvent.loading}
+            .unavailable=${this._selectedEvent.error}
+            .interval=${this._range.interval}
+            @close-event-history=${this.#closeEventHistory}></vercel-analytics-event-history-dialog>
         ` : ""}
       </main>
     `;

@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BreakdownData, BreakdownErrors, BreakdownResponses, ConnectionsData, ConnectionsErrors, ConnectionsResponses, DocumentRoutesData, DocumentRoutesErrors, DocumentRoutesResponses, SaveSettingsData, SaveSettingsErrors, SaveSettingsResponses, SettingsData, SettingsErrors, SettingsResponses, SummaryData, SummaryErrors, SummaryResponses, TestConnectionData, TestConnectionErrors, TestConnectionResponses } from './types.gen';
+import type { BreakdownData, BreakdownErrors, BreakdownResponses, ConnectionsData, ConnectionsErrors, ConnectionsResponses, DocumentRoutesData, DocumentRoutesErrors, DocumentRoutesResponses, EventHistoryData, EventHistoryErrors, EventHistoryResponses, EventsData, EventsErrors, EventsResponses, SaveSettingsData, SaveSettingsErrors, SaveSettingsResponses, SettingsData, SettingsErrors, SettingsResponses, SummaryData, SummaryErrors, SummaryResponses, TestConnectionData, TestConnectionErrors, TestConnectionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -31,7 +31,7 @@ export class UmbracoVercelAnalyticsService {
             ...options
         });
     }
-    
+
     public static documentRoutes<ThrowOnError extends boolean = false>(options: Options<DocumentRoutesData, ThrowOnError>) {
         return (options.client ?? client).get<DocumentRoutesResponses, DocumentRoutesErrors, ThrowOnError>({
             security: [
@@ -44,7 +44,7 @@ export class UmbracoVercelAnalyticsService {
             ...options
         });
     }
-    
+
     public static breakdown<ThrowOnError extends boolean = false>(options: Options<BreakdownData, ThrowOnError>) {
         return (options.client ?? client).get<BreakdownResponses, BreakdownErrors, ThrowOnError>({
             security: [
@@ -58,6 +58,32 @@ export class UmbracoVercelAnalyticsService {
         });
     }
     
+    public static events<ThrowOnError extends boolean = false>(options?: Options<EventsData, ThrowOnError>) {
+        return (options?.client ?? client).get<EventsResponses, EventsErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/management/api/v1/vercel-analytics/reports/events',
+            ...options
+        });
+    }
+
+    public static eventHistory<ThrowOnError extends boolean = false>(options?: Options<EventHistoryData, ThrowOnError>) {
+        return (options?.client ?? client).get<EventHistoryResponses, EventHistoryErrors, ThrowOnError>({
+            security: [
+                {
+                    scheme: 'bearer',
+                    type: 'http'
+                }
+            ],
+            url: '/umbraco/management/api/v1/vercel-analytics/reports/events/history',
+            ...options
+        });
+    }
+
     public static summary<ThrowOnError extends boolean = false>(options?: Options<SummaryData, ThrowOnError>) {
         return (options?.client ?? client).get<SummaryResponses, SummaryErrors, ThrowOnError>({
             security: [

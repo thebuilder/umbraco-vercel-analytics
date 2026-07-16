@@ -18,7 +18,6 @@ import {
   Tooltip,
 } from "chart.js";
 import type { Plugin } from "chart.js";
-import type { AnalyticsPoint } from "../api/types.gen.js";
 import type { AnalyticsInterval } from "../api/types.gen.js";
 import { formatChartAxisValue } from "./chart-value.js";
 import { formatAnalyticsDate, formatAnalyticsTooltipDate, isAnalyticsPeriodInProgress } from "./date-range.js";
@@ -27,8 +26,8 @@ Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryS
 
 @customElement("vercel-analytics-history-chart")
 export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitElement) {
-  @property({ attribute: false }) points: AnalyticsPoint[] = [];
-  @property() metric: "visitors" | "pageViews" = "visitors";
+  @property({ attribute: false }) points: Array<{ timestamp: string; visitors: number; pageViews?: number; count?: number }> = [];
+  @property() metric: "visitors" | "pageViews" | "count" = "visitors";
   @property() interval: AnalyticsInterval = "Day";
   @state() private _showTable = false;
   #chart?: Chart;
@@ -53,7 +52,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
     const guideColor = style.getPropertyValue("--uui-color-text").trim() || "#1b264f";
     const surfaceColor = style.getPropertyValue("--uui-color-surface").trim() || "#ffffff";
     const borderColor = style.getPropertyValue("--uui-color-border").trim() || "#d8d7d9";
-    const label = this.metric === "visitors" ? "Visitors" : "Page views";
+    const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
       ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
@@ -85,7 +84,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
         labels: this.points.map((point) => formatAnalyticsDate(point.timestamp, this.interval)),
         datasets: [{
           label,
-          data: this.points.map((point) => point[this.metric]),
+          data: this.points.map((point) => point[this.metric] ?? 0),
           borderColor: color,
           backgroundColor: fillColor,
           fill: true,
@@ -145,7 +144,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
   }
 
   render() {
-    const label = this.metric === "visitors" ? "Visitors" : "Page views";
+    const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
       ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
@@ -166,11 +165,16 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
           <caption>${label} history</caption>
           <thead><tr><th scope="col">Date</th><th scope="col">${label}</th></tr></thead>
           <tbody>${this.points.map((point, index) => html`
-            <tr><td>${formatAnalyticsDate(point.timestamp, this.interval)}${latestPeriodInProgress && index === this.points.length - 1 ? " (in progress)" : ""}</td><td>${point[this.metric].toLocaleString()}</td></tr>
+            <tr><td>${formatAnalyticsDate(point.timestamp, this.interval)}${latestPeriodInProgress && index === this.points.length - 1 ? " (in progress)" : ""}</td><td>${(point[this.metric] ?? 0).toLocaleString()}</td></tr>
           `)}</tbody>
         </table>
       ` : ""}
     `;
+  }
+
+  #metricLabel(): string {
+    if (this.metric === "visitors") return "Visitors";
+    return this.metric === "pageViews" ? "Page views" : "Total events";
   }
 
   static styles = css`

@@ -308,6 +308,44 @@ export type EventDetailsResponses = {
 
 export type EventDetailsResponse = EventDetailsResponses[keyof EventDetailsResponses];
 
+export type EventPropertyValuesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        connection?: string;
+        from?: string;
+        to?: string;
+        interval?: AnalyticsInterval;
+        eventName?: string;
+        propertyName?: string;
+        limit?: number;
+        search?: string;
+        eventProperty?: string;
+        eventValue?: string;
+        documentId?: string;
+        culture?: string;
+        path?: string;
+        filter?: Array<string>;
+    };
+    url: '/umbraco/management/api/v1/vercel-analytics/reports/events/property-values';
+};
+
+export type EventPropertyValuesErrors = {
+    /**
+     * The resource is protected and requires an authentication token
+     */
+    401: unknown;
+};
+
+export type EventPropertyValuesResponses = {
+    /**
+     * OK
+     */
+    200: AnalyticsEventProperty;
+};
+
+export type EventPropertyValuesResponse = EventPropertyValuesResponses[keyof EventPropertyValuesResponses];
+
 export type SummaryData = {
     body?: never;
     path?: never;

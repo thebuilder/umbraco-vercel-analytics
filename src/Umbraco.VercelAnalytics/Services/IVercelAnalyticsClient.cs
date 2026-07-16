@@ -50,6 +50,7 @@ public interface IVercelAnalyticsClient
         string eventName,
         string propertyName,
         int limit,
+        string? search,
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
 }

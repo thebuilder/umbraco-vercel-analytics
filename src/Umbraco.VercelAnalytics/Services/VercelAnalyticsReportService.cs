@@ -86,9 +86,46 @@ public sealed class VercelAnalyticsReportService(
             var propertyNames = await propertyNamesTask;
             var propertyTasks = propertyNames.Select(async propertyName => new AnalyticsEventProperty(
                 propertyName,
-                await client.GetEventPropertyValuesAsync(connection, query, normalizedEventName, propertyName, 100, eventDataFilter, cancellationToken)));
+                await client.GetEventPropertyValuesAsync(connection, query, normalizedEventName, propertyName, 100, null, eventDataFilter, cancellationToken)));
             var properties = await Task.WhenAll(propertyTasks);
             return new AnalyticsEventDetails(normalizedEventName, await totals, properties);
+        });
+    }
+
+    public async Task<AnalyticsEventProperty?> GetEventPropertyValuesAsync(
+        AnalyticsQuery query,
+        string eventName,
+        string propertyName,
+        int limit,
+        string? search,
+        AnalyticsEventDataFilter? eventDataFilter,
+        CancellationToken cancellationToken)
+    {
+        var connection = registry.Get(query.Connection);
+        if (connection is null || !connection.IsConfigured) return null;
+        var normalizedEventName = eventName.Trim();
+        var normalizedPropertyName = propertyName.Trim();
+        var normalizedSearch = search?.Trim();
+        var eventDataCacheKey = eventDataFilter is null
+            ? string.Empty
+            : $":{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Property))}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Value))}";
+        var eventNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedEventName));
+        var propertyNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedPropertyName));
+        var searchCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedSearch ?? string.Empty));
+        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-property-values:{eventNameCacheKey}:{propertyNameCacheKey}:{limit}:{searchCacheKey}{eventDataCacheKey}:{Normalize(query)}";
+        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
+            var values = await client.GetEventPropertyValuesAsync(
+                connection,
+                query,
+                normalizedEventName,
+                normalizedPropertyName,
+                limit,
+                normalizedSearch,
+                eventDataFilter,
+                cancellationToken);
+            return new AnalyticsEventProperty(normalizedPropertyName, values);
         });
     }
 

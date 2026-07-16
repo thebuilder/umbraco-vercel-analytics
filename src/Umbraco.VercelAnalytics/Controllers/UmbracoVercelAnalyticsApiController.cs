@@ -195,6 +195,67 @@ public sealed class UmbracoVercelAnalyticsApiController(
         }
     }
 
+    [HttpGet("reports/events/property-values")]
+    [ProducesResponseType<AnalyticsEventProperty>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AnalyticsEventProperty>> EventPropertyValues(
+        [FromQuery] string connection,
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] AnalyticsInterval interval,
+        [FromQuery] string eventName,
+        [FromQuery] string propertyName,
+        [FromQuery] int limit = 100,
+        [FromQuery] string? search = null,
+        [FromQuery] string? eventProperty = null,
+        [FromQuery] string? eventValue = null,
+        [FromQuery] Guid? documentId = null,
+        [FromQuery] string? culture = null,
+        [FromQuery] string? path = null,
+        [FromQuery] string[]? filter = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(eventName) || eventName.Length > 255)
+        {
+            return ValidationProblem("Event name is required and must be 255 characters or fewer.");
+        }
+        if (string.IsNullOrWhiteSpace(propertyName) || propertyName.Length > 255)
+        {
+            return ValidationProblem("Event property name is required and must be 255 characters or fewer.");
+        }
+        if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
+        if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
+        if (string.IsNullOrWhiteSpace(eventProperty) != string.IsNullOrWhiteSpace(eventValue))
+        {
+            return ValidationProblem("Event property and value must be supplied together.");
+        }
+        if (eventProperty?.Length > 255 || eventValue?.Length > 500)
+        {
+            return ValidationProblem("Event property must be 255 characters or fewer and value must be 500 characters or fewer.");
+        }
+
+        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, filter, cancellationToken);
+        if (scope.Error is not null) return scope.Error;
+        try
+        {
+            var eventDataFilter = string.IsNullOrWhiteSpace(eventProperty)
+                ? null
+                : new AnalyticsEventDataFilter(eventProperty, eventValue!);
+            var report = await reportService.GetEventPropertyValuesAsync(
+                scope.Query!,
+                eventName,
+                propertyName,
+                limit,
+                search,
+                eventDataFilter,
+                cancellationToken);
+            return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
+        }
+        catch (VercelAnalyticsApiException exception)
+        {
+            return VercelProblem(exception);
+        }
+    }
+
     private async Task<(AnalyticsQuery? Query, ActionResult? Error)> AuthorizeAndBuildQueryAsync(
         string connection,
         DateOnly from,

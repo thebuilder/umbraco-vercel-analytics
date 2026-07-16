@@ -215,6 +215,7 @@ public sealed class VercelAnalyticsClientTests
             "Signup",
             "signup-source",
             100,
+            "enter'prise",
             new AnalyticsEventDataFilter("account-tier", "Editor's choice"),
             CancellationToken.None);
 
@@ -222,7 +223,7 @@ public sealed class VercelAnalyticsClientTests
         Assert.Contains("by=eventData%2F%27signup-source%27", handler.Request!.RequestUri!.Query);
         Assert.Contains("limit=100", handler.Request.RequestUri.Query);
         Assert.Contains(
-            "filter=requestPath eq '/news' and eventName eq 'Signup' and eventData/'account-tier' eq 'Editor''s choice'",
+            "filter=requestPath eq '/news' and eventName eq 'Signup' and eventData/'account-tier' eq 'Editor''s choice' and contains(eventData/'signup-source', 'enter''prise')",
             Uri.UnescapeDataString(handler.Request.RequestUri.Query));
     }
 

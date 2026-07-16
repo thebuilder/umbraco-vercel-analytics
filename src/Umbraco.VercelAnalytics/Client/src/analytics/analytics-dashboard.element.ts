@@ -16,6 +16,7 @@ import type {
   AnalyticsDimension,
   AnalyticsDocumentRoute,
   AnalyticsEventDetails,
+  AnalyticsEventProperty,
   AnalyticsEventRow,
   AnalyticsEventsReport,
   AnalyticsSummary,
@@ -63,6 +64,13 @@ type SelectedEvent = {
   error?: string;
   eventProperty?: string;
   eventValue?: string;
+  propertySearch?: {
+    propertyName: string;
+    search: string;
+    property?: AnalyticsEventProperty;
+    loading: boolean;
+    error?: string;
+  };
 };
 
 const BREAKDOWNS: ReadonlyArray<{ dimension: AnalyticsDimension; headline: string; wide?: boolean; planLimited?: boolean }> = [
@@ -108,6 +116,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   #eventAbort?: AbortController;
   #eventSearchTimer?: number;
   #eventRequest = 0;
+  #eventPropertyAbort?: AbortController;
+  #eventPropertySearchTimer?: number;
+  #eventPropertyRequest = 0;
   #lastScopeKey?: string;
   #hasUrlDateState = false;
   #utmCapabilityByConnection = new Map<string, UtmCapability>();
@@ -121,8 +132,10 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   override disconnectedCallback(): void {
     this.#expandedAbort?.abort();
     this.#eventAbort?.abort();
+    this.#eventPropertyAbort?.abort();
     if (this.#expandedSearchTimer !== undefined) window.clearTimeout(this.#expandedSearchTimer);
     if (this.#eventSearchTimer !== undefined) window.clearTimeout(this.#eventSearchTimer);
+    if (this.#eventPropertySearchTimer !== undefined) window.clearTimeout(this.#eventPropertySearchTimer);
     super.disconnectedCallback();
   }
 
@@ -239,6 +252,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   async #loadReports(): Promise<void> {
     if (!this._connection) return;
+    this.#eventPropertyAbort?.abort();
+    if (this.#eventPropertySearchTimer !== undefined) window.clearTimeout(this.#eventPropertySearchTimer);
+    this.#eventPropertyRequest++;
     this._expanded = undefined;
     this._expandedEvents = undefined;
     this._selectedEvent = undefined;
@@ -459,7 +475,71 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     );
   }
 
+  #searchEventProperty(event: CustomEvent<{ propertyName: string; search: string }>): void {
+    if (!this._selectedEvent) return;
+    this.#eventPropertyAbort?.abort();
+    this.#eventPropertyRequest++;
+    if (this.#eventPropertySearchTimer !== undefined) window.clearTimeout(this.#eventPropertySearchTimer);
+    const search = event.detail.search.trim();
+    if (!search) {
+      this._selectedEvent = { ...this._selectedEvent, propertySearch: undefined };
+      return;
+    }
+
+    this._selectedEvent = {
+      ...this._selectedEvent,
+      propertySearch: { propertyName: event.detail.propertyName, search, loading: true },
+    };
+    this.#eventPropertySearchTimer = window.setTimeout(() => {
+      void this.#loadEventPropertyValues(event.detail.propertyName, search);
+    }, 300);
+  }
+
+  async #loadEventPropertyValues(propertyName: string, search: string): Promise<void> {
+    if (!this._connection || !this._selectedEvent) return;
+    this.#eventPropertyAbort?.abort();
+    const abort = new AbortController();
+    this.#eventPropertyAbort = abort;
+    const request = ++this.#eventPropertyRequest;
+    const eventName = this._selectedEvent.eventName;
+    const eventProperty = this._selectedEvent.eventProperty;
+    const eventValue = this._selectedEvent.eventValue;
+    try {
+      const { data, error, response } = await UmbracoVercelAnalyticsService.eventPropertyValues({
+        query: {
+          connection: this._connection,
+          ...this._range,
+          ...this.#scope(),
+          ...this.#filterQuery(),
+          eventName,
+          propertyName,
+          limit: 100,
+          search,
+          eventProperty,
+          eventValue,
+        },
+        signal: abort.signal,
+      });
+      if (request !== this.#eventPropertyRequest || this._selectedEvent?.eventName !== eventName) return;
+      this._selectedEvent = {
+        ...this._selectedEvent,
+        propertySearch: error
+          ? { propertyName, search, loading: false, error: reportErrorMessage({ status: response.status }) }
+          : { propertyName, search, loading: false, property: data },
+      };
+    } catch (error) {
+      if (abort.signal.aborted || request !== this.#eventPropertyRequest || this._selectedEvent?.eventName !== eventName) return;
+      this._selectedEvent = {
+        ...this._selectedEvent,
+        propertySearch: { propertyName, search, loading: false, error: reportErrorMessage(error) },
+      };
+    }
+  }
+
   #closeEventDetails(): void {
+    this.#eventPropertyAbort?.abort();
+    if (this.#eventPropertySearchTimer !== undefined) window.clearTimeout(this.#eventPropertySearchTimer);
+    this.#eventPropertyRequest++;
     this.#eventRequest++;
     this._selectedEvent = undefined;
   }
@@ -857,6 +937,11 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .unavailable=${this._selectedEvent.error}
             .filterProperty=${this._selectedEvent.eventProperty}
             .filterValue=${this._selectedEvent.eventValue}
+            .searchedProperty=${this._selectedEvent.propertySearch?.property}
+            .searchedTerm=${this._selectedEvent.propertySearch?.search}
+            .searchLoading=${this._selectedEvent.propertySearch?.loading ?? false}
+            .searchUnavailable=${this._selectedEvent.propertySearch?.error}
+            @search-event-property=${this.#searchEventProperty}
             @toggle-event-property-filter=${this.#toggleEventPropertyFilter}
             @close-event-details=${this.#closeEventDetails}></vercel-analytics-event-details-dialog>
         ` : ""}

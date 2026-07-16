@@ -137,14 +137,20 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         string eventName,
         string propertyName,
         int limit,
+        string? search,
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
+        var dimension = ToEventDataDimension(propertyName);
         var parameters = BuildParameters(connection, query);
-        parameters["by"] = ToEventDataDimension(propertyName);
+        parameters["by"] = dimension;
         parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
         AddEventDataFilter(parameters, eventDataFilter);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            AddFilter(parameters, $"contains({dimension}, '{EscapeODataString(search.Trim())}')");
+        }
         using var response = await SendAsync(connection, EventAggregatePath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
         return envelope?.Data

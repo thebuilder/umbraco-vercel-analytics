@@ -1,6 +1,7 @@
 import { LitElement, css, customElement, html, property, state } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
+import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventDetails, AnalyticsEventProperty } from "../api/types.gen.js";
 
 @customElement("vercel-analytics-event-details-dialog")
@@ -11,7 +12,12 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
   @property({ attribute: false }) details?: AnalyticsEventDetails;
   @property() filterProperty?: string;
   @property() filterValue?: string;
+  @property({ attribute: false }) searchedProperty?: AnalyticsEventProperty;
+  @property() searchedTerm?: string;
+  @property({ type: Boolean }) searchLoading = false;
+  @property() searchUnavailable?: string;
   @state() private _propertyName?: string;
+  @state() private _search = "";
 
   protected firstUpdated(): void { this.shadowRoot?.querySelector("dialog")?.showModal(); }
   #close(): void { this.shadowRoot?.querySelector("dialog")?.close(); }
@@ -25,6 +31,25 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
 
   #selectProperty(propertyName: string): void {
     this._propertyName = propertyName;
+    this.#clearSearch(propertyName);
+  }
+
+  #onSearch(event: Event): void {
+    this._search = String((event.target as UUIInputElement).value ?? "");
+    this.#notifySearch(this.#activeProperty()?.name ?? "", this._search);
+  }
+
+  #notifySearch(propertyName: string, search: string): void {
+    this.dispatchEvent(new CustomEvent("search-event-property", {
+      bubbles: true,
+      composed: true,
+      detail: { propertyName, search: search.trim() },
+    }));
+  }
+
+  #clearSearch(propertyName: string): void {
+    this._search = "";
+    this.#notifySearch(propertyName, "");
   }
 
   #onTabKeydown(event: KeyboardEvent): void {
@@ -38,12 +63,14 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
         ? properties.length - 1
         : (activeIndex + (event.key === "ArrowLeft" ? -1 : 1) + properties.length) % properties.length;
     this._propertyName = properties[nextIndex].name;
+    this.#clearSearch(properties[nextIndex].name);
     this.updateComplete.then(() => this.shadowRoot
       ?.querySelector<HTMLButtonElement>(`[data-property-index="${nextIndex}"]`)
       ?.focus());
   }
 
   #toggleFilter(property: string, value: string): void {
+    this.#clearSearch(property);
     this.dispatchEvent(new CustomEvent("toggle-event-property-filter", {
       bubbles: true,
       composed: true,
@@ -71,7 +98,11 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
   }
 
   #renderProperty(property: AnalyticsEventProperty) {
-    const maximum = Math.max(...property.values.map((value) => value.count), 1);
+    const search = this._search.trim().toLocaleLowerCase();
+    const searchIsCurrent = this.searchedProperty?.name === property.name
+      && this.searchedTerm?.toLocaleLowerCase() === search;
+    const values = search ? (searchIsCurrent ? this.searchedProperty?.values ?? [] : []) : property.values;
+    const maximum = Math.max(...values.map((value) => value.count), 1);
     return html`
       <div id="event-property-panel" role="tabpanel" aria-labelledby=${`event-property-${this.details?.properties.indexOf(property) ?? 0}`}>
         <table>
@@ -91,8 +122,25 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
                 </button>
               </th></tr>
             ` : ""}
+            ${property.values.length ? html`
+              <tr class="search-row"><th colspan="3">
+                <uui-input
+                  type="search"
+                  label=${`Search ${property.name} values`}
+                  maxlength="200"
+                  placeholder="Search"
+                  .value=${this._search}
+                  @input=${this.#onSearch}>
+                  <uui-icon name="icon-search" slot="prepend"></uui-icon>
+                </uui-input>
+              </th></tr>
+            ` : ""}
           </thead>
-          <tbody>${property.values.length ? property.values.map((value) => {
+          <tbody>${search && this.searchLoading ? html`
+            <tr class="empty-row"><td colspan="3"><umb-empty-state headline="Searching"><p>Looking up matching values…</p></umb-empty-state></td></tr>
+          ` : search && this.searchUnavailable ? html`
+            <tr class="empty-row"><td colspan="3"><umb-empty-state headline="Search unavailable"><p>${this.searchUnavailable}</p></umb-empty-state></td></tr>
+          ` : values.length ? values.map((value) => {
             const activeFilter = this.filterProperty === property.name && this.filterValue === value.value;
             return html`
               <tr>
@@ -117,7 +165,7 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
                 <td>${value.count.toLocaleString()}</td>
               </tr>
             `;
-          }) : html`<tr class="empty-row"><td colspan="3"><umb-empty-state headline="No values"><p>No values were recorded for this property in the selected period.</p></umb-empty-state></td></tr>`}</tbody>
+          }) : html`<tr class="empty-row"><td colspan="3"><umb-empty-state headline=${search ? "No matching values" : "No values"}><p>${search ? "Try a different search." : "No values were recorded for this property in the selected period."}</p></umb-empty-state></td></tr>`}</tbody>
         </table>
       </div>
     `;
@@ -148,9 +196,9 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
     dialog::backdrop { background: rgb(0 0 0 / 45%); }
     uui-dialog-layout { --uui-size-10: var(--uui-size-space-5); --uui-size-14: var(--uui-size-space-6); }
     .dialog-content { block-size: min(30rem, 52dvh); display: flex; flex-direction: column; min-block-size: 0; position: relative; }
-    .property-tabs { display: flex; gap: var(--uui-size-space-1); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
+    .property-tabs { display: flex; gap: var(--uui-size-space-1); inline-size: calc(100% + var(--uui-size-space-5)); margin-inline-start: calc(-1 * var(--uui-size-space-5)); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
     .property-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
-    .property-tabs button:first-child { margin-inline-start: calc(-1 * var(--uui-size-space-5)); padding-inline-start: var(--uui-size-space-5); }
+    .property-tabs button:first-child { padding-inline-start: var(--uui-size-space-5); }
     .property-tabs button:hover { color: var(--uui-color-text); }
     .property-tabs button[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); color: var(--uui-color-text); font-weight: 700; }
     .property-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -3px; }
@@ -164,6 +212,9 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
     .active-filter-row th { padding-block: var(--uui-size-space-2); }
     .active-filter { align-items: center; background: var(--uui-color-surface-alt); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); color: var(--uui-color-text); cursor: pointer; display: inline-flex; gap: var(--uui-size-space-2); max-inline-size: 100%; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
     .active-filter span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .search-row th { padding-block: var(--uui-size-space-3); }
+    .search-row uui-input { box-sizing: border-box; width: 100%; }
+    .search-row uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
     .metric-headings th { box-shadow: 0 1px 0 var(--uui-color-border); }
     thead th:not(:first-child), td { text-align: right; width: 8rem; }
     tbody th { font-weight: 500; min-width: 12rem; position: relative; }

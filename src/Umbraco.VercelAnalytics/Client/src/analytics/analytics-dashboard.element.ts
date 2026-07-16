@@ -310,14 +310,27 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     if (normalized) this._range = normalized;
   }
 
+  #onMetricKeydown(event: KeyboardEvent): void {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const tabs = Array.from((event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []);
+    const currentIndex = tabs.indexOf(event.currentTarget as HTMLButtonElement);
+    const targetIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? tabs.length - 1
+        : event.key === "ArrowLeft"
+          ? (currentIndex - 1 + tabs.length) % tabs.length
+          : (currentIndex + 1) % tabs.length;
+    const target = tabs[targetIndex];
+    target?.click();
+    target?.focus();
+  }
+
   #renderHeader() {
     const connection = this._connections.find((item) => item.alias === this._connection);
     return html`
       <header>
-        <div class="title-block">
-          <h1>Analytics</h1>
-          <p>Vercel Web Analytics for published production traffic.</p>
-        </div>
         <div class="controls">
           ${this.documentId ? html`
             <uui-select
@@ -373,34 +386,54 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   #renderSummary() {
     if (this._summaryError) return html`<uui-box><umb-empty-state headline="Analytics unavailable"><p>${this._summaryError}</p><uui-button look="secondary" label="Retry analytics summary" @click=${this.#loadReports}>Retry</uui-button></umb-empty-state></uui-box>`;
     return html`
-      <section class="summary" aria-label="Traffic summary" aria-busy=${this._summaryLoading ? "true" : "false"}>
-        <uui-box>
-          <span class="eyebrow">Visitors</span>
-          ${this._summaryLoading
-            ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
-            : html`<strong>${this._summary?.totals.visitors.toLocaleString()}</strong>`}
-        </uui-box>
-        <uui-box>
-          <span class="eyebrow">Page views</span>
-          ${this._summaryLoading
-            ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
-            : html`<strong>${this._summary?.totals.pageViews.toLocaleString()}</strong>`}
-        </uui-box>
-      </section>
-      <uui-box headline="History" class="history" aria-busy=${this._summaryLoading ? "true" : "false"}>
-        <uui-tab-group slot="header-actions" aria-label="History metric">
-          <uui-tab label="Visitors" .active=${this._metric === "visitors"} @click=${() => (this._metric = "visitors")}>Visitors</uui-tab>
-          <uui-tab label="Page views" .active=${this._metric === "pageViews"} @click=${() => (this._metric = "pageViews")}>Page views</uui-tab>
-        </uui-tab-group>
-        ${this._summaryLoading ? html`
-          <span class="visually-hidden" role="status">Loading traffic summary and history</span>
-          <div class="chart-skeleton" aria-hidden="true">
-            <span></span><span></span><span></span><span></span>
-          </div>
-          <span class="history-button-skeleton" aria-hidden="true"></span>
-        ` : this._summary?.points.length
-            ? html`<vercel-analytics-history-chart .points=${this._summary.points} .metric=${this._metric} .interval=${this._range.interval}></vercel-analytics-history-chart>`
-            : html`<umb-empty-state headline="No history"><p>No traffic was recorded in this period.</p></umb-empty-state>`}
+      <uui-box class="history" aria-busy=${this._summaryLoading ? "true" : "false"}>
+        <div class="metric-tabs" role="tablist" aria-label="Traffic metric">
+          <button
+            id="metric-visitors-tab"
+            class="metric-tab"
+            type="button"
+            role="tab"
+            aria-controls="history-panel"
+            aria-selected=${this._metric === "visitors"}
+            tabindex=${this._metric === "visitors" ? 0 : -1}
+            @click=${() => (this._metric = "visitors")}
+            @keydown=${this.#onMetricKeydown}>
+            <span class="eyebrow">Visitors</span>
+            ${this._summaryLoading
+              ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
+              : html`<strong>${this._summary?.totals.visitors.toLocaleString()}</strong>`}
+          </button>
+          <button
+            id="metric-page-views-tab"
+            class="metric-tab"
+            type="button"
+            role="tab"
+            aria-controls="history-panel"
+            aria-selected=${this._metric === "pageViews"}
+            tabindex=${this._metric === "pageViews" ? 0 : -1}
+            @click=${() => (this._metric = "pageViews")}
+            @keydown=${this.#onMetricKeydown}>
+            <span class="eyebrow">Page views</span>
+            ${this._summaryLoading
+              ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
+              : html`<strong>${this._summary?.totals.pageViews.toLocaleString()}</strong>`}
+          </button>
+        </div>
+        <div
+          id="history-panel"
+          class="history-panel"
+          role="tabpanel"
+          aria-labelledby=${this._metric === "visitors" ? "metric-visitors-tab" : "metric-page-views-tab"}>
+          ${this._summaryLoading ? html`
+            <span class="visually-hidden" role="status">Loading traffic summary and history</span>
+            <div class="chart-skeleton" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span class="history-button-skeleton" aria-hidden="true"></span>
+          ` : this._summary?.points.length
+              ? html`<vercel-analytics-history-chart .points=${this._summary.points} .metric=${this._metric} .interval=${this._range.interval}></vercel-analytics-history-chart>`
+              : html`<umb-empty-state headline="No history"><p>No traffic was recorded in this period.</p></umb-empty-state>`}
+        </div>
       </uui-box>
     `;
   }
@@ -464,22 +497,26 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   static styles = [UmbTextStyles, css`
     :host { display: block; }
     main { container-type: inline-size; padding: var(--uui-size-layout-1); max-width: 110rem; margin-inline: auto; }
-    header { align-items: end; display: flex; gap: var(--uui-size-layout-1); justify-content: space-between; margin-bottom: var(--uui-size-layout-1); }
-    h1 { margin: 0; font-size: var(--uui-type-h1-size); }
-    header p, .hint { color: var(--uui-color-text-alt); }
-    .title-block p { margin: var(--uui-size-space-1) 0 0; }
-    .controls { align-items: end; display: flex; flex-wrap: wrap; gap: var(--uui-size-layout-1); justify-content: flex-end; margin-inline-start: auto; }
+    header { margin-bottom: var(--uui-size-layout-1); }
+    .hint { color: var(--uui-color-text-alt); }
+    .controls { align-items: end; display: flex; flex-wrap: wrap; gap: var(--uui-size-layout-1); justify-content: flex-start; }
     .report-controls, .date-actions { align-items: end; display: flex; gap: var(--uui-size-space-4); }
     .date-control { display: grid; gap: var(--uui-size-space-2); }
     .date-control uui-input { min-inline-size: 11rem; }
     .project-select { min-inline-size: 10rem; }
     .range-select { min-inline-size: 12rem; }
     .route-select { max-inline-size: 28rem; min-inline-size: 18rem; }
-    .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--uui-size-layout-1); margin-bottom: var(--uui-size-layout-1); }
-    .summary strong { display: block; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; margin-top: var(--uui-size-space-3); font-variant-numeric: tabular-nums; }
+    .metric-tabs { border-bottom: 1px solid var(--uui-color-border); display: flex; }
+    .metric-tab { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text); cursor: pointer; flex: 0 1 20rem; font: inherit; min-inline-size: 12rem; padding: var(--uui-size-space-5); text-align: left; }
+    .metric-tab + .metric-tab { border-inline-start: 1px solid var(--uui-color-border); }
+    .metric-tab[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); }
+    .metric-tab:hover { background: var(--uui-color-surface-alt); }
+    .metric-tab:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
+    .metric-tab strong { display: block; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; margin-top: var(--uui-size-space-3); font-variant-numeric: tabular-nums; }
     .metric-skeleton { background: var(--uui-color-surface-alt); block-size: clamp(2.2rem, 4.4vw, 3.85rem); border-radius: var(--uui-border-radius); display: block; inline-size: 58%; margin-top: var(--uui-size-space-3); max-inline-size: 14rem; }
     .eyebrow { color: var(--uui-color-text-alt); font-weight: 700; }
     .history { margin-bottom: var(--uui-size-layout-1); }
+    .history-panel { padding-top: var(--uui-size-space-5); }
     .chart-skeleton { block-size: 18rem; display: grid; margin-bottom: var(--uui-size-space-4); }
     .chart-skeleton span { border-top: 1px solid var(--uui-color-border); }
     .history-button-skeleton { background: var(--uui-color-surface-alt); block-size: 2.5rem; border-radius: var(--uui-border-radius); display: block; inline-size: 8.5rem; }
@@ -488,17 +525,14 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     .warnings { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); }
     .warnings:empty { display: none; }
-    @container (max-width: 82rem) {
-      header { align-items: stretch; flex-direction: column; }
-      .controls { justify-content: flex-start; margin-inline-start: 0; }
-    }
     @container (max-width: 62rem) {
       .controls { align-items: stretch; flex-direction: column; gap: var(--uui-size-space-4); }
       .project-select, .route-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }
     }
     @container (max-width: 48rem) {
-      .grid, .summary { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
       .wide { grid-column: auto; }
+      .metric-tab { flex: 1 1 50%; min-inline-size: 0; }
     }
     @container (max-width: 40rem) {
       .report-controls, .date-actions { align-items: stretch; flex-direction: column; }

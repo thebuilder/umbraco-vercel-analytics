@@ -279,7 +279,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
               label="Published route"
               .options=${this.#selectOptions(this._routes.map((route) => ({
                 value: `${route.culture}|${route.hostname}|${route.path}`,
-                name: `${route.culture} · ${route.hostname}${route.path}`,
+                name: route.culture ? `${route.culture} · ${route.hostname}${route.path}` : `${route.hostname}${route.path}`,
               })), this._route ? `${this._route.culture}|${this._route.hostname}|${this._route.path}` : undefined)}
               @change=${this.#onRouteChange}></uui-select>
           ` : html`

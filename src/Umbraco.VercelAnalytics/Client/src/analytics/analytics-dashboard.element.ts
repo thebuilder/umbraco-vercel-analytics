@@ -849,7 +849,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .metric-tab { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text); cursor: pointer; flex: 0 0 auto; font: inherit; inline-size: max-content; min-inline-size: 18rem; padding: var(--uui-size-space-5); text-align: left; }
     .metric-tab + .metric-tab { border-inline-start: 1px solid var(--uui-color-border); }
     .metric-tab[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); }
-    .metric-tab:hover { background: var(--uui-color-surface-alt); }
+    .metric-tab:hover { background: color-mix(in srgb, var(--uui-color-interactive) 7%, var(--uui-color-surface)); }
     .metric-tab:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
     .metric-value { align-items: center; display: flex; flex-wrap: nowrap; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-3); }
     .metric-tab strong { font-size: clamp(2rem, 3cqi, 3rem); line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }

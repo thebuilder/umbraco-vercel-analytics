@@ -49,6 +49,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
 
     const style = getComputedStyle(this);
     const color = style.getPropertyValue("--uui-color-interactive").trim() || "#3544b1";
+    const fillColor = style.getPropertyValue("--vercel-analytics-chart-fill").trim() || "rgba(0, 112, 243, 0.14)";
     const guideColor = style.getPropertyValue("--uui-color-text").trim() || "#1b264f";
     const surfaceColor = style.getPropertyValue("--uui-color-surface").trim() || "#ffffff";
     const borderColor = style.getPropertyValue("--uui-color-border").trim() || "#d8d7d9";
@@ -86,7 +87,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
           label,
           data: this.points.map((point) => point[this.metric]),
           borderColor: color,
-          backgroundColor: `${color}1f`,
+          backgroundColor: fillColor,
           fill: true,
           pointRadius: 0,
           pointHoverRadius: 4,

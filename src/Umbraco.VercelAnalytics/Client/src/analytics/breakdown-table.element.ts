@@ -116,7 +116,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
   }
 
   static styles = css`
-    :host { display: block; overflow-x: auto; }
+    :host { display: block; overflow-x: clip; overflow-y: visible; }
     table {
       --bar-inset: var(--uui-size-space-3);
       --metric-column-width: 8.5rem;

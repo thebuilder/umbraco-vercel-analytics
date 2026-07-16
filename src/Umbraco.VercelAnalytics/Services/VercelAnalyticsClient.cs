@@ -12,6 +12,8 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
 {
     private const string CountPath = "v1/query/web-analytics/visits/count";
     private const string AggregatePath = "v1/query/web-analytics/visits/aggregate";
+    private const string EventCountPath = "v1/query/web-analytics/events/count";
+    private const string EventAggregatePath = "v1/query/web-analytics/events/aggregate";
 
     public async Task<AnalyticsTotals> CountAsync(
         VercelAnalyticsConnection connection,
@@ -57,14 +59,63 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchFilter = $"contains({apiDimension}, '{EscapeODataString(search.Trim())}')";
-            parameters["filter"] = parameters.TryGetValue("filter", out var existingFilter)
-                ? $"{existingFilter} and {searchFilter}"
-                : searchFilter;
+            AddFilter(parameters, searchFilter);
         }
         using var response = await SendAsync(connection, AggregatePath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
         return envelope?.Data.Select(item => ParseBreakdown(item, apiDimension)).ToArray()
             ?? throw new JsonException("Vercel Analytics breakdown response did not contain data.");
+    }
+
+    public async Task<AnalyticsEventTotals> CountEventsAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        CancellationToken cancellationToken)
+    {
+        var parameters = BuildParameters(connection, query);
+        AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
+        using var response = await SendAsync(connection, EventCountPath, parameters, cancellationToken);
+        var envelope = await response.Content.ReadFromJsonAsync<EventCountEnvelope>(cancellationToken);
+        return envelope?.Data is null
+            ? throw new JsonException("Vercel Analytics event count response did not contain data.")
+            : new AnalyticsEventTotals(envelope.Data.Count, envelope.Data.Visitors);
+    }
+
+    public async Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        int limit,
+        string? search,
+        CancellationToken cancellationToken)
+    {
+        var parameters = BuildParameters(connection, query);
+        parameters["by"] = "eventName";
+        parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            AddFilter(parameters, $"contains(eventName, '{EscapeODataString(search.Trim())}')");
+        }
+
+        using var response = await SendAsync(connection, EventAggregatePath, parameters, cancellationToken);
+        var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
+        return envelope?.Data.Select(ParseEvent).ToArray()
+            ?? throw new JsonException("Vercel Analytics event response did not contain data.");
+    }
+
+    public async Task<IReadOnlyList<AnalyticsEventPoint>> GetEventTrendAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        CancellationToken cancellationToken)
+    {
+        var parameters = BuildParameters(connection, query);
+        parameters["by"] = ToApiValue(query.Interval);
+        AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
+        using var response = await SendAsync(connection, EventAggregatePath, parameters, cancellationToken);
+        var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
+        return envelope?.Data.Select(ParseEventPoint).ToArray()
+            ?? throw new JsonException("Vercel Analytics event history response did not contain data.");
     }
 
     private async Task<HttpResponseMessage> SendAsync(
@@ -110,6 +161,11 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
 
     internal static string EscapeODataString(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 
+    private static void AddFilter(IDictionary<string, string?> parameters, string filter) =>
+        parameters["filter"] = parameters.TryGetValue("filter", out var existingFilter)
+            ? $"{existingFilter} and {filter}"
+            : filter;
+
     internal static string ToApiValue(AnalyticsInterval interval) => interval switch
     {
         AnalyticsInterval.Day => "day",
@@ -143,6 +199,16 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         GetInt64(element, "pageviews"),
         GetInt64(element, "visitors"));
 
+    private static AnalyticsEventRow ParseEvent(JsonElement element) => new(
+        element.TryGetProperty("eventName", out var eventName) ? eventName.ToString() : "Unknown",
+        GetInt64(element, "count"),
+        GetInt64(element, "visitors"));
+
+    private static AnalyticsEventPoint ParseEventPoint(JsonElement element) => new(
+        element.GetProperty("timestamp").GetDateTimeOffset(),
+        GetInt64(element, "count"),
+        GetInt64(element, "visitors"));
+
     private static long GetInt64(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.TryGetInt64(out var result) ? result : 0;
 
@@ -151,6 +217,10 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
     private sealed record CountData(
         [property: System.Text.Json.Serialization.JsonPropertyName("pageviews")] long PageViews,
         [property: System.Text.Json.Serialization.JsonPropertyName("visitors")] long Visitors);
+
+    private sealed record EventCountEnvelope(EventCountData Data);
+
+    private sealed record EventCountData(long Count, long Visitors);
 
     private sealed record AggregateEnvelope(JsonElement[] Data);
 }

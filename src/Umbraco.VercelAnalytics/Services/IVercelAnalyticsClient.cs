@@ -22,4 +22,23 @@ public interface IVercelAnalyticsClient
         int limit,
         string? search,
         CancellationToken cancellationToken);
+
+    Task<AnalyticsEventTotals> CountEventsAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        int limit,
+        string? search,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AnalyticsEventPoint>> GetEventTrendAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        CancellationToken cancellationToken);
 }

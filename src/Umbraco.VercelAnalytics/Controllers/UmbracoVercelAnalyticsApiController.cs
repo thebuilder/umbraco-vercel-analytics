@@ -110,6 +110,66 @@ public sealed class UmbracoVercelAnalyticsApiController(
         }
     }
 
+    [HttpGet("reports/events")]
+    [ProducesResponseType<AnalyticsEventsReport>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AnalyticsEventsReport>> Events(
+        [FromQuery] string connection,
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] AnalyticsInterval interval,
+        [FromQuery] int limit = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? documentId = null,
+        [FromQuery] string? culture = null,
+        [FromQuery] string? path = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
+        if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
+        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, cancellationToken);
+        if (scope.Error is not null) return scope.Error;
+        try
+        {
+            var report = await reportService.GetEventsAsync(scope.Query!, limit, search, cancellationToken);
+            return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
+        }
+        catch (VercelAnalyticsApiException exception)
+        {
+            return VercelProblem(exception);
+        }
+    }
+
+    [HttpGet("reports/events/history")]
+    [ProducesResponseType<AnalyticsEventHistory>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AnalyticsEventHistory>> EventHistory(
+        [FromQuery] string connection,
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] AnalyticsInterval interval,
+        [FromQuery] string eventName,
+        [FromQuery] Guid? documentId = null,
+        [FromQuery] string? culture = null,
+        [FromQuery] string? path = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(eventName) || eventName.Length > 255)
+        {
+            return ValidationProblem("Event name is required and must be 255 characters or fewer.");
+        }
+
+        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, cancellationToken);
+        if (scope.Error is not null) return scope.Error;
+        try
+        {
+            var report = await reportService.GetEventHistoryAsync(scope.Query!, eventName, cancellationToken);
+            return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
+        }
+        catch (VercelAnalyticsApiException exception)
+        {
+            return VercelProblem(exception);
+        }
+    }
+
     private async Task<(AnalyticsQuery? Query, ActionResult? Error)> AuthorizeAndBuildQueryAsync(
         string connection,
         DateOnly from,

@@ -47,6 +47,19 @@ public sealed record AnalyticsBreakdown(
     AnalyticsDimension Dimension,
     IReadOnlyList<AnalyticsBreakdownRow> Rows);
 
+public sealed record AnalyticsEventTotals(long Count, long Visitors);
+
+public sealed record AnalyticsEventRow(string EventName, long Count, long Visitors);
+
+public sealed record AnalyticsEventsReport(IReadOnlyList<AnalyticsEventRow> Rows);
+
+public sealed record AnalyticsEventPoint(DateTimeOffset Timestamp, long Count, long Visitors);
+
+public sealed record AnalyticsEventHistory(
+    string EventName,
+    AnalyticsEventTotals Totals,
+    IReadOnlyList<AnalyticsEventPoint> Points);
+
 public sealed record AnalyticsConnectionSummary(
     string Alias,
     string DisplayName,

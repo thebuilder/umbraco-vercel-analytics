@@ -46,6 +46,43 @@ public sealed class VercelAnalyticsReportService(
         });
     }
 
+    public async Task<AnalyticsEventsReport?> GetEventsAsync(
+        AnalyticsQuery query,
+        int limit,
+        string? search,
+        CancellationToken cancellationToken)
+    {
+        var connection = registry.Get(query.Connection);
+        if (connection is null || !connection.IsConfigured) return null;
+        var normalizedSearch = search?.Trim();
+        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:events:{limit}:{normalizedSearch}:{Normalize(query)}";
+        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
+            var rows = await client.GetEventsAsync(connection, query, limit, normalizedSearch, cancellationToken);
+            return new AnalyticsEventsReport(rows);
+        });
+    }
+
+    public async Task<AnalyticsEventHistory?> GetEventHistoryAsync(
+        AnalyticsQuery query,
+        string eventName,
+        CancellationToken cancellationToken)
+    {
+        var connection = registry.Get(query.Connection);
+        if (connection is null || !connection.IsConfigured) return null;
+        var normalizedEventName = eventName.Trim();
+        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-history:{normalizedEventName}:{Normalize(query)}";
+        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
+            var totals = client.CountEventsAsync(connection, query, normalizedEventName, cancellationToken);
+            var points = client.GetEventTrendAsync(connection, query, normalizedEventName, cancellationToken);
+            await Task.WhenAll(totals, points);
+            return new AnalyticsEventHistory(normalizedEventName, await totals, await points);
+        });
+    }
+
     private static string Normalize(AnalyticsQuery query) =>
         $"{query.Connection.ToLowerInvariant()}:{query.From:yyyyMMdd}:{query.To:yyyyMMdd}:{query.Interval}:{query.RequestPath}";
 

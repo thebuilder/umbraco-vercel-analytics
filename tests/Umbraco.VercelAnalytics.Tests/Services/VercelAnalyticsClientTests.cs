@@ -107,6 +107,67 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Event_count_combines_validated_route_and_escaped_event_filter()
+    {
+        var handler = new RecordingHandler("""{"data":{"count":42,"visitors":31}}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        var result = await client.CountEventsAsync(
+            connection,
+            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/editor's"),
+            "CTA's click",
+            CancellationToken.None);
+
+        Assert.Equal(new AnalyticsEventTotals(42, 31), result);
+        Assert.EndsWith("/events/count", handler.Request!.RequestUri!.AbsolutePath);
+        Assert.Contains(
+            "filter=requestPath eq '/editor''s' and eventName eq 'CTA''s click'",
+            Uri.UnescapeDataString(handler.Request.RequestUri.Query));
+    }
+
+    [Fact]
+    public async Task Events_parse_event_name_totals_and_server_side_search()
+    {
+        var handler = new RecordingHandler(
+            """{"data":[{"eventName":"Signup","count":20,"visitors":14}]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        var result = await client.GetEventsAsync(
+            connection,
+            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            100,
+            "sign'up",
+            CancellationToken.None);
+
+        Assert.Equal(new AnalyticsEventRow("Signup", 20, 14), Assert.Single(result));
+        Assert.EndsWith("/events/aggregate", handler.Request!.RequestUri!.AbsolutePath);
+        Assert.Contains("by=eventName", handler.Request.RequestUri.Query);
+        Assert.Contains("limit=100", handler.Request.RequestUri.Query);
+        Assert.Contains("contains(eventName, 'sign''up')", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
+    }
+
+    [Fact]
+    public async Task Event_trend_parses_count_and_visitors()
+    {
+        var handler = new RecordingHandler(
+            """{"data":[{"timestamp":"2026-07-01T00:00:00Z","count":10,"visitors":8}]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        var result = await client.GetEventTrendAsync(
+            connection,
+            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            "Signup",
+            CancellationToken.None);
+
+        Assert.Equal(new AnalyticsEventPoint(DateTimeOffset.Parse("2026-07-01T00:00:00Z"), 10, 8), Assert.Single(result));
+        Assert.Contains("by=day", handler.Request!.RequestUri!.Query);
+        Assert.Contains("eventName eq 'Signup'", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
+    }
+
+    [Fact]
     public async Task Error_response_throws_sanitized_exception()
     {
         var handler = new RecordingHandler("forbidden", HttpStatusCode.Forbidden);

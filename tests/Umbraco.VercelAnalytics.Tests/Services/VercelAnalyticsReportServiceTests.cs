@@ -82,6 +82,38 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
+    public async Task Events_are_cached_by_search_and_document_scope()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var query = CreateQuery() with { RequestPath = "/news" };
+
+        await service.GetEventsAsync(query, 100, "signup", CancellationToken.None);
+        await service.GetEventsAsync(query, 100, "signup", CancellationToken.None);
+        await service.GetEventsAsync(query, 100, "purchase", CancellationToken.None);
+
+        Assert.Equal(2, client.EventCalls);
+    }
+
+    [Fact]
+    public async Task Event_history_combines_totals_and_trend_and_is_cached_by_name()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var first = await service.GetEventHistoryAsync(CreateQuery(), "Signup", CancellationToken.None);
+        var second = await service.GetEventHistoryAsync(CreateQuery(), "Signup", CancellationToken.None);
+
+        Assert.NotNull(first);
+        Assert.Same(first, second);
+        Assert.Equal(new AnalyticsEventTotals(30, 12), first.Totals);
+        Assert.Equal(1, client.EventCountCalls);
+        Assert.Equal(1, client.EventTrendCalls);
+    }
+
+    [Fact]
     public async Task Cancellation_is_forwarded_to_the_Vercel_client()
     {
         var client = new CountingClient();
@@ -122,6 +154,9 @@ public sealed class VercelAnalyticsReportServiceTests
         public int CountCalls { get; private set; }
         public int TrendCalls { get; private set; }
         public int BreakdownCalls { get; private set; }
+        public int EventCalls { get; private set; }
+        public int EventCountCalls { get; private set; }
+        public int EventTrendCalls { get; private set; }
         public bool FailPreviousCount { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
 
@@ -149,6 +184,27 @@ public sealed class VercelAnalyticsReportServiceTests
             cancellationToken.ThrowIfCancellationRequested();
             BreakdownCalls++;
             return Task.FromResult<IReadOnlyList<AnalyticsBreakdownRow>>([]);
+        }
+
+        public Task<AnalyticsEventTotals> CountEventsAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EventCountCalls++;
+            return Task.FromResult(new AnalyticsEventTotals(30, 12));
+        }
+
+        public Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, int limit, string? search, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EventCalls++;
+            return Task.FromResult<IReadOnlyList<AnalyticsEventRow>>([]);
+        }
+
+        public Task<IReadOnlyList<AnalyticsEventPoint>> GetEventTrendAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EventTrendCalls++;
+            return Task.FromResult<IReadOnlyList<AnalyticsEventPoint>>([]);
         }
     }
 }

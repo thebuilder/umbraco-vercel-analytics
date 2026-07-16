@@ -504,16 +504,34 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   #renderHeader() {
     const connection = this._connections.find((item) => item.alias === this._connection);
+    const hostname = this._route?.hostname ?? connection?.hostnames[0];
+    const siteLabel = hostname ?? connection?.displayName;
+    const siteUrl = this.#linkBaseUrl();
     return html`
       <header>
+        <div class="site-context">
+          ${hostname && siteUrl ? html`
+            <a class="site-link" href=${siteUrl} target="_blank" rel="noopener noreferrer">
+              <uui-icon name="icon-globe" aria-hidden="true"></uui-icon>
+              <span>${hostname}</span>
+              <span class="external-indicator" aria-hidden="true">↗</span>
+              <span class="visually-hidden">Open site in a new tab</span>
+            </a>
+          ` : siteLabel ? html`
+            <span class="site-name">
+              <uui-icon name="icon-globe" aria-hidden="true"></uui-icon>
+              <span>${siteLabel}</span>
+            </span>
+          ` : ""}
+        </div>
         <div class="controls">
-          ${this.documentId ? "" : html`
+          ${!this.documentId && this._connections.length > 1 ? html`
             <uui-select
               class="project-select"
               label="Vercel project"
               .options=${this.#selectOptions(this._connections.map((item) => ({ value: item.alias, name: item.displayName })), this._connection)}
               @change=${this.#onConnectionChange}></uui-select>
-          `}
+          ` : ""}
           <div class="report-controls">
             <uui-select
               class="range-select"
@@ -815,9 +833,15 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   static styles = [UmbTextStyles, css`
     :host { display: block; }
     main { container-type: inline-size; padding: var(--uui-size-layout-1); max-width: 110rem; margin-inline: auto; }
-    header { margin-bottom: var(--uui-size-layout-1); }
+    header { align-items: end; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-5); justify-content: space-between; margin-bottom: var(--uui-size-layout-1); }
     .hint { color: var(--uui-color-text-alt); }
-    .controls { align-items: end; display: flex; flex-wrap: wrap; gap: var(--uui-size-layout-1); justify-content: flex-start; }
+    .site-context { align-items: center; display: flex; min-block-size: 2.5rem; min-inline-size: 0; }
+    .site-link, .site-name { align-items: center; color: var(--uui-color-text); display: inline-flex; font-weight: 700; gap: var(--uui-size-space-2); min-inline-size: 0; text-decoration: none; }
+    .site-link:hover { text-decoration: underline; text-underline-offset: 0.18em; }
+    .site-link:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 3px; }
+    .site-context uui-icon { color: var(--uui-color-text-alt); flex: 0 0 auto; }
+    .external-indicator { color: var(--uui-color-text-alt); font-size: 0.875em; }
+    .controls { align-items: end; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-4); justify-content: flex-end; margin-inline-start: auto; }
     .report-controls, .date-actions { align-items: end; display: flex; gap: var(--uui-size-space-4); }
     .date-control { display: grid; gap: var(--uui-size-space-2); }
     .date-control uui-input { min-inline-size: 11rem; }
@@ -838,7 +862,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .metric-skeleton { background: var(--uui-color-surface-alt); block-size: clamp(2.2rem, 4.4vw, 3.85rem); border-radius: var(--uui-border-radius); display: block; inline-size: 58%; margin-top: var(--uui-size-space-3); max-inline-size: 14rem; }
     .eyebrow { color: var(--uui-color-text-alt); font-weight: 700; }
     .history { --uui-box-default-padding: 0; margin-bottom: var(--uui-size-layout-1); overflow: hidden; }
-    .history-panel { padding: var(--uui-size-space-5); }
+    .history-panel { padding: var(--uui-size-space-3); }
     .chart-skeleton { block-size: 18rem; display: grid; }
     .chart-skeleton span { border-top: 1px solid var(--uui-color-border); }
     .summary-error { --uui-box-default-padding: 0; --uui-box-border-width: 1px; --uui-box-border-color: color-mix(in srgb, var(--uui-color-warning-standalone) 35%, var(--uui-color-border)); --uui-box-box-shadow: none; margin-bottom: var(--uui-size-layout-1); overflow: hidden; }
@@ -866,7 +890,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .filter-badge:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
     .filter-badge uui-icon { color: var(--uui-color-text-alt); }
     @container (max-width: 62rem) {
-      .controls { align-items: stretch; flex-direction: column; gap: var(--uui-size-space-4); }
+      .controls { align-items: flex-end; flex: 1 1 100%; flex-direction: column; gap: var(--uui-size-space-4); }
       .project-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .breakdown-card, .wide { grid-column: auto; }
@@ -876,6 +900,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       .metric-tab { flex: 1 1 50%; min-inline-size: 0; }
     }
     @container (max-width: 40rem) {
+      .controls { align-items: stretch; }
       .report-controls, .date-actions { align-items: stretch; flex-direction: column; }
       .report-controls > *, .date-actions > *, .date-control uui-input { box-sizing: border-box; inline-size: 100%; max-inline-size: none; }
       .metric-tabs { flex-direction: column; }

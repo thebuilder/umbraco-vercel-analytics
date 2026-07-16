@@ -21,6 +21,7 @@ import { dateRangeForPreset, normalizeCustomRange, type AnalyticsDateRange, type
 import { reportErrorMessage } from "./report-error.js";
 import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-capability.js";
 import { topBreakdownRows } from "./breakdown-rows.js";
+import { countrySearchValue } from "./country-display.js";
 import "./history-chart.element.js";
 import "./breakdown-table.element.js";
 import "./breakdown-dialog.element.js";
@@ -69,12 +70,20 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   #initializationRequest = 0;
   #reportRequest = 0;
   #expandedRequest = 0;
+  #expandedAbort?: AbortController;
+  #expandedSearchTimer?: number;
   #lastScopeKey?: string;
   #utmCapabilityByConnection = new Map<string, UtmCapability>();
 
   connectedCallback(): void {
     super.connectedCallback();
     void this.#initialize();
+  }
+
+  override disconnectedCallback(): void {
+    this.#expandedAbort?.abort();
+    if (this.#expandedSearchTimer !== undefined) window.clearTimeout(this.#expandedSearchTimer);
+    super.disconnectedCallback();
   }
 
   protected updated(changedProperties: Map<PropertyKey, unknown>): void {
@@ -209,25 +218,62 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   }
 
   async #openBreakdown(dimension: AnalyticsDimension, headline: string): Promise<void> {
+    if (this.#expandedSearchTimer !== undefined) window.clearTimeout(this.#expandedSearchTimer);
+    await this.#loadExpandedBreakdown(dimension, headline, "");
+  }
+
+  async #loadExpandedBreakdown(dimension: AnalyticsDimension, headline: string, search: string): Promise<void> {
     if (!this._connection) return;
+    this.#expandedAbort?.abort();
+    const abort = new AbortController();
+    this.#expandedAbort = abort;
     const request = ++this.#expandedRequest;
     this._expanded = { dimension, headline, rows: [], loading: true };
-    const { data, error, response } = await UmbracoVercelAnalyticsService.breakdown({
-      path: { dimension },
-      query: {
-        connection: this._connection,
-        ...this._range,
-        ...this.#scope(),
-        limit: 100,
-      },
-    });
+    let result;
+    try {
+      result = await UmbracoVercelAnalyticsService.breakdown({
+        path: { dimension },
+        query: {
+          connection: this._connection,
+          ...this._range,
+          ...this.#scope(),
+          limit: 100,
+          search: search || undefined,
+        },
+        signal: abort.signal,
+      });
+    } catch (error) {
+      if (abort.signal.aborted) return;
+      if (request === this.#expandedRequest && this._expanded?.dimension === dimension) {
+        this._expanded = { dimension, headline, rows: [], loading: false, error: reportErrorMessage(error) };
+      }
+      return;
+    }
+    const { data, error, response } = result;
     if (request !== this.#expandedRequest || this._expanded?.dimension !== dimension) return;
     this._expanded = error
       ? { dimension, headline, rows: [], loading: false, error: reportErrorMessage({ status: response.status }) }
       : { dimension, headline, rows: data?.rows ?? [], loading: false };
   }
 
+  #searchBreakdown(event: CustomEvent<{ search: string }>): void {
+    if (!this._expanded) return;
+    const { dimension, headline } = this._expanded;
+    const search = dimension === "Country"
+      ? countrySearchValue(event.detail.search, navigator.languages)
+      : event.detail.search;
+    this.#expandedAbort?.abort();
+    this.#expandedRequest++;
+    this._expanded = { dimension, headline, rows: [], loading: true };
+    if (this.#expandedSearchTimer !== undefined) window.clearTimeout(this.#expandedSearchTimer);
+    this.#expandedSearchTimer = window.setTimeout(() => {
+      void this.#loadExpandedBreakdown(dimension, headline, search);
+    }, 300);
+  }
+
   #closeBreakdown(): void {
+    if (this.#expandedSearchTimer !== undefined) window.clearTimeout(this.#expandedSearchTimer);
+    this.#expandedAbort?.abort();
     this.#expandedRequest++;
     this._expanded = undefined;
   }
@@ -408,6 +454,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .unavailable=${this._expanded.error}
             .baseUrl=${this.#linkBaseUrl()}
             .linkValues=${this._expanded.dimension === "RequestPath" || this._expanded.dimension === "Route"}
+            @search-breakdown=${this.#searchBreakdown}
             @close-breakdown=${this.#closeBreakdown}></vercel-analytics-breakdown-dialog>
         ` : ""}
       </main>

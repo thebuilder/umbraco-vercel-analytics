@@ -10,8 +10,6 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
-import { filterBreakdownRows } from "./breakdown-rows.js";
-import { countryDisplayName } from "./country-display.js";
 import "./breakdown-table.element.js";
 
 @customElement("vercel-analytics-breakdown-dialog")
@@ -42,32 +40,38 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
     this.#close();
   }
 
+  #onSearch(event: Event): void {
+    this._search = String((event.target as UUIInputElement).value ?? "");
+    this.dispatchEvent(new CustomEvent("search-breakdown", {
+      bubbles: true,
+      composed: true,
+      detail: { search: this._search.trim() },
+    }));
+  }
+
   render() {
-    const displayValue = this.dimension === "Country"
-      ? (value: string) => countryDisplayName(value, navigator.languages)
-      : undefined;
-    const rows = filterBreakdownRows(this.rows, this._search, displayValue);
     return html`
       <dialog aria-label=${this.headline} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
         <uui-dialog-layout headline=${this.headline}>
           <uui-input
             type="search"
             label=${`Search ${this.headline}`}
+            maxlength="200"
             placeholder="Search"
             .value=${this._search}
-            @input=${(event: Event) => (this._search = String((event.target as UUIInputElement).value ?? ""))}>
+            @input=${this.#onSearch}>
             <uui-icon name="icon-search" slot="prepend"></uui-icon>
           </uui-input>
-          <div class="results" aria-live="polite">
+          <div class="results" aria-busy=${this.loading} aria-live="polite">
             ${!this.loading && this.unavailable ? html`<umb-empty-state headline="Results unavailable"><p>${this.unavailable}</p></umb-empty-state>` : ""}
-            ${!this.loading && !this.unavailable && this._search && rows.length === 0
+            ${!this.loading && !this.unavailable && this._search && this.rows.length === 0
               ? html`<umb-empty-state headline="No matching results"><p>Try a different search.</p></umb-empty-state>`
               : ""}
-            ${(this.loading || (!this.unavailable && (!this._search || rows.length > 0))) ? html`
+            ${(this.loading || (!this.unavailable && (!this._search || this.rows.length > 0))) ? html`
               <vercel-analytics-breakdown-table
                 .headline=${this.headline}
                 .dimension=${this.dimension}
-                .rows=${rows}
+                .rows=${this.rows}
                 .loading=${this.loading}
                 .baseUrl=${this.baseUrl}
                 .linkValues=${this.linkValues}></vercel-analytics-breakdown-table>

@@ -180,6 +180,7 @@ export type BreakdownData = {
         to?: string;
         interval?: AnalyticsInterval;
         limit?: number;
+        search?: string;
         documentId?: string;
         culture?: string;
         path?: string;

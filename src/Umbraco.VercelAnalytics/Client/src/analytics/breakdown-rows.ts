@@ -10,20 +10,6 @@ export function topBreakdownRows(rows: AnalyticsBreakdownRow[], limit = 10): Ana
   return withoutAggregatedOthers(rows).slice(0, limit);
 }
 
-export function filterBreakdownRows(
-  rows: AnalyticsBreakdownRow[],
-  search: string,
-  displayValue: (value: string) => string = (value) => value,
-): AnalyticsBreakdownRow[] {
-  const query = search.trim().toLocaleLowerCase();
-  const visibleRows = withoutAggregatedOthers(rows);
-  return query
-    ? visibleRows.filter((row) =>
-      row.value.toLocaleLowerCase().includes(query)
-      || displayValue(row.value).toLocaleLowerCase().includes(query))
-    : visibleRows;
-}
-
 export function analyticsRowHref(baseUrl: string | undefined, value: string): string | undefined {
   if (!baseUrl || !value.startsWith("/")) return undefined;
 

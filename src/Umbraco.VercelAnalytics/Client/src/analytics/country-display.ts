@@ -21,3 +21,21 @@ export function countryFlagUrl(value: string): string | undefined {
   const code = normalizeCountryCode(value);
   return code ? `https://flag.vercel.app/s/${code}.svg` : undefined;
 }
+
+export function countrySearchValue(value: string, locales: Intl.LocalesArgument = "en"): string {
+  const query = value.trim();
+  const code = normalizeCountryCode(query);
+  if (code || !query || typeof Intl.DisplayNames !== "function") return code ?? query;
+
+  const displayNames = new Intl.DisplayNames(locales, { type: "region" });
+  const normalizedQuery = query.toLocaleLowerCase();
+  for (let first = 65; first <= 90; first++) {
+    for (let second = 65; second <= 90; second++) {
+      const candidate = String.fromCharCode(first, second);
+      const displayName = displayNames.of(candidate);
+      if (displayName !== candidate && displayName?.toLocaleLowerCase() === normalizedQuery) return candidate;
+    }
+  }
+
+  return query;
+}

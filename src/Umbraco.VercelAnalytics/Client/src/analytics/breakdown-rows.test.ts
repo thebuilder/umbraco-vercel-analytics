@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyticsRowHref, filterBreakdownRows, topBreakdownRows, withoutAggregatedOthers } from "./breakdown-rows.js";
+import { analyticsRowHref, topBreakdownRows, withoutAggregatedOthers } from "./breakdown-rows.js";
 
 const rows = [
   { value: "/news", visitors: 12, pageViews: 18 },
@@ -14,15 +14,6 @@ describe("analytics breakdown rows", () => {
 
   it("limits panels after removing the aggregate row", () => {
     expect(topBreakdownRows(rows, 1).map((row) => row.value)).toEqual(["/news"]);
-  });
-
-  it("filters expanded results case-insensitively", () => {
-    expect(filterBreakdownRows(rows, "ABOUT").map((row) => row.value)).toEqual(["/about"]);
-  });
-
-  it("can filter expanded results by their formatted display value", () => {
-    expect(filterBreakdownRows(rows, "news page", (value) => value === "/news" ? "News page" : value))
-      .toEqual([rows[0]]);
   });
 
   it("only creates links for rooted paths on an HTTP origin", () => {

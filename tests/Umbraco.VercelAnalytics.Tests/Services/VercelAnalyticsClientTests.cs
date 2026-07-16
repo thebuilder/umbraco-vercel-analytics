@@ -107,6 +107,30 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Count_combines_allowlisted_filters_and_escapes_values()
+    {
+        var handler = new RecordingHandler("""{"data":{"pageviews":42,"visitors":31}}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+        var query = new AnalyticsQuery(
+            connection.Alias,
+            new DateOnly(2026, 7, 1),
+            new DateOnly(2026, 7, 2),
+            AnalyticsInterval.Day,
+            Filters:
+            [
+                new AnalyticsFilter(AnalyticsDimension.Country, "DK"),
+                new AnalyticsFilter(AnalyticsDimension.ReferrerHostname, "editor's.example")
+            ]);
+
+        await client.CountAsync(connection, query, CancellationToken.None);
+
+        Assert.Contains(
+            "filter=country eq 'DK' and referrerHostname eq 'editor''s.example'",
+            Uri.UnescapeDataString(handler.Request!.RequestUri!.Query));
+    }
+
+    [Fact]
     public async Task Event_count_combines_validated_route_and_escaped_event_filter()
     {
         var handler = new RecordingHandler("""{"data":{"count":42,"visitors":31}}""");

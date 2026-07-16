@@ -83,8 +83,13 @@ public sealed class VercelAnalyticsReportService(
         });
     }
 
-    private static string Normalize(AnalyticsQuery query) =>
-        $"{query.Connection.ToLowerInvariant()}:{query.From:yyyyMMdd}:{query.To:yyyyMMdd}:{query.Interval}:{query.RequestPath}";
+    private static string Normalize(AnalyticsQuery query)
+    {
+        var filters = string.Join(",", (query.Filters ?? [])
+            .OrderBy(filter => filter.Dimension)
+            .Select(filter => $"{filter.Dimension}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(filter.Value))}"));
+        return $"{query.Connection.ToLowerInvariant()}:{query.From:yyyyMMdd}:{query.To:yyyyMMdd}:{query.Interval}:{query.RequestPath}:{filters}";
+    }
 
     private async Task<AnalyticsTotals?> TryGetPreviousTotalsAsync(
         VercelAnalyticsConnection connection,

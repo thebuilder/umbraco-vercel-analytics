@@ -155,6 +155,10 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         {
             parameters["filter"] = $"requestPath eq '{EscapeODataString(query.RequestPath)}'";
         }
+        foreach (var filter in query.Filters ?? [])
+        {
+            AddFilter(parameters, $"{ToApiValue(filter.Dimension)} eq '{EscapeODataString(filter.Value)}'");
+        }
 
         return parameters;
     }

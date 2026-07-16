@@ -30,7 +30,10 @@ public sealed record AnalyticsQuery(
     DateOnly From,
     DateOnly To,
     AnalyticsInterval Interval,
-    string? RequestPath = null);
+    string? RequestPath = null,
+    IReadOnlyList<AnalyticsFilter>? Filters = null);
+
+public sealed record AnalyticsFilter(AnalyticsDimension Dimension, string Value);
 
 public sealed record AnalyticsTotals(long PageViews, long Visitors);
 

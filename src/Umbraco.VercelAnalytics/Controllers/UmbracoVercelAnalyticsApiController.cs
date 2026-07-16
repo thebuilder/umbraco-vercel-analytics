@@ -65,9 +65,10 @@ public sealed class UmbracoVercelAnalyticsApiController(
         [FromQuery] Guid? documentId,
         [FromQuery] string? culture,
         [FromQuery] string? path,
+        [FromQuery] string[]? filter,
         CancellationToken cancellationToken)
     {
-        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, cancellationToken);
+        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, filter, cancellationToken);
         if (scope.Error is not null) return scope.Error;
         try
         {
@@ -93,11 +94,12 @@ public sealed class UmbracoVercelAnalyticsApiController(
         [FromQuery] Guid? documentId = null,
         [FromQuery] string? culture = null,
         [FromQuery] string? path = null,
+        [FromQuery] string[]? filter = null,
         CancellationToken cancellationToken = default)
     {
         if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
         if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
-        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, cancellationToken);
+        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, filter, cancellationToken);
         if (scope.Error is not null) return scope.Error;
         try
         {
@@ -122,11 +124,12 @@ public sealed class UmbracoVercelAnalyticsApiController(
         [FromQuery] Guid? documentId = null,
         [FromQuery] string? culture = null,
         [FromQuery] string? path = null,
+        [FromQuery] string[]? filter = null,
         CancellationToken cancellationToken = default)
     {
         if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
         if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
-        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, cancellationToken);
+        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, filter, cancellationToken);
         if (scope.Error is not null) return scope.Error;
         try
         {
@@ -150,6 +153,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
         [FromQuery] Guid? documentId = null,
         [FromQuery] string? culture = null,
         [FromQuery] string? path = null,
+        [FromQuery] string[]? filter = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(eventName) || eventName.Length > 255)
@@ -157,7 +161,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
             return ValidationProblem("Event name is required and must be 255 characters or fewer.");
         }
 
-        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, cancellationToken);
+        var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, filter, cancellationToken);
         if (scope.Error is not null) return scope.Error;
         try
         {
@@ -178,6 +182,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
         Guid? documentId,
         string? culture,
         string? path,
+        IReadOnlyList<string>? filterValues,
         CancellationToken cancellationToken)
     {
         if (!registry.Settings.Enabled) return (null, StatusCode(StatusCodes.Status503ServiceUnavailable));
@@ -185,11 +190,15 @@ public sealed class UmbracoVercelAnalyticsApiController(
         {
             return (null, ValidationProblem("The date range must be ordered and no longer than 730 days."));
         }
+        if (!AnalyticsFilterParser.TryParse(filterValues, out var filters, out var filterError))
+        {
+            return (null, ValidationProblem(filterError!));
+        }
 
         if (documentId is null)
         {
             return HasAnalyticsSectionAccess()
-                ? (new AnalyticsQuery(connection, from, to, interval), null)
+                ? (new AnalyticsQuery(connection, from, to, interval, Filters: filters), null)
                 : (null, Forbid());
         }
 
@@ -200,7 +209,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
             string.Equals(route.Path, path, StringComparison.Ordinal));
         return selectedRoute is null
             ? (null, ValidationProblem("The selected path is not a published route for this document and connection."))
-            : (new AnalyticsQuery(connection, from, to, interval, selectedRoute.Path), null);
+            : (new AnalyticsQuery(connection, from, to, interval, selectedRoute.Path, filters), null);
     }
 
     private bool HasAnalyticsSectionAccess()

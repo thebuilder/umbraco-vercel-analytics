@@ -82,6 +82,26 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
+    public async Task Summary_cache_separates_filter_values()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await service.GetSummaryAsync(CreateQuery() with
+        {
+            Filters = [new AnalyticsFilter(AnalyticsDimension.Country, "DK")]
+        }, CancellationToken.None);
+        await service.GetSummaryAsync(CreateQuery() with
+        {
+            Filters = [new AnalyticsFilter(AnalyticsDimension.Country, "US")]
+        }, CancellationToken.None);
+
+        Assert.Equal(4, client.CountCalls);
+        Assert.Equal(2, client.TrendCalls);
+    }
+
+    [Fact]
     public async Task Events_are_cached_by_search_and_document_scope()
     {
         var client = new CountingClient();

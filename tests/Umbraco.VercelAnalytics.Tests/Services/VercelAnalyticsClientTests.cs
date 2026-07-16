@@ -143,6 +143,7 @@ public sealed class VercelAnalyticsClientTests
             connection,
             new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/editor's"),
             "CTA's click",
+            null,
             CancellationToken.None);
 
         Assert.Equal(new AnalyticsEventTotals(42, 31), result);
@@ -192,6 +193,7 @@ public sealed class VercelAnalyticsClientTests
             connection,
             new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             "Signup",
+            null,
             CancellationToken.None);
 
         Assert.Equal("plan", Assert.Single(result));
@@ -213,12 +215,15 @@ public sealed class VercelAnalyticsClientTests
             "Signup",
             "signup-source",
             100,
+            new AnalyticsEventDataFilter("account-tier", "Editor's choice"),
             CancellationToken.None);
 
         Assert.Equal(new AnalyticsEventPropertyValue("Enterprise", 12, 10), Assert.Single(result));
         Assert.Contains("by=eventData%2F%27signup-source%27", handler.Request!.RequestUri!.Query);
         Assert.Contains("limit=100", handler.Request.RequestUri.Query);
-        Assert.Contains("filter=requestPath eq '/news' and eventName eq 'Signup'", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
+        Assert.Contains(
+            "filter=requestPath eq '/news' and eventName eq 'Signup' and eventData/'account-tier' eq 'Editor''s choice'",
+            Uri.UnescapeDataString(handler.Request.RequestUri.Query));
     }
 
     [Fact]

@@ -67,22 +67,26 @@ public sealed class VercelAnalyticsReportService(
     public async Task<AnalyticsEventDetails?> GetEventDetailsAsync(
         AnalyticsQuery query,
         string eventName,
+        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
         var connection = registry.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedEventName = eventName.Trim();
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-details:{normalizedEventName}:{Normalize(query)}";
+        var eventDataCacheKey = eventDataFilter is null
+            ? string.Empty
+            : $":{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Property))}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Value))}";
+        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-details:{normalizedEventName}{eventDataCacheKey}:{Normalize(query)}";
         return await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
-            var totals = client.CountEventsAsync(connection, query, normalizedEventName, cancellationToken);
-            var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, cancellationToken);
+            var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, cancellationToken);
+            var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, cancellationToken);
             await Task.WhenAll(totals, propertyNamesTask);
             var propertyNames = await propertyNamesTask;
             var propertyTasks = propertyNames.Select(async propertyName => new AnalyticsEventProperty(
                 propertyName,
-                await client.GetEventPropertyValuesAsync(connection, query, normalizedEventName, propertyName, 100, cancellationToken)));
+                await client.GetEventPropertyValuesAsync(connection, query, normalizedEventName, propertyName, 100, eventDataFilter, cancellationToken)));
             var properties = await Task.WhenAll(propertyTasks);
             return new AnalyticsEventDetails(normalizedEventName, await totals, properties);
         });

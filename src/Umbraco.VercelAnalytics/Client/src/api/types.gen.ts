@@ -281,6 +281,8 @@ export type EventDetailsData = {
         to?: string;
         interval?: AnalyticsInterval;
         eventName?: string;
+        eventProperty?: string;
+        eventValue?: string;
         documentId?: string;
         culture?: string;
         path?: string;

@@ -151,6 +151,8 @@ public sealed class UmbracoVercelAnalyticsApiController(
         [FromQuery] DateOnly to,
         [FromQuery] AnalyticsInterval interval,
         [FromQuery] string eventName,
+        [FromQuery] string? eventProperty = null,
+        [FromQuery] string? eventValue = null,
         [FromQuery] Guid? documentId = null,
         [FromQuery] string? culture = null,
         [FromQuery] string? path = null,
@@ -161,12 +163,23 @@ public sealed class UmbracoVercelAnalyticsApiController(
         {
             return ValidationProblem("Event name is required and must be 255 characters or fewer.");
         }
+        if (string.IsNullOrWhiteSpace(eventProperty) != string.IsNullOrWhiteSpace(eventValue))
+        {
+            return ValidationProblem("Event property and value must be supplied together.");
+        }
+        if (eventProperty?.Length > 255 || eventValue?.Length > 500)
+        {
+            return ValidationProblem("Event property must be 255 characters or fewer and value must be 500 characters or fewer.");
+        }
 
         var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, filter, cancellationToken);
         if (scope.Error is not null) return scope.Error;
         try
         {
-            var report = await reportService.GetEventDetailsAsync(scope.Query!, eventName, cancellationToken);
+            var eventDataFilter = string.IsNullOrWhiteSpace(eventProperty)
+                ? null
+                : new AnalyticsEventDataFilter(eventProperty, eventValue!);
+            var report = await reportService.GetEventDetailsAsync(scope.Query!, eventName, eventDataFilter, cancellationToken);
             return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
         }
         catch (VercelAnalyticsApiException exception)

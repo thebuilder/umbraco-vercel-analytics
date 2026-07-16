@@ -72,10 +72,12 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
+        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
         var parameters = BuildParameters(connection, query);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
+        AddEventDataFilter(parameters, eventDataFilter);
         using var response = await SendAsync(connection, EventCountPath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<EventCountEnvelope>(cancellationToken);
         return envelope?.Data is null
@@ -112,12 +114,14 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
+        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
         var parameters = BuildParameters(connection, query);
         parameters["by"] = "eventData";
         parameters["limit"] = EventPropertyLimit.ToString(CultureInfo.InvariantCulture);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
+        AddEventDataFilter(parameters, eventDataFilter);
         using var response = await SendAsync(connection, EventAggregatePath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
         return envelope?.Data
@@ -133,12 +137,14 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         string eventName,
         string propertyName,
         int limit,
+        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
         var parameters = BuildParameters(connection, query);
         parameters["by"] = ToEventDataDimension(propertyName);
         parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
+        AddEventDataFilter(parameters, eventDataFilter);
         using var response = await SendAsync(connection, EventAggregatePath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
         return envelope?.Data
@@ -204,6 +210,15 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         parameters["filter"] = parameters.TryGetValue("filter", out var existingFilter)
             ? $"{existingFilter} and {filter}"
             : filter;
+
+    private static void AddEventDataFilter(
+        IDictionary<string, string?> parameters,
+        AnalyticsEventDataFilter? filter)
+    {
+        if (filter is null) return;
+        AddFilter(parameters,
+            $"{ToEventDataDimension(filter.Property)} eq '{EscapeODataString(filter.Value)}'");
+    }
 
     internal static string ToApiValue(AnalyticsInterval interval) => interval switch
     {

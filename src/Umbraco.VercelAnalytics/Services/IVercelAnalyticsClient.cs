@@ -27,6 +27,7 @@ public interface IVercelAnalyticsClient
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
+        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
@@ -40,6 +41,7 @@ public interface IVercelAnalyticsClient
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
+        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(
@@ -48,5 +50,6 @@ public interface IVercelAnalyticsClient
         string eventName,
         string propertyName,
         int limit,
+        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
 }

@@ -36,6 +36,8 @@ public sealed record AnalyticsQuery(
 
 public sealed record AnalyticsFilter(AnalyticsDimension Dimension, string Value);
 
+public sealed record AnalyticsEventDataFilter(string Property, string Value);
+
 public sealed record AnalyticsTotals(long PageViews, long Visitors);
 
 public sealed record AnalyticsPoint(DateTimeOffset Timestamp, long PageViews, long Visitors);

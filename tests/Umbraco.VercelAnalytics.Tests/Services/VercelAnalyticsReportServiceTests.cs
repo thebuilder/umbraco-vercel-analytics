@@ -123,8 +123,8 @@ public sealed class VercelAnalyticsReportServiceTests
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
 
-        var first = await service.GetEventDetailsAsync(CreateQuery(), "Signup", CancellationToken.None);
-        var second = await service.GetEventDetailsAsync(CreateQuery(), "Signup", CancellationToken.None);
+        var first = await service.GetEventDetailsAsync(CreateQuery(), "Signup", null, CancellationToken.None);
+        var second = await service.GetEventDetailsAsync(CreateQuery(), "Signup", null, CancellationToken.None);
 
         Assert.NotNull(first);
         Assert.Same(first, second);
@@ -133,6 +133,22 @@ public sealed class VercelAnalyticsReportServiceTests
         Assert.Equal(1, client.EventCountCalls);
         Assert.Equal(1, client.EventPropertyNameCalls);
         Assert.Equal(1, client.EventPropertyValueCalls);
+    }
+
+    [Fact]
+    public async Task Event_details_cache_and_queries_include_the_event_data_filter()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var filter = new AnalyticsEventDataFilter("plan", "Enterprise");
+
+        await service.GetEventDetailsAsync(CreateQuery(), "Signup", filter, CancellationToken.None);
+        await service.GetEventDetailsAsync(CreateQuery(), "Signup", filter, CancellationToken.None);
+        await service.GetEventDetailsAsync(CreateQuery(), "Signup", new("plan", "Pro"), CancellationToken.None);
+
+        Assert.Equal(2, client.EventCountCalls);
+        Assert.Equal(new AnalyticsEventDataFilter("plan", "Pro"), client.LastEventDataFilter);
     }
 
     [Fact]
@@ -180,6 +196,7 @@ public sealed class VercelAnalyticsReportServiceTests
         public int EventCountCalls { get; private set; }
         public int EventPropertyNameCalls { get; private set; }
         public int EventPropertyValueCalls { get; private set; }
+        public AnalyticsEventDataFilter? LastEventDataFilter { get; private set; }
         public bool FailPreviousCount { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
 
@@ -209,10 +226,11 @@ public sealed class VercelAnalyticsReportServiceTests
             return Task.FromResult<IReadOnlyList<AnalyticsBreakdownRow>>([]);
         }
 
-        public Task<AnalyticsEventTotals> CountEventsAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, CancellationToken cancellationToken)
+        public Task<AnalyticsEventTotals> CountEventsAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventCountCalls++;
+            LastEventDataFilter = eventDataFilter;
             return Task.FromResult(new AnalyticsEventTotals(30, 12));
         }
 
@@ -223,14 +241,14 @@ public sealed class VercelAnalyticsReportServiceTests
             return Task.FromResult<IReadOnlyList<AnalyticsEventRow>>([]);
         }
 
-        public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventPropertyNameCalls++;
             return Task.FromResult<IReadOnlyList<string>>(["plan"]);
         }
 
-        public Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, string propertyName, int limit, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, string propertyName, int limit, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventPropertyValueCalls++;

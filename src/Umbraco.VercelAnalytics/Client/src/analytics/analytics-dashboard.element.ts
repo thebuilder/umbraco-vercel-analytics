@@ -56,7 +56,14 @@ type ExpandedBreakdown = {
   error?: string;
 };
 type ExpandedEvents = { rows: AnalyticsEventRow[]; loading: boolean; error?: string };
-type SelectedEvent = { eventName: string; details?: AnalyticsEventDetails; loading: boolean; error?: string };
+type SelectedEvent = {
+  eventName: string;
+  details?: AnalyticsEventDetails;
+  loading: boolean;
+  error?: string;
+  eventProperty?: string;
+  eventValue?: string;
+};
 
 const BREAKDOWNS: ReadonlyArray<{ dimension: AnalyticsDimension; headline: string; wide?: boolean; planLimited?: boolean }> = [
   { dimension: "RequestPath", headline: "Pages and routes", wide: true },
@@ -405,16 +412,42 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   async #selectEvent(event: CustomEvent<{ eventName: string }>): Promise<void> {
     if (!this._connection) return;
     this.#closeEvents();
-    const eventName = event.detail.eventName;
+    await this.#loadEventDetails(event.detail.eventName);
+  }
+
+  async #loadEventDetails(eventName: string, eventProperty?: string, eventValue?: string): Promise<void> {
+    if (!this._connection) return;
     const request = ++this.#eventRequest;
-    this._selectedEvent = { eventName, loading: true };
+    const previousDetails = this._selectedEvent?.eventName === eventName
+      ? this._selectedEvent.details
+      : undefined;
+    this._selectedEvent = { eventName, eventProperty, eventValue, details: previousDetails, loading: true };
     const { data, error, response } = await UmbracoVercelAnalyticsService.eventDetails({
-      query: { connection: this._connection, ...this._range, ...this.#scope(), ...this.#filterQuery(), eventName },
+      query: {
+        connection: this._connection,
+        ...this._range,
+        ...this.#scope(),
+        ...this.#filterQuery(),
+        eventName,
+        eventProperty,
+        eventValue,
+      },
     });
     if (request !== this.#eventRequest || this._selectedEvent?.eventName !== eventName) return;
     this._selectedEvent = error
-      ? { eventName, loading: false, error: reportErrorMessage({ status: response.status }) }
-      : { eventName, loading: false, details: data };
+      ? { eventName, eventProperty, eventValue, details: previousDetails, loading: false, error: reportErrorMessage({ status: response.status }) }
+      : { eventName, eventProperty, eventValue, loading: false, details: data };
+  }
+
+  #toggleEventPropertyFilter(event: CustomEvent<{ property: string; value: string }>): void {
+    if (!this._selectedEvent) return;
+    const active = this._selectedEvent.eventProperty === event.detail.property
+      && this._selectedEvent.eventValue === event.detail.value;
+    void this.#loadEventDetails(
+      this._selectedEvent.eventName,
+      active ? undefined : event.detail.property,
+      active ? undefined : event.detail.value,
+    );
   }
 
   #closeEventDetails(): void {
@@ -790,6 +823,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .details=${this._selectedEvent.details}
             .loading=${this._selectedEvent.loading}
             .unavailable=${this._selectedEvent.error}
+            .filterProperty=${this._selectedEvent.eventProperty}
+            .filterValue=${this._selectedEvent.eventValue}
+            @toggle-event-property-filter=${this.#toggleEventPropertyFilter}
             @close-event-details=${this.#closeEventDetails}></vercel-analytics-event-details-dialog>
         ` : ""}
       </main>

@@ -8,10 +8,28 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
   @property() headline = "Breakdown";
   @property() unavailable?: string;
   @property() baseUrl?: string;
+  @property({ type: Boolean }) loading = false;
   @property({ type: Boolean }) linkValues = false;
+  @property({ type: Number }) skeletonRows = 10;
   @property({ attribute: false }) rows: AnalyticsBreakdownRow[] = [];
 
   render() {
+    if (this.loading) {
+      return html`
+        <span class="visually-hidden" role="status">Loading ${this.headline}</span>
+        <table class="skeleton-table" aria-hidden="true">
+          <caption>${this.headline}</caption>
+          <thead><tr><th scope="col">Value</th><th scope="col">Visitors</th><th scope="col">Page views</th></tr></thead>
+          <tbody>${Array.from({ length: this.skeletonRows }, () => html`
+            <tr>
+              <th scope="row"><span class="skeleton-line"></span></th>
+              <td><span class="skeleton-number"></span></td>
+              <td><span class="skeleton-number"></span></td>
+            </tr>
+          `)}</tbody>
+        </table>
+      `;
+    }
     if (this.unavailable) return html`<p class="message">${this.unavailable}</p>`;
     const rows = withoutAggregatedOthers(this.rows);
     if (rows.length === 0) return html`<p class="message">No traffic was recorded for this breakdown.</p>`;
@@ -58,6 +76,16 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
       position: absolute;
       width: var(--bar-width);
     }
+    .skeleton-line, .skeleton-number {
+      background: var(--uui-color-surface-alt);
+      block-size: 1lh;
+      border-radius: var(--uui-border-radius);
+      display: block;
+    }
+    .skeleton-line { width: 72%; }
+    .skeleton-number { margin-inline-start: auto; width: 3.5rem; }
+    .skeleton-table tbody tr:nth-child(3n + 2) .skeleton-line { width: 56%; }
+    .skeleton-table tbody tr:nth-child(3n) .skeleton-line { width: 84%; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     .message { color: var(--uui-color-text-alt); }
   `;

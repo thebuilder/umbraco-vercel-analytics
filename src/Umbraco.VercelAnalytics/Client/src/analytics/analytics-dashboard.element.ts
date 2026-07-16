@@ -305,22 +305,36 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   }
 
   #renderSummary() {
-    if (this._summaryLoading) return html`<uui-loader-bar aria-label="Loading summary"></uui-loader-bar>`;
     if (this._summaryError) return html`<uui-box><umb-empty-state headline="Analytics unavailable"><p>${this._summaryError}</p><uui-button look="secondary" label="Retry analytics summary" @click=${this.#loadReports}>Retry</uui-button></umb-empty-state></uui-box>`;
-    if (!this._summary) return "";
     return html`
-      <section class="summary" aria-label="Traffic summary">
-        <uui-box><span class="eyebrow">Visitors</span><strong>${this._summary.totals.visitors.toLocaleString()}</strong></uui-box>
-        <uui-box><span class="eyebrow">Page views</span><strong>${this._summary.totals.pageViews.toLocaleString()}</strong></uui-box>
+      <section class="summary" aria-label="Traffic summary" aria-busy=${this._summaryLoading ? "true" : "false"}>
+        <uui-box>
+          <span class="eyebrow">Visitors</span>
+          ${this._summaryLoading
+            ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
+            : html`<strong>${this._summary?.totals.visitors.toLocaleString()}</strong>`}
+        </uui-box>
+        <uui-box>
+          <span class="eyebrow">Page views</span>
+          ${this._summaryLoading
+            ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
+            : html`<strong>${this._summary?.totals.pageViews.toLocaleString()}</strong>`}
+        </uui-box>
       </section>
-      <uui-box headline="History" class="history">
+      <uui-box headline="History" class="history" aria-busy=${this._summaryLoading ? "true" : "false"}>
         <uui-tab-group slot="header-actions" aria-label="History metric">
           <uui-tab label="Visitors" .active=${this._metric === "visitors"} @click=${() => (this._metric = "visitors")}>Visitors</uui-tab>
           <uui-tab label="Page views" .active=${this._metric === "pageViews"} @click=${() => (this._metric = "pageViews")}>Page views</uui-tab>
         </uui-tab-group>
-        ${this._summary.points.length
-          ? html`<vercel-analytics-history-chart .points=${this._summary.points} .metric=${this._metric} .interval=${this._range.interval}></vercel-analytics-history-chart>`
-          : html`<umb-empty-state headline="No history"><p>No traffic was recorded in this period.</p></umb-empty-state>`}
+        ${this._summaryLoading ? html`
+          <span class="visually-hidden" role="status">Loading traffic summary and history</span>
+          <div class="chart-skeleton" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <span class="history-button-skeleton" aria-hidden="true"></span>
+        ` : this._summary?.points.length
+            ? html`<vercel-analytics-history-chart .points=${this._summary.points} .metric=${this._metric} .interval=${this._range.interval}></vercel-analytics-history-chart>`
+            : html`<umb-empty-state headline="No history"><p>No traffic was recorded in this period.</p></umb-empty-state>`}
       </uui-box>
     `;
   }
@@ -328,25 +342,26 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   #renderBreakdown(dimension: AnalyticsDimension, headline: string, wide = false, planLimited = false) {
     if (planLimited && this._utmCapability === "unavailable") return "";
     const state = this._breakdowns[dimension];
+    const loading = state?.loading ?? true;
     const rows = topBreakdownRows(state?.data?.rows ?? []);
     const linkValues = dimension === "RequestPath" || dimension === "Route";
     return html`
       <uui-box headline=${headline} class=${wide ? "wide" : ""}>
-        ${!state?.loading && !state?.error && rows.length ? html`
+        ${!loading && !state?.error && rows.length ? html`
           <uui-button
             slot="header-actions"
             look="secondary"
             label=${`View all ${headline}`}
             @click=${() => this.#openBreakdown(dimension, headline)}>View all</uui-button>
         ` : ""}
-        ${state?.loading ? html`<uui-loader-bar aria-label=${`Loading ${headline}`}></uui-loader-bar>` : ""}
-        ${!state?.loading ? html`
-          <vercel-analytics-breakdown-table
-            .headline=${headline}
-            .rows=${rows}
-            .baseUrl=${this.#linkBaseUrl()}
-            .linkValues=${linkValues}
-            .unavailable=${state?.error}></vercel-analytics-breakdown-table>
+        <vercel-analytics-breakdown-table
+          .headline=${headline}
+          .rows=${rows}
+          .loading=${loading}
+          .baseUrl=${this.#linkBaseUrl()}
+          .linkValues=${linkValues}
+          .unavailable=${state?.error}></vercel-analytics-breakdown-table>
+        ${!loading ? html`
           ${state?.error ? html`<uui-button look="secondary" label=${`Retry ${headline} report`} @click=${this.#loadReports}>Retry</uui-button>` : ""}
           ${planLimited && state?.error ? html`<p class="hint">UTM reporting availability depends on your Vercel plan and reporting window.</p>` : ""}
         ` : ""}
@@ -387,10 +402,15 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .custom-range { justify-content: flex-end; margin-bottom: var(--uui-size-layout-1); }
     .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--uui-size-layout-1); margin-bottom: var(--uui-size-layout-1); }
     .summary strong { display: block; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; margin-top: var(--uui-size-space-3); font-variant-numeric: tabular-nums; }
+    .metric-skeleton { background: var(--uui-color-surface-alt); block-size: clamp(2.2rem, 4.4vw, 3.85rem); border-radius: var(--uui-border-radius); display: block; inline-size: 58%; margin-top: var(--uui-size-space-3); max-inline-size: 14rem; }
     .eyebrow { color: var(--uui-color-text-alt); font-weight: 700; }
     .history { margin-bottom: var(--uui-size-layout-1); }
+    .chart-skeleton { block-size: 18rem; display: grid; margin-bottom: var(--uui-size-space-4); }
+    .chart-skeleton span { border-top: 1px solid var(--uui-color-border); }
+    .history-button-skeleton { background: var(--uui-color-surface-alt); block-size: 2.5rem; border-radius: var(--uui-border-radius); display: block; inline-size: 8.5rem; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--uui-size-layout-1); }
     .wide { grid-column: span 2; }
+    .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     uui-tag { margin: 0 var(--uui-size-space-3) var(--uui-size-space-5) 0; }
     @media (max-width: 900px) {
       header { align-items: stretch; flex-direction: column; }

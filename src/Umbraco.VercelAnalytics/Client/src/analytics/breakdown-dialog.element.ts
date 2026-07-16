@@ -54,15 +54,15 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
             <uui-icon name="icon-search" slot="prepend"></uui-icon>
           </uui-input>
           <div class="results" aria-live="polite">
-            ${this.loading ? html`<uui-loader-bar aria-label=${`Loading all ${this.headline}`}></uui-loader-bar>` : ""}
             ${!this.loading && this.unavailable ? html`<umb-empty-state headline="Results unavailable"><p>${this.unavailable}</p></umb-empty-state>` : ""}
             ${!this.loading && !this.unavailable && this._search && rows.length === 0
               ? html`<umb-empty-state headline="No matching results"><p>Try a different search.</p></umb-empty-state>`
               : ""}
-            ${!this.loading && !this.unavailable && (!this._search || rows.length > 0) ? html`
+            ${(this.loading || (!this.unavailable && (!this._search || rows.length > 0))) ? html`
               <vercel-analytics-breakdown-table
                 .headline=${this.headline}
                 .rows=${rows}
+                .loading=${this.loading}
                 .baseUrl=${this.baseUrl}
                 .linkValues=${this.linkValues}></vercel-analytics-breakdown-table>
             ` : ""}

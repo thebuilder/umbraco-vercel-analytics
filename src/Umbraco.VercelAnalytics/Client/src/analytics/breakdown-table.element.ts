@@ -13,6 +13,7 @@ import {
   type TrafficMetric,
 } from "./breakdown-rows.js";
 import { countryDisplayName, countryFlagUrl, normalizeCountryCode } from "./country-display.js";
+import type { AnalyticsFilter } from "./dashboard-url-state.js";
 
 @customElement("vercel-analytics-breakdown-table")
 export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitElement) {
@@ -26,6 +27,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
   @property({ type: Number }) skeletonRows = 10;
   @property({ type: Number }) total = 0;
   @property({ attribute: false }) rows: AnalyticsBreakdownRow[] = [];
+  @property({ attribute: false }) filters: AnalyticsFilter[] = [];
 
   render() {
     if (this.loading) {
@@ -64,6 +66,8 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
           const percentage = breakdownPercentage(metricValue, this.total);
           const barRatio = breakdownBarRatio(metricValue, maximum);
           const tooltipId = `breakdown-value-${index}`;
+          const activeFilter = this.filters.some((filter) => filter.dimension === this.dimension && filter.value === row.value);
+          const filterLabel = activeFilter ? `Remove ${displayValue} filter` : `Filter analytics by ${displayValue}`;
           return html`
           <tr>
             <th scope="row">
@@ -76,16 +80,31 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
                   : displayValue}</span>
               </span>
             </th>
-            <td>${percentageDimension ? html`
-              <span class="percentage-value" tabindex="0" aria-describedby=${tooltipId}>
-                <span aria-hidden="true">${percentage.display}</span>
-                <span class="visually-hidden">${metricValue.toLocaleString()} ${this.#metricLabel().toLocaleLowerCase()}, ${percentage.precise} of the total</span>
-                <span id=${tooltipId} class="percentage-tooltip" role="tooltip">
-                  <strong>${metricValue.toLocaleString()}</strong>
-                  <span>${percentage.precise}</span>
+            <td><span class="metric-cell">
+              <button
+                class="filter-action"
+                type="button"
+                aria-label=${filterLabel}
+                aria-pressed=${activeFilter}
+                title=${filterLabel}
+                @click=${() => this.dispatchEvent(new CustomEvent("toggle-filter", {
+                  bubbles: true,
+                  composed: true,
+                  detail: { dimension: this.dimension, value: row.value },
+                }))}>
+                <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
+              </button>
+              ${percentageDimension ? html`
+                <span class="percentage-value" tabindex="0" aria-describedby=${tooltipId}>
+                  <span aria-hidden="true">${percentage.display}</span>
+                  <span class="visually-hidden">${metricValue.toLocaleString()} ${this.#metricLabel().toLocaleLowerCase()}, ${percentage.precise} of the total</span>
+                  <span id=${tooltipId} class="percentage-tooltip" role="tooltip">
+                    <strong>${metricValue.toLocaleString()}</strong>
+                    <span>${percentage.precise}</span>
+                  </span>
                 </span>
-              </span>
-            ` : metricValue.toLocaleString()}</td>
+              ` : html`<span class="metric-number">${metricValue.toLocaleString()}</span>`}
+            </span></td>
           </tr>
         `;})}</tbody>
       </table>
@@ -100,7 +119,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     :host { display: block; overflow-x: auto; }
     table {
       --bar-inset: var(--uui-size-space-3);
-      --metric-column-width: 7rem;
+      --metric-column-width: 8.5rem;
       border-collapse: collapse;
       min-inline-size: 20rem;
       table-layout: fixed;
@@ -111,6 +130,12 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     thead th:nth-child(2) { color: var(--uui-color-text-alt); text-align: right; width: var(--metric-column-width); }
     th, td { box-sizing: border-box; padding: var(--uui-size-space-3) var(--uui-size-space-5); text-align: left; }
     td { font-variant-numeric: tabular-nums; position: relative; text-align: right; z-index: 1; }
+    .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
+    .metric-number { min-inline-size: 0; }
+    .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
+    tbody tr:hover .filter-action, .filter-action:focus-visible, .filter-action[aria-pressed="true"] { opacity: 1; }
+    .filter-action:hover, .filter-action[aria-pressed="true"] { background: var(--uui-color-surface-alt); color: var(--uui-color-interactive-emphasis); }
+    .filter-action:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 1px; }
     tbody th { position: relative; font-weight: 500; min-width: 10rem; }
     .row-value { align-items: center; display: flex; gap: var(--uui-size-space-3); min-inline-size: 0; position: relative; z-index: 1; }
     .row-label { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -181,6 +206,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     .skeleton-table tbody tr:nth-child(3n) .skeleton-line { width: 84%; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     .message { color: var(--uui-color-text-alt); padding: var(--uui-size-space-5); }
+    @media (hover: none) { .filter-action { opacity: 1; } }
     @media (prefers-reduced-motion: reduce) { .percentage-tooltip { transition: none; } }
   `;
 }

@@ -212,6 +212,7 @@ export type BreakdownData = {
         documentId?: string;
         culture?: string;
         path?: string;
+        filter?: Array<string>;
     };
     url: '/umbraco/management/api/v1/vercel-analytics/reports/breakdown/{dimension}';
 };
@@ -245,6 +246,7 @@ export type EventsData = {
         documentId?: string;
         culture?: string;
         path?: string;
+        filter?: Array<string>;
     };
     url: '/umbraco/management/api/v1/vercel-analytics/reports/events';
 };
@@ -277,6 +279,7 @@ export type EventHistoryData = {
         documentId?: string;
         culture?: string;
         path?: string;
+        filter?: Array<string>;
     };
     url: '/umbraco/management/api/v1/vercel-analytics/reports/events/history';
 };
@@ -308,6 +311,7 @@ export type SummaryData = {
         documentId?: string;
         culture?: string;
         path?: string;
+        filter?: Array<string>;
     };
     url: '/umbraco/management/api/v1/vercel-analytics/reports/summary';
 };

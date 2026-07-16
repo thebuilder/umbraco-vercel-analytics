@@ -11,6 +11,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
 import type { TrafficMetric } from "./breakdown-rows.js";
+import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import "./breakdown-table.element.js";
 
 @customElement("vercel-analytics-breakdown-dialog")
@@ -24,6 +25,7 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
   @property({ type: Number }) total = 0;
   @property({ type: Boolean }) linkValues = false;
   @property({ attribute: false }) rows: AnalyticsBreakdownRow[] = [];
+  @property({ attribute: false }) filters: AnalyticsFilter[] = [];
   @state() private _search = "";
 
   protected firstUpdated(): void {
@@ -79,6 +81,7 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
                 .rows=${this.rows}
                 .loading=${this.loading}
                 .baseUrl=${this.baseUrl}
+                .filters=${this.filters}
                 .linkValues=${this.linkValues}></vercel-analytics-breakdown-table>
             ` : ""}
           </div>

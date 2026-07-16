@@ -57,7 +57,7 @@ export class UmbracoVercelAnalyticsService {
             ...options
         });
     }
-    
+
     public static events<ThrowOnError extends boolean = false>(options?: Options<EventsData, ThrowOnError>) {
         return (options?.client ?? client).get<EventsResponses, EventsErrors, ThrowOnError>({
             security: [

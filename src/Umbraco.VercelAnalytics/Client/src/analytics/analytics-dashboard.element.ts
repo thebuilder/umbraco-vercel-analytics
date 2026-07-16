@@ -23,11 +23,19 @@ import type {
 import { dateRangeForPreset, inclusiveRangeDays, normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
 import { reportErrorMessage } from "./report-error.js";
 import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-capability.js";
-import { topBreakdownRows, type TrafficMetric } from "./breakdown-rows.js";
-import { countrySearchValue } from "./country-display.js";
+import { topBreakdownRows } from "./breakdown-rows.js";
+import { countryDisplayName, countrySearchValue, normalizeCountryCode } from "./country-display.js";
 import { metricComparison } from "./metric-comparison.js";
 import { activeDocumentRoute } from "./document-route.js";
 import { topEventRows, visibleEventRows } from "./event-rows.js";
+import {
+  parseDashboardUrlState,
+  serializeFilter,
+  writeDashboardUrlState,
+  type AnalyticsFilter,
+  type AudienceDimension,
+  type DashboardMetric,
+} from "./dashboard-url-state.js";
 import "./history-chart.element.js";
 import "./breakdown-table.element.js";
 import "./breakdown-dialog.element.js";
@@ -74,8 +82,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   @state() private _summaryLoading = true;
   @state() private _summaryError?: string;
   @state() private _breakdowns: Partial<Record<AnalyticsDimension, BreakdownState>> = {};
-  @state() private _metric: TrafficMetric = "visitors";
-  @state() private _audienceDimension: "DeviceType" | "BrowserName" = "DeviceType";
+  @state() private _metric: DashboardMetric = "visitors";
+  @state() private _audienceDimension: AudienceDimension = "DeviceType";
+  @state() private _filters: AnalyticsFilter[] = [];
   @state() private _configurationError?: string;
   @state() private _utmCapability: UtmCapability = "unknown";
   @state() private _expanded?: ExpandedBreakdown;
@@ -91,10 +100,12 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   #eventSearchTimer?: number;
   #eventRequest = 0;
   #lastScopeKey?: string;
+  #hasUrlDateState = false;
   #utmCapabilityByConnection = new Map<string, UtmCapability>();
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.#restoreUrlState();
     void this.#initialize();
   }
 
@@ -115,6 +126,39 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   #currentScopeKey(): string {
     return this.documentId ? `${this.documentId}:${this.culture ?? ""}` : "global";
+  }
+
+  #restoreUrlState(): void {
+    const state = parseDashboardUrlState(new URLSearchParams(window.location.search));
+    this._connection = state.connection;
+    this._metric = state.metric;
+    this._audienceDimension = state.audience;
+    this._filters = state.filters;
+    if (state.range) {
+      this._range = state.range;
+      this._preset = state.preset ?? "custom";
+      this.#hasUrlDateState = true;
+    } else if (state.preset && state.preset !== "custom") {
+      this._preset = state.preset;
+      this._range = dateRangeForPreset(state.preset);
+      this.#hasUrlDateState = true;
+    }
+  }
+
+  #syncUrlState(): void {
+    const url = writeDashboardUrlState(new URL(window.location.href), {
+      connection: this._connection,
+      preset: this._preset,
+      range: this._range,
+      metric: this._metric,
+      audience: this._audienceDimension,
+      filters: this._filters,
+    });
+    window.history.replaceState(window.history.state, "", url);
+  }
+
+  #filterQuery(): { filter?: string[] } {
+    return this._filters.length ? { filter: this._filters.map(serializeFilter) } : {};
   }
 
   async #initialize(): Promise<void> {
@@ -149,18 +193,26 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         return;
       }
       this._connections = data.connections;
-      const defaultDays = data.defaultRangeDays;
-      if ([7, 30, 90, 365].includes(defaultDays)) {
-        this._preset = defaultDays as Exclude<DatePreset, "custom">;
-      } else {
-        this._preset = "custom";
+      if (!this.#hasUrlDateState) {
+        const defaultDays = data.defaultRangeDays;
+        if ([7, 30, 90, 365].includes(defaultDays)) {
+          this._preset = defaultDays as Exclude<DatePreset, "custom">;
+        } else {
+          this._preset = "custom";
+        }
+        this._range = dateRangeForPreset(defaultDays);
       }
-      this._range = dateRangeForPreset(defaultDays);
       const stored = localStorage.getItem("umbraco-vercel-analytics:connection");
-      this._connection = data.connections.some((item) => item.alias === stored)
-        ? stored ?? undefined
-        : data.defaultConnection ?? data.connections[0]?.alias;
+      const requestedConnection = this._connection;
+      const requestedConnectionExists = data.connections.some((item) => item.alias === requestedConnection);
+      const storedConnectionExists = data.connections.some((item) => item.alias === stored);
+      this._connection = requestedConnectionExists
+        ? requestedConnection
+        : storedConnectionExists
+          ? stored ?? undefined
+          : data.defaultConnection ?? data.connections[0]?.alias;
     }
+    this.#syncUrlState();
     await this.#loadReports();
   }
 
@@ -193,7 +245,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     let utmSucceeded = false;
     const utmStatuses: number[] = [];
 
-    const query = { connection: this._connection, ...this._range, ...this.#scope() };
+    const query = { connection: this._connection, ...this._range, ...this.#scope(), ...this.#filterQuery() };
     const summaryPromise = UmbracoVercelAnalyticsService.summary({ query }).then(({ data, error, response }) => {
       if (request !== this.#reportRequest) return;
       this._summaryLoading = false;
@@ -269,6 +321,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           connection: this._connection,
           ...this._range,
           ...this.#scope(),
+          ...this.#filterQuery(),
           limit: 100,
           search: search || undefined,
         },
@@ -319,7 +372,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this._expandedEvents = { rows: [], loading: true };
     try {
       const { data, error, response } = await UmbracoVercelAnalyticsService.events({
-        query: { connection: this._connection, ...this._range, ...this.#scope(), limit: 100, search: search || undefined },
+        query: { connection: this._connection, ...this._range, ...this.#scope(), ...this.#filterQuery(), limit: 100, search: search || undefined },
         signal: abort.signal,
       });
       if (request !== this.#eventRequest) return;
@@ -354,7 +407,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     const request = ++this.#eventRequest;
     this._selectedEvent = { eventName, loading: true };
     const { data, error, response } = await UmbracoVercelAnalyticsService.eventHistory({
-      query: { connection: this._connection, ...this._range, ...this.#scope(), eventName },
+      query: { connection: this._connection, ...this._range, ...this.#scope(), ...this.#filterQuery(), eventName },
     });
     if (request !== this.#eventRequest || this._selectedEvent?.eventName !== eventName) return;
     this._selectedEvent = error
@@ -374,6 +427,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   #onConnectionChange(event: Event): void {
     this._connection = (event.target as UUISelectElement).value as string;
     localStorage.setItem("umbraco-vercel-analytics:connection", this._connection);
+    this.#syncUrlState();
     void this.#loadReports();
   }
 
@@ -382,6 +436,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this._preset = value === "custom" ? "custom" : Number(value) as Exclude<DatePreset, "custom">;
     if (this._preset !== "custom") {
       this._range = dateRangeForPreset(this._preset);
+      this.#syncUrlState();
       void this.#loadReports();
     }
   }
@@ -390,6 +445,44 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     const value = (event.target as UUIInputElement).value as string;
     const normalized = normalizeCustomRange(field === "from" ? value : this._range.from, field === "to" ? value : this._range.to);
     if (normalized) this._range = normalized;
+  }
+
+  #applyCustomRange(): void {
+    this.#syncUrlState();
+    void this.#loadReports();
+  }
+
+  #setMetric(metric: DashboardMetric): void {
+    this._metric = metric;
+    this.#syncUrlState();
+  }
+
+  #setAudienceDimension(dimension: AudienceDimension): void {
+    this._audienceDimension = dimension;
+    this.#syncUrlState();
+  }
+
+  #toggleFilter(event: CustomEvent<{ dimension?: AnalyticsDimension; value: string }>): void {
+    const { dimension, value } = event.detail;
+    if (!dimension || !value) return;
+    const active = this._filters.some((filter) => filter.dimension === dimension && filter.value === value);
+    this._filters = active
+      ? this._filters.filter((filter) => filter.dimension !== dimension)
+      : [...this._filters.filter((filter) => filter.dimension !== dimension), { dimension, value }];
+    this.#syncUrlState();
+    void this.#loadReports();
+  }
+
+  #removeFilter(dimension: AnalyticsDimension): void {
+    this._filters = this._filters.filter((filter) => filter.dimension !== dimension);
+    this.#syncUrlState();
+    void this.#loadReports();
+  }
+
+  #clearFilters(): void {
+    this._filters = [];
+    this.#syncUrlState();
+    void this.#loadReports();
   }
 
   #onMetricKeydown(event: KeyboardEvent): void {
@@ -441,7 +534,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
                   <uui-label for="analytics-to">To</uui-label>
                   <uui-input id="analytics-to" label="To" type="date" .value=${this._range.to} @change=${(event: Event) => this.#onCustomDate("to", event)}></uui-input>
                 </div>
-                <uui-button look="primary" label="Apply custom date range" @click=${this.#loadReports}>Apply dates</uui-button>
+                <uui-button look="primary" label="Apply custom date range" @click=${this.#applyCustomRange}>Apply dates</uui-button>
               </div>
             ` : html`
               <uui-button look="primary" label="Refresh analytics" @click=${this.#loadReports}>Refresh</uui-button>
@@ -493,7 +586,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             aria-controls="history-panel"
             aria-selected=${this._metric === "visitors"}
             tabindex=${this._metric === "visitors" ? 0 : -1}
-            @click=${() => (this._metric = "visitors")}
+            @click=${() => this.#setMetric("visitors")}
             @keydown=${this.#onMetricKeydown}>
             <span class="eyebrow">Visitors</span>
             ${this._summaryLoading
@@ -511,7 +604,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             aria-controls="history-panel"
             aria-selected=${this._metric === "pageViews"}
             tabindex=${this._metric === "pageViews" ? 0 : -1}
-            @click=${() => (this._metric = "pageViews")}
+            @click=${() => this.#setMetric("pageViews")}
             @keydown=${this.#onMetricKeydown}>
             <span class="eyebrow">Page views</span>
             ${this._summaryLoading
@@ -551,6 +644,33 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     `;
   }
 
+  #filterLabel(filter: AnalyticsFilter): string {
+    if (filter.dimension === "Country") {
+      const code = normalizeCountryCode(filter.value);
+      if (code) return countryDisplayName(code, navigator.languages);
+    }
+    return filter.value;
+  }
+
+  #renderFilters() {
+    if (!this._filters.length) return "";
+    return html`
+      <div class="active-filters" role="group" aria-label="Active analytics filters">
+        ${this._filters.map((filter) => {
+          const value = this.#filterLabel(filter);
+          return html`
+            <button type="button" class="filter-badge" aria-label=${`Remove ${value} filter`} @click=${() => this.#removeFilter(filter.dimension)}>
+              <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
+              <span>${value}</span>
+              <span aria-hidden="true">×</span>
+            </button>
+          `;
+        })}
+        <uui-button look="secondary" compact label="Clear all analytics filters" @click=${this.#clearFilters}>Clear</uui-button>
+      </div>
+    `;
+  }
+
   #renderBreakdown(
     dimension: AnalyticsDimension,
     headline: string,
@@ -574,6 +694,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .total=${total}
             .rows=${rows}
             .loading=${loading}
+            .filters=${this._filters}
             .baseUrl=${this.#linkBaseUrl()}
             .linkValues=${linkValues}
             .unavailable=${state?.error}>
@@ -584,14 +705,14 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
                   role="tab"
                   aria-selected=${this._audienceDimension === "DeviceType"}
                   tabindex=${this._audienceDimension === "DeviceType" ? 0 : -1}
-                  @click=${() => (this._audienceDimension = "DeviceType")}
+                  @click=${() => this.#setAudienceDimension("DeviceType")}
                   @keydown=${this.#onMetricKeydown}>Devices</button>
                 <button
                   type="button"
                   role="tab"
                   aria-selected=${this._audienceDimension === "BrowserName"}
                   tabindex=${this._audienceDimension === "BrowserName" ? 0 : -1}
-                  @click=${() => (this._audienceDimension = "BrowserName")}
+                  @click=${() => this.#setAudienceDimension("BrowserName")}
                   @keydown=${this.#onMetricKeydown}>Browsers</button>
               </div>
             ` : ""}
@@ -646,8 +767,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   render() {
     if (this._configurationError) return html`<main><umb-empty-state headline="Analytics is not available"><p>${this._configurationError}</p></umb-empty-state></main>`;
     return html`
-      <main>
+      <main @toggle-filter=${this.#toggleFilter}>
         ${this.#renderHeader()}
+        ${this.#renderFilters()}
         ${this.#renderSummary()}
         <section class="grid" aria-label="Traffic breakdowns">
           ${this.#availableBreakdowns().filter(({ dimension }) => !isUtmDimension(dimension)).map((item) => this.#renderBreakdownItem(item))}
@@ -659,6 +781,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .headline=${this._expanded.headline}
             .dimension=${this._expanded.dimension}
             .rows=${this._expanded.rows}
+            .filters=${this._filters}
             .loading=${this._expanded.loading}
             .unavailable=${this._expanded.error}
             .metric=${this._metric}
@@ -739,6 +862,11 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     .warnings { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); }
     .warnings:empty { display: none; }
+    .active-filters { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-layout-1); }
+    .filter-badge { align-items: center; appearance: none; background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); color: var(--uui-color-text); cursor: pointer; display: inline-flex; font: inherit; gap: var(--uui-size-space-2); min-block-size: 2.5rem; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
+    .filter-badge:hover { background: var(--uui-color-surface-alt); border-color: var(--uui-color-interactive); }
+    .filter-badge:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
+    .filter-badge uui-icon { color: var(--uui-color-text-alt); }
     @container (max-width: 62rem) {
       .controls { align-items: stretch; flex-direction: column; gap: var(--uui-size-space-4); }
       .project-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }

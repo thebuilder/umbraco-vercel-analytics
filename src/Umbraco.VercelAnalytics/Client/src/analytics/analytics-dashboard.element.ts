@@ -66,7 +66,7 @@ type SelectedEvent = {
 };
 
 const BREAKDOWNS: ReadonlyArray<{ dimension: AnalyticsDimension; headline: string; wide?: boolean; planLimited?: boolean }> = [
-  { dimension: "RequestPath", headline: "Pages and routes", wide: true },
+  { dimension: "RequestPath", headline: "Pages", wide: true },
   { dimension: "ReferrerHostname", headline: "Referrers", wide: true },
   { dimension: "Country", headline: "Countries" },
   { dimension: "DeviceType", headline: "Devices" },
@@ -306,8 +306,17 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       }
     }
 
-    const hostname = this._connections.find((item) => item.alias === this._connection)?.hostnames[0];
-    return hostname ? `https://${hostname}` : undefined;
+    const connection = this._connections.find((item) => item.alias === this._connection);
+    return connection?.baseUrl ?? (connection?.hostnames[0] ? `https://${connection.hostnames[0]}` : undefined);
+  }
+
+  #linkHostname(baseUrl: string | undefined): string | undefined {
+    if (!baseUrl) return undefined;
+    try {
+      return new URL(baseUrl).hostname;
+    } catch {
+      return undefined;
+    }
   }
 
   async #openBreakdown(dimension: AnalyticsDimension, headline: string): Promise<void> {
@@ -525,9 +534,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   #renderHeader() {
     const connection = this._connections.find((item) => item.alias === this._connection);
-    const hostname = this._route?.hostname ?? connection?.hostnames[0];
-    const siteLabel = hostname ?? connection?.displayName;
     const siteUrl = this.#linkBaseUrl();
+    const hostname = this._route?.hostname ?? connection?.hostnames[0] ?? this.#linkHostname(siteUrl);
+    const siteLabel = hostname ?? connection?.displayName;
     return html`
       <header>
         <div class="site-context">

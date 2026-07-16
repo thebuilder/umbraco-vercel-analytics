@@ -26,20 +26,27 @@ public sealed class UmbracoVercelAnalyticsApiController(
     [HttpGet("connections")]
     [ProducesResponseType<AnalyticsConnectionsResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public ActionResult<AnalyticsConnectionsResponse> Connections()
+    public async Task<ActionResult<AnalyticsConnectionsResponse>> Connections(CancellationToken cancellationToken)
     {
         if (!HasAnalyticsSectionAccess()) return Forbid();
-        var response = new AnalyticsConnectionsResponse(
-            registry.Settings.Enabled,
-            registry.Settings.DefaultConnection,
-            registry.Settings.DefaultRangeDays,
-            registry.Connections.Select(connection => new AnalyticsConnectionSummary(
+        var connections = new List<AnalyticsConnectionSummary>();
+        foreach (var connection in registry.Connections.OrderBy(connection => connection.DisplayName))
+        {
+            connections.Add(new AnalyticsConnectionSummary(
                 connection.Alias,
                 connection.DisplayName,
                 string.Equals(connection.Alias, registry.Settings.DefaultConnection, StringComparison.OrdinalIgnoreCase),
                 connection.IsConfigured,
+                await routeService.GetConnectionBaseUrlAsync(connection, cancellationToken),
                 connection.Hostnames.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
-                ConnectionWarnings(connection))).OrderBy(connection => connection.DisplayName).ToArray());
+                ConnectionWarnings(connection)));
+        }
+
+        var response = new AnalyticsConnectionsResponse(
+            registry.Settings.Enabled,
+            registry.Settings.DefaultConnection,
+            registry.Settings.DefaultRangeDays,
+            connections);
         return Ok(response);
     }
 

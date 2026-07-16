@@ -75,6 +75,7 @@ public sealed record AnalyticsConnectionSummary(
     string DisplayName,
     bool IsDefault,
     bool IsConfigured,
+    string? BaseUrl,
     IReadOnlyList<string> Hostnames,
     IReadOnlyList<string> Warnings);
 

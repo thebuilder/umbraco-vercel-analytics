@@ -14,6 +14,37 @@ public sealed class AnalyticsDocumentRouteService(
     IPublishedUrlProvider publishedUrlProvider,
     VercelAnalyticsConnectionRegistry registry)
 {
+    public async Task<string?> GetConnectionBaseUrlAsync(
+        VercelAnalyticsConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var configuredHostname = connection.Hostnames.Order(StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        if (configuredHostname is not null) return $"https://{configuredHostname}";
+
+        using var contextReference = umbracoContextFactory.EnsureUmbracoContext();
+        var publishedContent = contextReference.UmbracoContext.Content;
+        if (publishedContent is null) return null;
+
+        foreach (var rootKey in connection.DocumentRootKeys)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var root = await publishedContent.GetByIdAsync(rootKey);
+            if (root is null) continue;
+
+            var cultures = root.Cultures.Count == 0 ? [string.Empty] : root.Cultures.Keys;
+            foreach (var culture in cultures)
+            {
+                var url = root.Url(publishedUrlProvider, NullIfEmpty(culture), UrlMode.Absolute);
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                    (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)) continue;
+
+                return uri.GetLeftPart(UriPartial.Authority);
+            }
+        }
+
+        return null;
+    }
+
     public async Task<IReadOnlyList<AnalyticsDocumentRoute>> GetRoutesAsync(
         Guid documentId,
         string? currentCulture,

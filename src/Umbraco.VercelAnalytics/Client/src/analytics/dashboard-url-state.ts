@@ -4,6 +4,7 @@ import { normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "
 export type AnalyticsFilter = { dimension: AnalyticsDimension; value: string };
 export type DashboardMetric = "visitors" | "pageViews";
 export type AudienceDimension = "DeviceType" | "BrowserName";
+export type UtmDimension = "UtmSource" | "UtmMedium" | "UtmCampaign";
 
 export type DashboardUrlState = {
   connection?: string;
@@ -11,6 +12,7 @@ export type DashboardUrlState = {
   range?: AnalyticsDateRange;
   metric: DashboardMetric;
   audience: AudienceDimension;
+  utm: UtmDimension;
   filters: AnalyticsFilter[];
 };
 
@@ -48,19 +50,23 @@ export function parseDashboardUrlState(params: URLSearchParams): DashboardUrlSta
     range,
     metric: params.get("metric") === "pageViews" ? "pageViews" : "visitors",
     audience: params.get("audience") === "BrowserName" ? "BrowserName" : "DeviceType",
+    utm: params.get("utm") === "UtmMedium"
+      ? "UtmMedium"
+      : params.get("utm") === "UtmCampaign" ? "UtmCampaign" : "UtmSource",
     filters,
   };
 }
 
-export function writeDashboardUrlState(url: URL, state: Required<Pick<DashboardUrlState, "preset" | "range" | "metric" | "audience" | "filters">> & { connection?: string }): URL {
+export function writeDashboardUrlState(url: URL, state: Required<Pick<DashboardUrlState, "preset" | "range" | "metric" | "audience" | "utm" | "filters">> & { connection?: string }): URL {
   const params = url.searchParams;
-  for (const name of ["connection", "range", "from", "to", "metric", "audience", "filter"]) params.delete(name);
+  for (const name of ["connection", "range", "from", "to", "metric", "audience", "utm", "filter"]) params.delete(name);
   if (state.connection) params.set("connection", state.connection);
   params.set("range", String(state.preset));
   params.set("from", state.range.from);
   params.set("to", state.range.to);
   params.set("metric", state.metric);
   params.set("audience", state.audience);
+  params.set("utm", state.utm);
   state.filters.forEach((filter) => params.append("filter", serializeFilter(filter)));
   return url;
 }

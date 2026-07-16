@@ -36,6 +36,7 @@ import {
   type AnalyticsFilter,
   type AudienceDimension,
   type DashboardMetric,
+  type UtmDimension,
 } from "./dashboard-url-state.js";
 import "./history-chart.element.js";
 import "./breakdown-table.element.js";
@@ -84,6 +85,11 @@ const BREAKDOWNS: ReadonlyArray<{ dimension: AnalyticsDimension; headline: strin
   { dimension: "UtmMedium", headline: "UTM media", planLimited: true },
   { dimension: "UtmCampaign", headline: "UTM campaigns", planLimited: true },
 ];
+const UTM_TABS: ReadonlyArray<{ dimension: UtmDimension; label: string; headline: string }> = [
+  { dimension: "UtmSource", label: "Sources", headline: "UTM sources" },
+  { dimension: "UtmMedium", label: "Media", headline: "UTM media" },
+  { dimension: "UtmCampaign", label: "Campaigns", headline: "UTM campaigns" },
+];
 
 @customElement("vercel-analytics-dashboard")
 export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
@@ -101,6 +107,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   @state() private _breakdowns: Partial<Record<AnalyticsDimension, BreakdownState>> = {};
   @state() private _metric: DashboardMetric = "visitors";
   @state() private _audienceDimension: AudienceDimension = "DeviceType";
+  @state() private _utmDimension: UtmDimension = "UtmSource";
   @state() private _filters: AnalyticsFilter[] = [];
   @state() private _configurationError?: string;
   @state() private _utmCapability: UtmCapability = "unknown";
@@ -155,6 +162,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this._connection = state.connection;
     this._metric = state.metric;
     this._audienceDimension = state.audience;
+    this._utmDimension = state.utm;
     this._filters = state.filters;
     if (state.range) {
       this._range = state.range;
@@ -174,6 +182,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       range: this._range,
       metric: this._metric,
       audience: this._audienceDimension,
+      utm: this._utmDimension,
       filters: this._filters,
     });
     window.history.replaceState(window.history.state, "", url);
@@ -572,6 +581,11 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this.#syncUrlState();
   }
 
+  #setUtmDimension(dimension: UtmDimension): void {
+    this._utmDimension = dimension;
+    this.#syncUrlState();
+  }
+
   #toggleFilter(event: CustomEvent<{ dimension?: AnalyticsDimension; value: string }>): void {
     const { dimension, value } = event.detail;
     if (!dimension || !value) return;
@@ -804,7 +818,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     headline: string,
     wide = false,
     planLimited = false,
-    audienceTabs = false,
+    tabs?: "audience" | "utm",
   ) {
     if (planLimited && this._utmCapability === "unavailable") return "";
     const state = this._breakdowns[dimension];
@@ -826,7 +840,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .baseUrl=${this.#linkBaseUrl()}
             .linkValues=${linkValues}
             .unavailable=${state?.error}>
-            ${audienceTabs ? html`
+            ${tabs === "audience" ? html`
               <div slot="heading" class="breakdown-tabs" role="tablist" aria-label="Audience technology">
                 <button
                   type="button"
@@ -842,6 +856,18 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
                   tabindex=${this._audienceDimension === "BrowserName" ? 0 : -1}
                   @click=${() => this.#setAudienceDimension("BrowserName")}
                   @keydown=${this.#onMetricKeydown}>Browsers</button>
+              </div>
+            ` : tabs === "utm" ? html`
+              <div slot="heading" class="breakdown-tabs" role="tablist" aria-label="UTM parameter">
+                ${UTM_TABS.map(({ dimension: tabDimension, label }) => html`
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected=${this._utmDimension === tabDimension}
+                    tabindex=${this._utmDimension === tabDimension ? 0 : -1}
+                    @click=${() => this.#setUtmDimension(tabDimension)}
+                    @keydown=${this.#onMetricKeydown}>${label}</button>
+                `)}
               </div>
             ` : ""}
           </vercel-analytics-breakdown-table>
@@ -871,10 +897,16 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         dimension === "DeviceType" ? "Devices" : "Browsers",
         item.wide,
         item.planLimited,
-        true,
+        "audience",
       );
     }
     return this.#renderBreakdown(item.dimension, item.headline, item.wide, item.planLimited);
+  }
+
+  #renderUtmBreakdown() {
+    if (this._utmCapability === "unavailable") return "";
+    const selected = UTM_TABS.find(({ dimension }) => dimension === this._utmDimension) ?? UTM_TABS[0];
+    return this.#renderBreakdown(selected.dimension, selected.headline, false, true, "utm");
   }
 
   #renderEvents() {
@@ -902,7 +934,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         <section class="grid" aria-label="Traffic breakdowns">
           ${this.#availableBreakdowns().filter(({ dimension }) => !isUtmDimension(dimension)).map((item) => this.#renderBreakdownItem(item))}
           ${this.#renderEvents()}
-          ${this.#availableBreakdowns().filter(({ dimension }) => isUtmDimension(dimension)).map((item) => this.#renderBreakdownItem(item))}
+          ${this.#renderUtmBreakdown()}
         </section>
         ${this._expanded ? html`
           <vercel-analytics-breakdown-dialog

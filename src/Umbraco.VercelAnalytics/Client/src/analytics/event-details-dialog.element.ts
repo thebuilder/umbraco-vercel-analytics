@@ -150,7 +150,7 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
     .dialog-content { block-size: min(30rem, 52dvh); display: flex; flex-direction: column; min-block-size: 0; position: relative; }
     .property-tabs { display: flex; gap: var(--uui-size-space-1); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
     .property-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
-    .property-tabs button:first-child { padding-inline-start: 0; }
+    .property-tabs button:first-child { margin-inline-start: calc(-1 * var(--uui-size-space-5)); padding-inline-start: var(--uui-size-space-5); }
     .property-tabs button:hover { color: var(--uui-color-text); }
     .property-tabs button[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); color: var(--uui-color-text); font-weight: 700; }
     .property-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -3px; }

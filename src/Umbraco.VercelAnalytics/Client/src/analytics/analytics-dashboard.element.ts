@@ -262,13 +262,14 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     const connection = this._connections.find((item) => item.alias === this._connection);
     return html`
       <header>
-        <div>
+        <div class="title-block">
           <h1>Analytics</h1>
           <p>Vercel Web Analytics for published production traffic.</p>
         </div>
         <div class="controls">
           ${this.documentId ? html`
             <uui-select
+              class="route-select"
               label="Published route"
               .options=${this.#selectOptions(this._routes.map((route) => ({
                 value: `${route.culture}|${route.hostname}|${route.path}`,
@@ -277,30 +278,43 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
               @change=${this.#onRouteChange}></uui-select>
           ` : html`
             <uui-select
+              class="project-select"
               label="Vercel project"
               .options=${this.#selectOptions(this._connections.map((item) => ({ value: item.alias, name: item.displayName })), this._connection)}
               @change=${this.#onConnectionChange}></uui-select>
           `}
-          <uui-select
-            label="Date range"
-            .options=${this.#selectOptions([
-              { value: "7", name: "Last 7 days" }, { value: "30", name: "Last 30 days" },
-              { value: "90", name: "Last 90 days" }, { value: "365", name: "Last 12 months" },
-              { value: "custom", name: "Custom range" },
-            ], String(this._preset))}
-            @change=${this.#onPresetChange}></uui-select>
-          <uui-button look="primary" label="Refresh analytics" @click=${this.#loadReports}>Refresh</uui-button>
+          <div class="report-controls">
+            <uui-select
+              class="range-select"
+              label="Date range"
+              .options=${this.#selectOptions([
+                { value: "7", name: "Last 7 days" }, { value: "30", name: "Last 30 days" },
+                { value: "90", name: "Last 90 days" }, { value: "365", name: "Last 12 months" },
+                { value: "custom", name: "Custom range" },
+              ], String(this._preset))}
+              @change=${this.#onPresetChange}></uui-select>
+            ${this._preset === "custom" ? html`
+              <div class="date-actions">
+                <div class="date-control">
+                  <uui-label for="analytics-from">From</uui-label>
+                  <uui-input id="analytics-from" type="date" .value=${this._range.from} @change=${(event: Event) => this.#onCustomDate("from", event)}></uui-input>
+                </div>
+                <div class="date-control">
+                  <uui-label for="analytics-to">To</uui-label>
+                  <uui-input id="analytics-to" type="date" .value=${this._range.to} @change=${(event: Event) => this.#onCustomDate("to", event)}></uui-input>
+                </div>
+                <uui-button look="primary" label="Apply custom date range" @click=${this.#loadReports}>Apply dates</uui-button>
+              </div>
+            ` : html`
+              <uui-button look="primary" label="Refresh analytics" @click=${this.#loadReports}>Refresh</uui-button>
+            `}
+          </div>
         </div>
       </header>
-      ${this._preset === "custom" ? html`
-        <div class="custom-range">
-          <uui-form-layout-item><uui-label slot="label" for="analytics-from">From</uui-label><uui-input id="analytics-from" type="date" .value=${this._range.from} @change=${(event: Event) => this.#onCustomDate("from", event)}></uui-input></uui-form-layout-item>
-          <uui-form-layout-item><uui-label slot="label" for="analytics-to">To</uui-label><uui-input id="analytics-to" type="date" .value=${this._range.to} @change=${(event: Event) => this.#onCustomDate("to", event)}></uui-input></uui-form-layout-item>
-          <uui-button look="secondary" label="Apply custom date range" @click=${this.#loadReports}>Apply dates</uui-button>
-        </div>
-      ` : ""}
-      ${connection?.warnings.map((warning) => html`<uui-tag color="warning">${warning}</uui-tag>`)}
-      ${this._route?.warnings.map((warning) => html`<uui-tag color="warning">${warning}</uui-tag>`)}
+      <div class="warnings">
+        ${connection?.warnings.map((warning) => html`<uui-tag color="warning">${warning}</uui-tag>`)}
+        ${this._route?.warnings.map((warning) => html`<uui-tag color="warning">${warning}</uui-tag>`)}
+      </div>
     `;
   }
 
@@ -394,12 +408,18 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
 
   static styles = [UmbTextStyles, css`
     :host { display: block; }
-    main { padding: var(--uui-size-layout-1); max-width: 110rem; margin-inline: auto; }
-    header { display: flex; align-items: end; justify-content: space-between; gap: var(--uui-size-layout-1); margin-bottom: var(--uui-size-layout-1); }
+    main { container-type: inline-size; padding: var(--uui-size-layout-1); max-width: 110rem; margin-inline: auto; }
+    header { align-items: end; display: flex; gap: var(--uui-size-layout-1); justify-content: space-between; margin-bottom: var(--uui-size-layout-1); }
     h1 { margin: 0; font-size: var(--uui-type-h1-size); }
     header p, .hint { color: var(--uui-color-text-alt); }
-    .controls, .custom-range { display: flex; align-items: end; flex-wrap: wrap; gap: var(--uui-size-space-4); }
-    .custom-range { justify-content: flex-end; margin-bottom: var(--uui-size-layout-1); }
+    .title-block p { margin: var(--uui-size-space-1) 0 0; }
+    .controls { align-items: end; display: flex; flex-wrap: wrap; gap: var(--uui-size-layout-1); justify-content: flex-end; margin-inline-start: auto; }
+    .report-controls, .date-actions { align-items: end; display: flex; gap: var(--uui-size-space-4); }
+    .date-control { display: grid; gap: var(--uui-size-space-2); }
+    .date-control uui-input { min-inline-size: 11rem; }
+    .project-select { min-inline-size: 10rem; }
+    .range-select { min-inline-size: 12rem; }
+    .route-select { max-inline-size: 28rem; min-inline-size: 18rem; }
     .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--uui-size-layout-1); margin-bottom: var(--uui-size-layout-1); }
     .summary strong { display: block; font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.1; margin-top: var(--uui-size-space-3); font-variant-numeric: tabular-nums; }
     .metric-skeleton { background: var(--uui-color-surface-alt); block-size: clamp(2.2rem, 4.4vw, 3.85rem); border-radius: var(--uui-border-radius); display: block; inline-size: 58%; margin-top: var(--uui-size-space-3); max-inline-size: 14rem; }
@@ -411,11 +431,23 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--uui-size-layout-1); }
     .wide { grid-column: span 2; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-    uui-tag { margin: 0 var(--uui-size-space-3) var(--uui-size-space-5) 0; }
-    @media (max-width: 900px) {
+    .warnings { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); }
+    .warnings:empty { display: none; }
+    @container (max-width: 82rem) {
       header { align-items: stretch; flex-direction: column; }
+      .controls { justify-content: flex-start; margin-inline-start: 0; }
+    }
+    @container (max-width: 62rem) {
+      .controls { align-items: stretch; flex-direction: column; gap: var(--uui-size-space-4); }
+      .project-select, .route-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }
+    }
+    @container (max-width: 48rem) {
       .grid, .summary { grid-template-columns: 1fr; }
       .wide { grid-column: auto; }
+    }
+    @container (max-width: 40rem) {
+      .report-controls, .date-actions { align-items: stretch; flex-direction: column; }
+      .report-controls > *, .date-actions > *, .date-control uui-input { box-sizing: border-box; inline-size: 100%; max-inline-size: none; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }
   `];

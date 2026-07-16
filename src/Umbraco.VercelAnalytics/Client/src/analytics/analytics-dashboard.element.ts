@@ -847,7 +847,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .date-control uui-input { min-inline-size: 11rem; }
     .project-select { min-inline-size: 10rem; }
     .range-select { min-inline-size: 12rem; }
-    .metric-tabs { border-bottom: 1px solid var(--uui-color-border); display: flex; }
+    .metric-tabs { border-bottom: 1px solid var(--uui-color-border); display: flex; flex-wrap: nowrap; }
     .metric-tab { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text); cursor: pointer; flex: 0 0 auto; font: inherit; inline-size: max-content; min-inline-size: 18rem; padding: var(--uui-size-space-5); text-align: left; }
     .metric-tab + .metric-tab { border-inline-start: 1px solid var(--uui-color-border); }
     .metric-tab[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); }
@@ -897,15 +897,19 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     }
     @container (max-width: 48rem) {
       .grid { grid-template-columns: 1fr; }
-      .metric-tab { flex: 1 1 50%; min-inline-size: 0; }
+      .metric-tab { flex: 1 1 50%; min-inline-size: 0; padding: var(--uui-size-space-4); }
+      .metric-tab strong { font-size: clamp(1.5rem, 4cqi, 2rem); }
+      .metric-value { gap: var(--uui-size-space-2); }
+      .comparison { font-size: 0.875rem; padding: var(--uui-size-space-1) var(--uui-size-space-2); }
     }
     @container (max-width: 40rem) {
       .controls { align-items: stretch; }
       .report-controls, .date-actions { align-items: stretch; flex-direction: column; }
       .report-controls > *, .date-actions > *, .date-control uui-input { box-sizing: border-box; inline-size: 100%; max-inline-size: none; }
-      .metric-tabs { flex-direction: column; }
-      .metric-tab { box-sizing: border-box; flex: 0 0 auto; inline-size: 100%; }
-      .metric-tab + .metric-tab { border-inline-start: 0; border-top: 1px solid var(--uui-color-border); }
+      .metric-tab { box-sizing: border-box; padding: var(--uui-size-space-3); }
+      .metric-tab strong { font-size: clamp(1.25rem, 5cqi, 1.75rem); }
+      .eyebrow { font-size: 0.875rem; }
+      .comparison { font-size: 0.75rem; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }
   `];

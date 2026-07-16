@@ -20,5 +20,6 @@ public interface IVercelAnalyticsClient
         AnalyticsQuery query,
         AnalyticsDimension dimension,
         int limit,
+        string? search,
         CancellationToken cancellationToken);
 }

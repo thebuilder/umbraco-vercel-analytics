@@ -61,6 +61,7 @@ public sealed class VercelAnalyticsClientTests
             new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             AnalyticsDimension.Country,
             10,
+            null,
             CancellationToken.None);
 
         Assert.Equal(new AnalyticsBreakdownRow("DK", 20, 14), Assert.Single(result));
@@ -79,9 +80,30 @@ public sealed class VercelAnalyticsClientTests
             new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             AnalyticsDimension.RequestPath,
             100,
+            null,
             CancellationToken.None);
 
         Assert.Contains("limit=100", handler.Request!.RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task Breakdown_combines_document_scope_and_escaped_search_filter()
+    {
+        var handler = new RecordingHandler("""{"data":[]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        await client.GetBreakdownAsync(
+            connection,
+            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/news"),
+            AnalyticsDimension.ReferrerHostname,
+            100,
+            "editor's",
+            CancellationToken.None);
+
+        Assert.Contains(
+            "filter=requestPath eq '/news' and contains(referrerHostname, 'editor''s')",
+            Uri.UnescapeDataString(handler.Request!.RequestUri!.Query));
     }
 
     [Fact]

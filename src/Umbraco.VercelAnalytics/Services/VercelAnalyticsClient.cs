@@ -47,12 +47,20 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         AnalyticsQuery query,
         AnalyticsDimension dimension,
         int limit,
+        string? search,
         CancellationToken cancellationToken)
     {
         var apiDimension = ToApiValue(dimension);
         var parameters = BuildParameters(connection, query);
         parameters["by"] = apiDimension;
         parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchFilter = $"contains({apiDimension}, '{EscapeODataString(search.Trim())}')";
+            parameters["filter"] = parameters.TryGetValue("filter", out var existingFilter)
+                ? $"{existingFilter} and {searchFilter}"
+                : searchFilter;
+        }
         using var response = await SendAsync(connection, AggregatePath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
         return envelope?.Data.Select(item => ParseBreakdown(item, apiDimension)).ToArray()

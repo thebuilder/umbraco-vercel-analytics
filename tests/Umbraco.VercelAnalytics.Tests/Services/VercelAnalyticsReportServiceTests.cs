@@ -32,8 +32,21 @@ public sealed class VercelAnalyticsReportServiceTests
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
 
-        await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.Country, 10, CancellationToken.None);
-        await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.DeviceType, 10, CancellationToken.None);
+        await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.Country, 10, null, CancellationToken.None);
+        await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.DeviceType, 10, null, CancellationToken.None);
+
+        Assert.Equal(2, client.BreakdownCalls);
+    }
+
+    [Fact]
+    public async Task Breakdown_cache_separates_search_terms()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.RequestPath, 100, "news", CancellationToken.None);
+        await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.RequestPath, 100, "about", CancellationToken.None);
 
         Assert.Equal(2, client.BreakdownCalls);
     }
@@ -94,7 +107,7 @@ public sealed class VercelAnalyticsReportServiceTests
             return Task.FromResult<IReadOnlyList<AnalyticsPoint>>([]);
         }
 
-        public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, AnalyticsDimension dimension, int limit, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, AnalyticsDimension dimension, int limit, string? search, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             BreakdownCalls++;

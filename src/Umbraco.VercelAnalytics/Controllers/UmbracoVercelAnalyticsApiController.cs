@@ -89,17 +89,19 @@ public sealed class UmbracoVercelAnalyticsApiController(
         [FromQuery] DateOnly to,
         [FromQuery] AnalyticsInterval interval,
         [FromQuery] int limit = 10,
+        [FromQuery] string? search = null,
         [FromQuery] Guid? documentId = null,
         [FromQuery] string? culture = null,
         [FromQuery] string? path = null,
         CancellationToken cancellationToken = default)
     {
         if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
+        if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
         var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, cancellationToken);
         if (scope.Error is not null) return scope.Error;
         try
         {
-            var report = await reportService.GetBreakdownAsync(scope.Query!, dimension, limit, cancellationToken);
+            var report = await reportService.GetBreakdownAsync(scope.Query!, dimension, limit, search, cancellationToken);
             return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
         }
         catch (VercelAnalyticsApiException exception)

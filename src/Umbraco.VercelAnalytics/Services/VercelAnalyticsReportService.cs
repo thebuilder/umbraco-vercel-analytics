@@ -30,15 +30,17 @@ public sealed class VercelAnalyticsReportService(
         AnalyticsQuery query,
         AnalyticsDimension dimension,
         int limit,
+        string? search,
         CancellationToken cancellationToken)
     {
         var connection = registry.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:breakdown:{dimension}:{limit}:{Normalize(query)}";
+        var normalizedSearch = search?.Trim();
+        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:breakdown:{dimension}:{limit}:{normalizedSearch}:{Normalize(query)}";
         return await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
-            var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, cancellationToken);
+            var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, normalizedSearch, cancellationToken);
             return new AnalyticsBreakdown(dimension, rows);
         });
     }

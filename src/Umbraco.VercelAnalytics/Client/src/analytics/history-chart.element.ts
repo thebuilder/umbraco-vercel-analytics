@@ -19,7 +19,7 @@ import {
 } from "chart.js";
 import type { AnalyticsPoint } from "../api/types.gen.js";
 import type { AnalyticsInterval } from "../api/types.gen.js";
-import { formatAnalyticsDate } from "./date-range.js";
+import { formatAnalyticsDate, isAnalyticsPeriodInProgress } from "./date-range.js";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip);
 
@@ -47,6 +47,10 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
 
     const style = getComputedStyle(this);
     const color = style.getPropertyValue("--uui-color-interactive").trim() || "#3544b1";
+    const latestPoint = this.points[this.points.length - 1];
+    const latestPeriodInProgress = latestPoint
+      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
+      : false;
     this.#chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -58,6 +62,11 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
           fill: true,
           pointRadius: 2,
           tension: 0.2,
+          segment: {
+            borderDash: (context) => latestPeriodInProgress && context.p1DataIndex === this.points.length - 1
+              ? [6, 6]
+              : undefined,
+          },
         }],
       },
       options: {
@@ -71,8 +80,13 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
 
   render() {
     const label = this.metric === "visitors" ? "Visitors" : "Page views";
+    const latestPoint = this.points[this.points.length - 1];
+    const latestPeriodInProgress = latestPoint
+      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
+      : false;
+    const progressDescription = latestPeriodInProgress ? ". The final period is still in progress" : "";
     return html`
-      <div class="chart" role="img" aria-label="${label} history for ${this.points.length} periods">
+      <div class="chart" role="img" aria-label="${label} history for ${this.points.length} periods${progressDescription}">
         <canvas aria-hidden="true"></canvas>
       </div>
       <uui-button
@@ -85,8 +99,8 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
         <table>
           <caption>${label} history</caption>
           <thead><tr><th scope="col">Date</th><th scope="col">${label}</th></tr></thead>
-          <tbody>${this.points.map((point) => html`
-            <tr><td>${formatAnalyticsDate(point.timestamp, this.interval)}</td><td>${point[this.metric].toLocaleString()}</td></tr>
+          <tbody>${this.points.map((point, index) => html`
+            <tr><td>${formatAnalyticsDate(point.timestamp, this.interval)}${latestPeriodInProgress && index === this.points.length - 1 ? " (in progress)" : ""}</td><td>${point[this.metric].toLocaleString()}</td></tr>
           `)}</tbody>
         </table>
       ` : ""}

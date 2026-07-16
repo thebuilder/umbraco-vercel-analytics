@@ -79,8 +79,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     a:hover { text-decoration-thickness: 2px; }
     a:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
     .bar {
-      background: color-mix(in srgb, var(--uui-color-interactive) 16%, var(--uui-color-surface));
-      border-inline-start: 3px solid var(--uui-color-interactive);
+      background: color-mix(in srgb, var(--uui-color-interactive) 10%, var(--uui-color-surface));
       border-radius: var(--uui-border-radius);
       inset: var(--uui-size-space-1) auto var(--uui-size-space-1) 0;
       position: absolute;

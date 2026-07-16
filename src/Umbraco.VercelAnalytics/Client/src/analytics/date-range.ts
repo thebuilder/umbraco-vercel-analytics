@@ -65,3 +65,21 @@ export function formatAnalyticsDate(
     timeZone: "UTC",
   }).format(date);
 }
+
+export function isAnalyticsPeriodInProgress(
+  timestamp: string,
+  interval: AnalyticsInterval,
+  now = new Date(),
+): boolean {
+  const start = new Date(timestamp);
+  if (Number.isNaN(start.valueOf())) return false;
+
+  const end = new Date(start);
+  if (interval === "Month") {
+    end.setUTCMonth(end.getUTCMonth() + 1);
+  } else {
+    end.setUTCDate(end.getUTCDate() + (interval === "Week" ? 7 : 1));
+  }
+
+  return start <= now && now < end;
+}

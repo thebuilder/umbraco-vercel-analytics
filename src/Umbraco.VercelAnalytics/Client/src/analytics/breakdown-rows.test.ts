@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { analyticsRowHref, referrerFaviconUrl, topBreakdownRows, visibleBreakdownRows, withoutAggregatedOthers } from "./breakdown-rows.js";
+import {
+  analyticsRowHref,
+  breakdownDisplayValue,
+  breakdownPercentage,
+  isPercentageDimension,
+  referrerFaviconUrl,
+  topBreakdownRows,
+  visibleBreakdownRows,
+  withoutAggregatedOthers,
+} from "./breakdown-rows.js";
 
 const rows = [
   { value: "/news", visitors: 12, pageViews: 18 },
@@ -16,15 +25,23 @@ describe("analytics breakdown rows", () => {
     expect(topBreakdownRows(rows, 1).map((row) => row.value)).toEqual(["/news"]);
   });
 
-  it("removes unknown values only from referrer breakdowns", () => {
+  it("removes blank and unknown values from every breakdown", () => {
     const referrers = [
       { value: "", visitors: 12, pageViews: 18 },
       { value: "Unknown", visitors: 9, pageViews: 11 },
       { value: "google.com", visitors: 4, pageViews: 6 },
     ];
 
-    expect(visibleBreakdownRows(referrers, "ReferrerHostname").map((row) => row.value)).toEqual(["google.com"]);
-    expect(visibleBreakdownRows(referrers, "BrowserName")).toHaveLength(3);
+    expect(visibleBreakdownRows(referrers).map((row) => row.value)).toEqual(["google.com"]);
+  });
+
+  it("formats percentage dimensions and device labels", () => {
+    expect(isPercentageDimension("Country")).toBe(true);
+    expect(isPercentageDimension("RequestPath")).toBe(false);
+    expect(breakdownPercentage(379_285, 968_832)).toEqual({ display: "39%", precise: "39.15%" });
+    expect(breakdownPercentage(2, 1_000)).toEqual({ display: "<1%", precise: "0.2%" });
+    expect(breakdownDisplayValue("mobile", "DeviceType")).toBe("Mobile");
+    expect(breakdownDisplayValue("Mobile Safari", "BrowserName")).toBe("Mobile Safari");
   });
 
   it("builds an encoded Google favicon URL for a referrer hostname", () => {

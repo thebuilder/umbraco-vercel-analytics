@@ -3,27 +3,56 @@ import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen
 const OTHERS_LABEL = "others";
 const UNKNOWN_LABEL = "unknown";
 
+export type TrafficMetric = "visitors" | "pageViews";
+
+const PERCENTAGE_DIMENSIONS = new Set<AnalyticsDimension>([
+  "Country",
+  "DeviceType",
+  "BrowserName",
+  "OsName",
+]);
+
 export function withoutAggregatedOthers(rows: AnalyticsBreakdownRow[]): AnalyticsBreakdownRow[] {
   return rows.filter((row) => row.value.trim().toLocaleLowerCase() !== OTHERS_LABEL);
 }
 
 export function visibleBreakdownRows(
   rows: AnalyticsBreakdownRow[],
-  dimension?: AnalyticsDimension,
 ): AnalyticsBreakdownRow[] {
   return withoutAggregatedOthers(rows).filter((row) => {
-    if (dimension !== "ReferrerHostname") return true;
     const value = row.value.trim().toLocaleLowerCase();
     return value.length > 0 && value !== UNKNOWN_LABEL;
   });
 }
 
+export function isPercentageDimension(dimension?: AnalyticsDimension): boolean {
+  return dimension ? PERCENTAGE_DIMENSIONS.has(dimension) : false;
+}
+
+export function breakdownMetricValue(row: AnalyticsBreakdownRow, metric: TrafficMetric): number {
+  return row[metric];
+}
+
+export function breakdownPercentage(value: number, total: number): { display: string; precise: string } {
+  const percentage = total > 0 ? (value / total) * 100 : 0;
+  return {
+    display: percentage > 0 && percentage < 0.5 ? "<1%" : `${Math.round(percentage)}%`,
+    precise: `${percentage.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`,
+  };
+}
+
+export function breakdownDisplayValue(value: string, dimension?: AnalyticsDimension): string {
+  const trimmed = value.trim();
+  return dimension === "DeviceType" && trimmed
+    ? `${trimmed.charAt(0).toLocaleUpperCase()}${trimmed.slice(1)}`
+    : trimmed;
+}
+
 export function topBreakdownRows(
   rows: AnalyticsBreakdownRow[],
   limit = 10,
-  dimension?: AnalyticsDimension,
 ): AnalyticsBreakdownRow[] {
-  return visibleBreakdownRows(rows, dimension).slice(0, limit);
+  return visibleBreakdownRows(rows).slice(0, limit);
 }
 
 export function referrerFaviconUrl(domain: string): string | undefined {

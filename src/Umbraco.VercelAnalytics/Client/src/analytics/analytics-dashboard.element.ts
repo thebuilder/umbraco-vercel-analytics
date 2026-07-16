@@ -20,7 +20,7 @@ import type {
 import { dateRangeForPreset, inclusiveRangeDays, normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
 import { reportErrorMessage } from "./report-error.js";
 import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-capability.js";
-import { topBreakdownRows } from "./breakdown-rows.js";
+import { topBreakdownRows, type TrafficMetric } from "./breakdown-rows.js";
 import { countrySearchValue } from "./country-display.js";
 import { metricComparison } from "./metric-comparison.js";
 import { activeDocumentRoute } from "./document-route.js";
@@ -64,7 +64,8 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   @state() private _summaryLoading = true;
   @state() private _summaryError?: string;
   @state() private _breakdowns: Partial<Record<AnalyticsDimension, BreakdownState>> = {};
-  @state() private _metric: "visitors" | "pageViews" = "visitors";
+  @state() private _metric: TrafficMetric = "visitors";
+  @state() private _audienceDimension: "DeviceType" | "BrowserName" = "DeviceType";
   @state() private _configurationError?: string;
   @state() private _utmCapability: UtmCapability = "unknown";
   @state() private _expanded?: ExpandedBreakdown;
@@ -352,11 +353,11 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
               <div class="date-actions">
                 <div class="date-control">
                   <uui-label for="analytics-from">From</uui-label>
-                  <uui-input id="analytics-from" type="date" .value=${this._range.from} @change=${(event: Event) => this.#onCustomDate("from", event)}></uui-input>
+                  <uui-input id="analytics-from" label="From" type="date" .value=${this._range.from} @change=${(event: Event) => this.#onCustomDate("from", event)}></uui-input>
                 </div>
                 <div class="date-control">
                   <uui-label for="analytics-to">To</uui-label>
-                  <uui-input id="analytics-to" type="date" .value=${this._range.to} @change=${(event: Event) => this.#onCustomDate("to", event)}></uui-input>
+                  <uui-input id="analytics-to" label="To" type="date" .value=${this._range.to} @change=${(event: Event) => this.#onCustomDate("to", event)}></uui-input>
                 </div>
                 <uui-button look="primary" label="Apply custom date range" @click=${this.#loadReports}>Apply dates</uui-button>
               </div>
@@ -468,35 +469,81 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     `;
   }
 
-  #renderBreakdown(dimension: AnalyticsDimension, headline: string, wide = false, planLimited = false) {
+  #renderBreakdown(
+    dimension: AnalyticsDimension,
+    headline: string,
+    wide = false,
+    planLimited = false,
+    audienceTabs = false,
+  ) {
     if (planLimited && this._utmCapability === "unavailable") return "";
     const state = this._breakdowns[dimension];
     const loading = state?.loading ?? true;
-    const rows = topBreakdownRows(state?.data?.rows ?? [], 10, dimension);
+    const rows = topBreakdownRows(state?.data?.rows ?? [], 10);
     const linkValues = dimension === "RequestPath" || dimension === "Route";
+    const total = this._summary?.totals[this._metric] ?? 0;
     return html`
-      <uui-box headline=${headline} class=${wide ? "wide" : ""}>
-        ${!loading && !state?.error && rows.length ? html`
-          <uui-button
-            slot="header-actions"
-            look="secondary"
-            label=${`View all ${headline}`}
-            @click=${() => this.#openBreakdown(dimension, headline)}>View all</uui-button>
-        ` : ""}
-        <vercel-analytics-breakdown-table
-          .headline=${headline}
-          .dimension=${dimension}
-          .rows=${rows}
-          .loading=${loading}
-          .baseUrl=${this.#linkBaseUrl()}
-          .linkValues=${linkValues}
-          .unavailable=${state?.error}></vercel-analytics-breakdown-table>
-        ${!loading ? html`
-          ${state?.error ? html`<uui-button look="secondary" label=${`Retry ${headline} report`} @click=${this.#loadReports}>Retry</uui-button>` : ""}
-          ${planLimited && state?.error ? html`<p class="hint">UTM reporting availability depends on your Vercel plan and reporting window.</p>` : ""}
-        ` : ""}
+      <uui-box class=${`breakdown-card ${wide ? "wide" : ""}`}>
+        <div class="breakdown-card-layout">
+          <vercel-analytics-breakdown-table
+            .headline=${headline}
+            .dimension=${dimension}
+            .metric=${this._metric}
+            .total=${total}
+            .rows=${rows}
+            .loading=${loading}
+            .baseUrl=${this.#linkBaseUrl()}
+            .linkValues=${linkValues}
+            .unavailable=${state?.error}>
+            ${audienceTabs ? html`
+              <div slot="heading" class="breakdown-tabs" role="tablist" aria-label="Audience technology">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected=${this._audienceDimension === "DeviceType"}
+                  tabindex=${this._audienceDimension === "DeviceType" ? 0 : -1}
+                  @click=${() => (this._audienceDimension = "DeviceType")}
+                  @keydown=${this.#onMetricKeydown}>Devices</button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected=${this._audienceDimension === "BrowserName"}
+                  tabindex=${this._audienceDimension === "BrowserName" ? 0 : -1}
+                  @click=${() => (this._audienceDimension = "BrowserName")}
+                  @keydown=${this.#onMetricKeydown}>Browsers</button>
+              </div>
+            ` : ""}
+          </vercel-analytics-breakdown-table>
+          ${planLimited && state?.error ? html`<p class="hint breakdown-hint">UTM reporting availability depends on your Vercel plan and reporting window.</p>` : ""}
+          <footer class="breakdown-footer">
+            ${!loading && !state?.error && rows.length ? html`
+              <uui-button
+                look="secondary"
+                label=${`View all ${headline}`}
+                @click=${() => this.#openBreakdown(dimension, headline)}>View all</uui-button>
+            ` : ""}
+            ${!loading && state?.error ? html`
+              <uui-button look="secondary" label=${`Retry ${headline} report`} @click=${this.#loadReports}>Retry</uui-button>
+            ` : ""}
+          </footer>
+        </div>
       </uui-box>
     `;
+  }
+
+  #renderBreakdownItem(item: (typeof BREAKDOWNS)[number]) {
+    if (item.dimension === "BrowserName") return "";
+    if (item.dimension === "DeviceType") {
+      const dimension = this._audienceDimension;
+      return this.#renderBreakdown(
+        dimension,
+        dimension === "DeviceType" ? "Devices" : "Browsers",
+        item.wide,
+        item.planLimited,
+        true,
+      );
+    }
+    return this.#renderBreakdown(item.dimension, item.headline, item.wide, item.planLimited);
   }
 
   render() {
@@ -506,7 +553,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         ${this.#renderHeader()}
         ${this.#renderSummary()}
         <section class="grid" aria-label="Traffic breakdowns">
-          ${this.#availableBreakdowns().map((item) => this.#renderBreakdown(item.dimension, item.headline, item.wide, item.planLimited))}
+          ${this.#availableBreakdowns().map((item) => this.#renderBreakdownItem(item))}
         </section>
         ${this._expanded ? html`
           <vercel-analytics-breakdown-dialog
@@ -515,6 +562,8 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .rows=${this._expanded.rows}
             .loading=${this._expanded.loading}
             .unavailable=${this._expanded.error}
+            .metric=${this._metric}
+            .total=${this._summary?.totals[this._metric] ?? 0}
             .baseUrl=${this.#linkBaseUrl()}
             .linkValues=${this._expanded.dimension === "RequestPath" || this._expanded.dimension === "Route"}
             @search-breakdown=${this.#searchBreakdown}
@@ -559,18 +608,28 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .summary-error-content uui-icon { color: var(--uui-color-warning-standalone); font-size: 1.5rem; }
     .summary-error-copy { flex: 1 1 22rem; }
     .summary-error-copy p { color: var(--uui-color-text-alt); margin: var(--uui-size-space-1) 0 0; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--uui-size-layout-1); }
-    .wide { grid-column: span 2; }
+    .grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--uui-size-layout-1); }
+    .breakdown-card { --uui-box-default-padding: 0; grid-column: span 2; overflow: hidden; position: relative; }
+    .breakdown-card-layout { box-sizing: border-box; min-block-size: 100%; padding-bottom: 3.75rem; }
+    .breakdown-footer { align-items: center; background: color-mix(in srgb, var(--uui-color-surface-alt) 42%, var(--uui-color-surface)); border-top: 1px solid var(--uui-color-border); bottom: 0; box-sizing: border-box; display: flex; justify-content: flex-end; left: 0; min-block-size: 3.75rem; padding: var(--uui-size-space-2) var(--uui-size-space-4); position: absolute; right: 0; }
+    .breakdown-hint { margin: 0; padding: var(--uui-size-space-3) var(--uui-size-space-5); }
+    .breakdown-tabs { align-items: stretch; display: flex; margin: calc(-1 * var(--uui-size-space-3)); }
+    .breakdown-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; font: inherit; font-weight: 500; padding: var(--uui-size-space-3); }
+    .breakdown-tabs button[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); color: var(--uui-color-text); }
+    .breakdown-tabs button:hover { background: var(--uui-color-surface-alt); }
+    .breakdown-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
+    .wide { grid-column: span 3; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     .warnings { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); }
     .warnings:empty { display: none; }
     @container (max-width: 62rem) {
       .controls { align-items: stretch; flex-direction: column; gap: var(--uui-size-space-4); }
       .project-select { inline-size: min(100%, 28rem); max-inline-size: 100%; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .breakdown-card, .wide { grid-column: auto; }
     }
     @container (max-width: 48rem) {
       .grid { grid-template-columns: 1fr; }
-      .wide { grid-column: auto; }
       .metric-tab { flex: 1 1 50%; min-inline-size: 0; }
     }
     @container (max-width: 40rem) {

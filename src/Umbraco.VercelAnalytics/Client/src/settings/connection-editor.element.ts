@@ -52,7 +52,6 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
 
   render() {
     const connection = this.connection;
-    const globalOnly = connection.hostnames.length === 0 && connection.documentRootKeys.length === 0;
     return html`
       <uui-box headline=${connection.displayName || connection.alias || "New connection"}>
         <div slot="header-actions" class="header-actions">
@@ -93,27 +92,26 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
         </fieldset>
 
         <fieldset>
-          <legend>Document mapping <span>optional</span></legend>
-          <p class="description">
-            A hostname or document root enables page-level analytics. Leave both empty for global reports only.
+          <legend>Page analytics <span>optional</span></legend>
+          <p class="description mapping-description">
+            Select document roots to enable page analytics for Umbraco content. Use published hostnames instead, or as a fallback. If both match, the document root wins. Leave both empty for global analytics only.
           </p>
-          ${globalOnly ? html`<uui-tag color="default">Global reports only</uui-tag>` : ""}
-          <div class="fields">
-            <uui-form-layout-item>
-              <uui-label slot="label" for=${`${connection.alias}-hostnames`}>Published hostnames</uui-label>
-              <uui-textarea
-                id=${`${connection.alias}-hostnames`}
-                label="Published hostnames"
-                .value=${connection.hostnames.join("\n")}
-                @input=${(event: Event) => this.#lines("hostnames", event)}></uui-textarea>
-              <span slot="description">One exact hostname per line. Do not include the scheme or path.</span>
-            </uui-form-layout-item>
+          <div class="fields mapping-fields">
             <uui-form-layout-item>
               <uui-label slot="label">Document roots</uui-label>
               <umb-input-document
                 .selection=${connection.documentRootKeys}
                 @change=${this.#documentRoots}></umb-input-document>
-              <span slot="description">The nearest selected ancestor wins over hostname mapping.</span>
+              <span slot="description">Recommended. Select each Umbraco site's root.</span>
+            </uui-form-layout-item>
+            <uui-form-layout-item class="hostname-field">
+              <uui-label slot="label" for=${`${connection.alias}-hostnames`}>Hostname fallback</uui-label>
+              <uui-textarea
+                id=${`${connection.alias}-hostnames`}
+                label="Published hostnames"
+                .value=${connection.hostnames.join("\n")}
+                @input=${(event: Event) => this.#lines("hostnames", event)}></uui-textarea>
+              <span slot="description">Enter one exact published hostname per line, without scheme or path.</span>
             </uui-form-layout-item>
           </div>
         </fieldset>
@@ -127,7 +125,7 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
             Enable analytics for all document types
           </uui-toggle>
           ${connection.enableAllDocumentTypes ? html`
-            <p class="description">New document types will automatically receive analytics when they are published beneath a mapped root or hostname.</p>
+            <p class="description document-types-help">New document types will automatically receive analytics when they are published beneath a mapped root or hostname.</p>
           ` : html`
             <uui-form-layout-item>
               <uui-label slot="label">Enabled document types</uui-label>
@@ -135,7 +133,6 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
                 documentTypesOnly
                 .selection=${connection.enabledDocumentTypeKeys}
                 @change=${this.#documentTypes}></umb-input-document-type>
-              <span slot="description">Choose exact document types. Pattern matching such as <code>*Page</code> is intentionally not used.</span>
             </uui-form-layout-item>
           `}
         </fieldset>
@@ -167,19 +164,25 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
   }
 
   static styles = [UmbTextStyles, css`
-    :host { display: block; }
+    :host { container-type: inline-size; display: block; }
     .header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--uui-size-space-3); }
-    fieldset { border: 0; padding: 0; margin: 0 0 var(--uui-size-layout-1); }
+    fieldset { border: 0; padding: 0; margin: 0 0 var(--uui-size-space-6); }
     fieldset:last-child { margin-bottom: 0; }
-    legend { font-weight: 700; font-size: var(--uui-type-h5-size); padding: 0; margin-bottom: var(--uui-size-space-4); }
+    legend { font-weight: 700; font-size: var(--uui-type-h5-size); padding: 0; margin-bottom: var(--uui-size-space-3); }
     legend span, .description { color: var(--uui-color-text-alt); font-weight: 400; }
-    .fields { display: grid; gap: var(--uui-size-space-5); }
+    .description { margin: 0; }
+    .fields { display: grid; gap: var(--uui-size-space-4); }
     .two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two-columns > uui-form-layout-item:nth-child(3) { grid-column: 1 / -1; }
+    .mapping-description { margin-bottom: var(--uui-size-space-4); max-width: 65ch; }
+    .mapping-fields { align-items: start; }
+    .hostname-field { max-width: 40rem; }
+    .document-types-help { margin-top: var(--uui-size-space-2); }
     uui-input, uui-textarea { width: 100%; }
-    uui-textarea { min-height: 8rem; }
-    .token-help { padding: var(--uui-size-space-4); background: var(--uui-color-surface-alt); overflow-wrap: anywhere; }
+    uui-textarea { min-height: 5rem; }
+    .token-help { padding: var(--uui-size-space-3); background: var(--uui-color-surface-alt); margin: var(--uui-size-space-4) 0 0; overflow-wrap: anywhere; }
     code { font-family: var(--uui-font-monospace); }
-    @media (max-width: 800px) { .two-columns { grid-template-columns: 1fr; } }
+    @container (max-width: 48rem) { .two-columns { grid-template-columns: 1fr; } .two-columns > uui-form-layout-item:nth-child(3) { grid-column: auto; } }
   `];
 }
 

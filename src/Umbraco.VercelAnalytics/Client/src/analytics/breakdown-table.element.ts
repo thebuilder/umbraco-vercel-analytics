@@ -1,7 +1,7 @@
 import { LitElement, css, customElement, html, property } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
-import { analyticsRowHref, withoutAggregatedOthers } from "./breakdown-rows.js";
+import { analyticsRowHref, referrerFaviconUrl, visibleBreakdownRows } from "./breakdown-rows.js";
 import { countryDisplayName, countryFlagUrl, normalizeCountryCode } from "./country-display.js";
 
 @customElement("vercel-analytics-breakdown-table")
@@ -33,7 +33,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
       `;
     }
     if (this.unavailable) return html`<p class="message">${this.unavailable}</p>`;
-    const rows = withoutAggregatedOthers(this.rows);
+    const rows = visibleBreakdownRows(this.rows, this.dimension);
     if (rows.length === 0) return html`<p class="message">No traffic was recorded for this breakdown.</p>`;
     const maximum = Math.max(...rows.map((row) => row.visitors), 1);
 
@@ -44,6 +44,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
         <tbody>${rows.map((row) => {
           const href = this.linkValues ? analyticsRowHref(this.baseUrl, row.value) : undefined;
           const countryCode = this.dimension === "Country" ? normalizeCountryCode(row.value) : undefined;
+          const faviconUrl = this.dimension === "ReferrerHostname" ? referrerFaviconUrl(row.value) : undefined;
           const displayValue = countryCode ? countryDisplayName(countryCode, navigator.languages) : row.value || "Unknown";
           return html`
           <tr>
@@ -51,6 +52,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
               <span class="bar" style=${`--bar-width:${(row.visitors / maximum) * 100}%`}></span>
               <span class="row-value">
                 ${countryCode ? html`<img class="country-flag" src=${countryFlagUrl(countryCode)} alt="" width="20" height="15" loading="lazy" referrerpolicy="no-referrer" @error=${(event: Event) => ((event.currentTarget as HTMLImageElement).style.visibility = "hidden")}>` : ""}
+                ${faviconUrl ? html`<img class="referrer-favicon" src=${faviconUrl} alt="" width="20" height="20" loading="lazy" referrerpolicy="no-referrer" @error=${(event: Event) => ((event.currentTarget as HTMLImageElement).style.visibility = "hidden")}>` : ""}
                 <span class="row-label" title=${displayValue}>${href
                   ? html`<a href=${href} target="_blank" rel="noopener noreferrer">${displayValue}<span class="visually-hidden"> (opens in a new tab)</span></a>`
                   : displayValue}</span>
@@ -75,6 +77,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     .row-value { align-items: center; display: flex; gap: var(--uui-size-space-3); min-inline-size: 0; position: relative; }
     .row-label { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .country-flag { border-radius: 2px; flex: 0 0 auto; object-fit: cover; }
+    .referrer-favicon { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: contain; }
     a { color: var(--uui-color-interactive-emphasis); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
     a:hover { text-decoration-thickness: 2px; }
     a:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }

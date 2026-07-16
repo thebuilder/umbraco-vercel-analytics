@@ -483,7 +483,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     if (planLimited && this._utmCapability === "unavailable") return "";
     const state = this._breakdowns[dimension];
     const loading = state?.loading ?? true;
-    const rows = topBreakdownRows(state?.data?.rows ?? []);
+    const rows = topBreakdownRows(state?.data?.rows ?? [], 10, dimension);
     const linkValues = dimension === "RequestPath" || dimension === "Route";
     return html`
       <uui-box headline=${headline} class=${wide ? "wide" : ""}>

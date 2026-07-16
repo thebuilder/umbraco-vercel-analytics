@@ -98,7 +98,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
                 <span class="percentage-value" tabindex="0" aria-describedby=${tooltipId}>
                   <span aria-hidden="true">${percentage.display}</span>
                   <span class="visually-hidden">${metricValue.toLocaleString()} ${this.#metricLabel().toLocaleLowerCase()}, ${percentage.precise} of the total</span>
-                  <span id=${tooltipId} class="percentage-tooltip" role="tooltip">
+                  <span id=${tooltipId} class=${`percentage-tooltip${index === 0 ? " below" : ""}`} role="tooltip">
                     <strong>${metricValue.toLocaleString()}</strong>
                     <span>${percentage.precise}</span>
                   </span>
@@ -130,6 +130,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     thead th:nth-child(2) { color: var(--uui-color-text-alt); text-align: right; width: var(--metric-column-width); }
     th, td { box-sizing: border-box; padding: var(--uui-size-space-3) var(--uui-size-space-5); text-align: left; }
     td { font-variant-numeric: tabular-nums; position: relative; text-align: right; z-index: 1; }
+    tbody tr:hover, tbody tr:focus-within { position: relative; z-index: 2; }
     .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
     .metric-number { min-inline-size: 0; }
     .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
@@ -163,7 +164,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
       transition: opacity 120ms ease-out, transform 120ms ease-out;
       visibility: hidden;
       white-space: nowrap;
-      z-index: 1;
+      z-index: 3;
     }
     .percentage-tooltip::after {
       border: var(--uui-size-space-2) solid transparent;
@@ -172,6 +173,17 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
       position: absolute;
       right: var(--uui-size-space-4);
       top: 100%;
+    }
+    .percentage-tooltip.below {
+      bottom: auto;
+      top: calc(100% + var(--uui-size-space-3));
+      transform: translateY(calc(-1 * var(--uui-size-space-2)));
+    }
+    .percentage-tooltip.below::after {
+      border-bottom-color: var(--uui-color-text);
+      border-top-color: transparent;
+      bottom: 100%;
+      top: auto;
     }
     .percentage-tooltip strong { font-size: 1rem; }
     .percentage-tooltip span { color: color-mix(in srgb, var(--uui-color-surface) 70%, transparent); }

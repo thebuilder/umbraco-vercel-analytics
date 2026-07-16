@@ -543,8 +543,8 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           ${hostname && siteUrl ? html`
             <a class="site-link" href=${siteUrl} target="_blank" rel="noopener noreferrer">
               <uui-icon name="icon-globe" aria-hidden="true"></uui-icon>
-              <span>${hostname}</span>
-              <span class="external-indicator" aria-hidden="true">↗</span>
+              <span class="site-link-label">${hostname}</span>
+              <uui-icon class="external-indicator" name="icon-out" aria-hidden="true"></uui-icon>
               <span class="visually-hidden">Open site in a new tab</span>
             </a>
           ` : siteLabel ? html`
@@ -871,7 +871,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .hint { color: var(--uui-color-text-alt); }
     .site-context { align-items: center; display: flex; min-block-size: 2.5rem; min-inline-size: 0; }
     .site-link, .site-name { align-items: center; color: var(--uui-color-text); display: inline-flex; font-weight: 700; gap: var(--uui-size-space-2); min-inline-size: 0; text-decoration: none; }
-    .site-link:hover { text-decoration: underline; text-underline-offset: 0.18em; }
+    .site-link:hover .site-link-label { text-decoration: underline; text-underline-offset: 0.18em; }
     .site-link:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 3px; }
     .site-context uui-icon { color: var(--uui-color-text-alt); flex: 0 0 auto; }
     .external-indicator { color: var(--uui-color-text-alt); font-size: 0.875em; }

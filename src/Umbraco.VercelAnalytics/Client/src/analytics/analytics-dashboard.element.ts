@@ -136,6 +136,12 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
       : {};
   }
 
+  #availableBreakdowns() {
+    return this.documentId
+      ? BREAKDOWNS.filter(({ dimension }) => dimension !== "RequestPath" && dimension !== "Route")
+      : BREAKDOWNS;
+  }
+
   async #loadReports(): Promise<void> {
     if (!this._connection) return;
     this._expanded = undefined;
@@ -144,7 +150,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     this._summaryError = undefined;
     this._summary = undefined;
     this._utmCapability = this.#utmCapabilityByConnection.get(this._connection) ?? "unknown";
-    const requestedBreakdowns = BREAKDOWNS.filter(({ planLimited }) => !planLimited || this._utmCapability !== "unavailable");
+    const requestedBreakdowns = this.#availableBreakdowns().filter(({ planLimited }) => !planLimited || this._utmCapability !== "unavailable");
     this._breakdowns = Object.fromEntries(requestedBreakdowns.map(({ dimension }) => [dimension, { loading: true }])) as typeof this._breakdowns;
     let baselineSucceeded = false;
     let utmSucceeded = false;
@@ -390,7 +396,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         ${this.#renderHeader()}
         ${this.#renderSummary()}
         <section class="grid" aria-label="Traffic breakdowns">
-          ${BREAKDOWNS.map((item) => this.#renderBreakdown(item.dimension, item.headline, item.wide, item.planLimited))}
+          ${this.#availableBreakdowns().map((item) => this.#renderBreakdown(item.dimension, item.headline, item.wide, item.planLimited))}
         </section>
         ${this._expanded ? html`
           <vercel-analytics-breakdown-dialog

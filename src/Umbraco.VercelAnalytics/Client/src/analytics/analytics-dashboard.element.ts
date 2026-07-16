@@ -385,7 +385,18 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   }
 
   #renderSummary() {
-    if (this._summaryError) return html`<uui-box><umb-empty-state headline="Analytics unavailable"><p>${this._summaryError}</p><uui-button look="secondary" label="Retry analytics summary" @click=${this.#loadReports}>Retry</uui-button></umb-empty-state></uui-box>`;
+    if (this._summaryError) return html`
+      <uui-box class="summary-error">
+        <div class="summary-error-content" role="status">
+          <uui-icon name="icon-alert" aria-hidden="true"></uui-icon>
+          <div class="summary-error-copy">
+            <strong>Analytics unavailable</strong>
+            <p>${this._summaryError}</p>
+          </div>
+          <uui-button look="secondary" label="Retry analytics summary" @click=${this.#loadReports}>Retry</uui-button>
+        </div>
+      </uui-box>
+    `;
     const periodDays = inclusiveRangeDays(this._range);
     const visitorsComparison = metricComparison(
       this._summary?.totals.visitors ?? 0,
@@ -555,6 +566,11 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     .chart-skeleton { block-size: 18rem; display: grid; margin-bottom: var(--uui-size-space-4); }
     .chart-skeleton span { border-top: 1px solid var(--uui-color-border); }
     .history-button-skeleton { background: var(--uui-color-surface-alt); block-size: 2.5rem; border-radius: var(--uui-border-radius); display: block; inline-size: 8.5rem; }
+    .summary-error { --uui-box-default-padding: 0; --uui-box-border-width: 1px; --uui-box-border-color: color-mix(in srgb, var(--uui-color-warning-standalone) 35%, var(--uui-color-border)); --uui-box-box-shadow: none; margin-bottom: var(--uui-size-layout-1); overflow: hidden; }
+    .summary-error-content { align-items: center; background: color-mix(in srgb, var(--uui-color-warning) 8%, var(--uui-color-surface)); border-inline-start: 3px solid var(--uui-color-warning-standalone); display: flex; flex-wrap: wrap; gap: var(--uui-size-space-5); padding: var(--uui-size-space-5); }
+    .summary-error-content uui-icon { color: var(--uui-color-warning-standalone); font-size: 1.5rem; }
+    .summary-error-copy { flex: 1 1 22rem; }
+    .summary-error-copy p { color: var(--uui-color-text-alt); margin: var(--uui-size-space-1) 0 0; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--uui-size-layout-1); }
     .wide { grid-column: span 2; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }

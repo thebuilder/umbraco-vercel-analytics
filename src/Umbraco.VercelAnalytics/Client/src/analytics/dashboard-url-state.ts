@@ -16,7 +16,7 @@ export type DashboardUrlState = {
 
 const DIMENSIONS = new Set<AnalyticsDimension>([
   "RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType",
-  "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign",
+  "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "EventName",
 ]);
 const PRESETS = new Set([7, 30, 90, 365]);
 

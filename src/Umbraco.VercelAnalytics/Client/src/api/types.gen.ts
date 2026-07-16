@@ -49,7 +49,7 @@ export type AnalyticsConnectionsResponse = {
     connections: Array<AnalyticsConnectionSummary>;
 };
 
-export type AnalyticsDimension = 'RequestPath' | 'Route' | 'ReferrerHostname' | 'Country' | 'DeviceType' | 'BrowserName' | 'OsName' | 'UtmSource' | 'UtmMedium' | 'UtmCampaign';
+export type AnalyticsDimension = 'RequestPath' | 'Route' | 'ReferrerHostname' | 'Country' | 'DeviceType' | 'BrowserName' | 'OsName' | 'UtmSource' | 'UtmMedium' | 'UtmCampaign' | 'EventName';
 
 export type AnalyticsDocumentRoute = {
     connection: string;

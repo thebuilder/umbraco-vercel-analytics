@@ -772,7 +772,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     return html`
       <uui-box class="breakdown-card wide">
         <div class="breakdown-card-layout">
-          <vercel-analytics-event-table .rows=${rows} .loading=${this._events.loading} @select-event=${this.#selectEvent}></vercel-analytics-event-table>
+          <vercel-analytics-event-table .rows=${rows} .filters=${this._filters} .loading=${this._events.loading} @select-event=${this.#selectEvent}></vercel-analytics-event-table>
           <footer class="breakdown-footer">
             ${!this._events.loading && rows.length ? html`<uui-button look="secondary" label="View all events" @click=${() => this.#loadExpandedEvents()}>View all</uui-button>` : ""}
           </footer>
@@ -811,6 +811,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
         ${this._expandedEvents ? html`
           <vercel-analytics-event-dialog
             .rows=${this._expandedEvents.rows}
+            .filters=${this._filters}
             .loading=${this._expandedEvents.loading}
             .unavailable=${this._expandedEvents.error}
             @search-events=${this.#searchEvents}

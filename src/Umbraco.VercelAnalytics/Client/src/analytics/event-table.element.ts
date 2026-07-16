@@ -1,6 +1,7 @@
 import { LitElement, css, customElement, html, property } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import type { AnalyticsEventRow } from "../api/types.gen.js";
+import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import { visibleEventRows } from "./event-rows.js";
 
 @customElement("vercel-analytics-event-table")
@@ -8,6 +9,7 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
   @property({ type: Boolean }) loading = false;
   @property({ type: Number }) skeletonRows = 10;
   @property({ attribute: false }) rows: AnalyticsEventRow[] = [];
+  @property({ attribute: false }) filters: AnalyticsFilter[] = [];
 
   #select(eventName: string): void {
     this.dispatchEvent(new CustomEvent("select-event", {
@@ -29,16 +31,34 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
           ? Array.from({ length: this.skeletonRows }, () => html`
               <tr><th scope="row"><span class="skeleton-line"></span></th><td><span class="skeleton-number"></span></td><td><span class="skeleton-number"></span></td></tr>
             `)
-          : rows.map((row) => html`
+          : rows.map((row) => {
+              const activeFilter = this.filters.some((filter) => filter.dimension === "EventName" && filter.value === row.eventName);
+              const filterLabel = activeFilter ? `Remove ${row.eventName} event filter` : `Filter analytics by ${row.eventName} event`;
+              return html`
               <tr>
                 <th scope="row">
                   <span class="bar" style=${`--bar-width:${(row.count / maximum) * 100}%;--bar-minimum:${row.count > 0 ? "4px" : "0px"}`}></span>
-                  <button type="button" title=${`View details for ${row.eventName}`} @click=${() => this.#select(row.eventName)}>${row.eventName}</button>
+                  <button class="details-action" type="button" title=${`View details for ${row.eventName}`} @click=${() => this.#select(row.eventName)}>${row.eventName}</button>
                 </th>
-                <td>${row.visitors.toLocaleString()}</td>
+                <td><span class="metric-cell">
+                  <button
+                    class="filter-action"
+                    type="button"
+                    aria-label=${filterLabel}
+                    aria-pressed=${activeFilter}
+                    title=${filterLabel}
+                    @click=${() => this.dispatchEvent(new CustomEvent("toggle-filter", {
+                      bubbles: true,
+                      composed: true,
+                      detail: { dimension: "EventName", value: row.eventName },
+                    }))}>
+                    <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
+                  </button>
+                  <span>${row.visitors.toLocaleString()}</span>
+                </span></td>
                 <td>${row.count.toLocaleString()}</td>
               </tr>
-            `)}</tbody>
+            `;})}</tbody>
       </table>
     `;
   }
@@ -52,15 +72,22 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
     thead th:not(:first-child), td { text-align: right; width: 8rem; }
     tbody th { font-weight: 500; min-width: 12rem; position: relative; }
     td { font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
-    button { appearance: none; background: transparent; border: 0; color: var(--uui-color-interactive-emphasis); cursor: pointer; font: inherit; max-width: 100%; overflow: hidden; padding: 0; position: relative; text-align: left; text-overflow: ellipsis; white-space: nowrap; z-index: 1; }
-    button:hover { text-decoration: underline; text-underline-offset: 0.18em; }
-    button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
+    tbody tr:hover, tbody tr:focus-within { position: relative; z-index: 2; }
+    .details-action { appearance: none; background: transparent; border: 0; color: var(--uui-color-text); cursor: pointer; font: inherit; max-width: 100%; overflow: hidden; padding: 0; position: relative; text-align: left; text-overflow: ellipsis; white-space: nowrap; z-index: 1; }
+    .details-action:hover { text-decoration: underline; text-underline-offset: 0.18em; }
+    .details-action:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
+    .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
+    .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
+    tbody tr:hover .filter-action, .filter-action:focus-visible, .filter-action[aria-pressed="true"] { opacity: 1; }
+    .filter-action:hover, .filter-action[aria-pressed="true"] { background: var(--uui-color-surface-alt); color: var(--uui-color-interactive-emphasis); }
+    .filter-action:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 1px; }
     .bar { inset-block: var(--uui-size-space-1); inset-inline-start: var(--bar-inset); inline-size: calc(100% + 16rem - 2 * var(--bar-inset)); position: absolute; }
     .bar::before { background: color-mix(in srgb, var(--uui-color-interactive) 4%, var(--uui-color-surface)); block-size: 100%; border-radius: var(--uui-border-radius); content: ""; display: block; inline-size: max(var(--bar-minimum), var(--bar-width)); }
     .skeleton-line, .skeleton-number { background: var(--uui-color-surface-alt); block-size: 1lh; border-radius: var(--uui-border-radius); display: block; }
     .skeleton-line { width: 70%; }
     .skeleton-number { margin-inline-start: auto; width: 3.5rem; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+    @media (hover: none) { .filter-action { opacity: 1; } }
   `;
 }
 

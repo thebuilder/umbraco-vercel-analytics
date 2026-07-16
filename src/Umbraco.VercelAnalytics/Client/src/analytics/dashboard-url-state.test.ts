@@ -4,7 +4,7 @@ import { parseDashboardUrlState, writeDashboardUrlState } from "./dashboard-url-
 describe("analytics dashboard URL state", () => {
   it("parses shareable report state and ignores malformed filters", () => {
     const state = parseDashboardUrlState(new URLSearchParams(
-      "connection=main&range=30&from=2026-06-17&to=2026-07-16&metric=pageViews&audience=BrowserName&filter=Country%3ADK&filter=RequestPath%3A%2Fnews%3Aarchive&filter=Nope%3Ax&filter=Country%3AUS",
+      "connection=main&range=30&from=2026-06-17&to=2026-07-16&metric=pageViews&audience=BrowserName&filter=Country%3ADK&filter=RequestPath%3A%2Fnews%3Aarchive&filter=EventName%3ASignup&filter=Nope%3Ax&filter=Country%3AUS",
     ));
 
     expect(state.connection).toBe("main");
@@ -15,6 +15,7 @@ describe("analytics dashboard URL state", () => {
     expect(state.filters).toEqual([
       { dimension: "Country", value: "DK" },
       { dimension: "RequestPath", value: "/news:archive" },
+      { dimension: "EventName", value: "Signup" },
     ]);
   });
 

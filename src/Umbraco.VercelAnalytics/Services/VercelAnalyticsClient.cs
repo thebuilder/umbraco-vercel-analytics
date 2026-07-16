@@ -93,6 +93,10 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         var parameters = BuildParameters(connection, query);
         parameters["by"] = "eventName";
         parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
+        foreach (var filter in query.Filters?.Where(filter => filter.Dimension == AnalyticsDimension.EventName) ?? [])
+        {
+            AddFilter(parameters, $"eventName eq '{EscapeODataString(filter.Value)}'");
+        }
         if (!string.IsNullOrWhiteSpace(search))
         {
             AddFilter(parameters, $"contains(eventName, '{EscapeODataString(search.Trim())}')");
@@ -181,7 +185,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         {
             parameters["filter"] = $"requestPath eq '{EscapeODataString(query.RequestPath)}'";
         }
-        foreach (var filter in query.Filters ?? [])
+        foreach (var filter in query.Filters?.Where(filter => filter.Dimension != AnalyticsDimension.EventName) ?? [])
         {
             AddFilter(parameters, $"{ToApiValue(filter.Dimension)} eq '{EscapeODataString(filter.Value)}'");
         }

@@ -97,6 +97,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
         [FromQuery] string[]? filter = null,
         CancellationToken cancellationToken = default)
     {
+        if (dimension == AnalyticsDimension.EventName) return ValidationProblem("EventName is only supported as an Events report filter.");
         if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
         if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
         var scope = await AuthorizeAndBuildQueryAsync(connection, from, to, interval, documentId, culture, path, filter, cancellationToken);

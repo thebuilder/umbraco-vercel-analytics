@@ -120,7 +120,8 @@ public sealed class VercelAnalyticsClientTests
             Filters:
             [
                 new AnalyticsFilter(AnalyticsDimension.Country, "DK"),
-                new AnalyticsFilter(AnalyticsDimension.ReferrerHostname, "editor's.example")
+                new AnalyticsFilter(AnalyticsDimension.ReferrerHostname, "editor's.example"),
+                new AnalyticsFilter(AnalyticsDimension.EventName, "Signup")
             ]);
 
         await client.CountAsync(connection, query, CancellationToken.None);
@@ -128,6 +129,7 @@ public sealed class VercelAnalyticsClientTests
         Assert.Contains(
             "filter=country eq 'DK' and referrerHostname eq 'editor''s.example'",
             Uri.UnescapeDataString(handler.Request!.RequestUri!.Query));
+        Assert.DoesNotContain("eventName", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
     }
 
     [Fact]
@@ -160,7 +162,12 @@ public sealed class VercelAnalyticsClientTests
 
         var result = await client.GetEventsAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            new AnalyticsQuery(
+                connection.Alias,
+                new DateOnly(2026, 7, 1),
+                new DateOnly(2026, 7, 2),
+                AnalyticsInterval.Day,
+                Filters: [new AnalyticsFilter(AnalyticsDimension.EventName, "Signup")]),
             100,
             "sign'up",
             CancellationToken.None);
@@ -169,6 +176,7 @@ public sealed class VercelAnalyticsClientTests
         Assert.EndsWith("/events/aggregate", handler.Request!.RequestUri!.AbsolutePath);
         Assert.Contains("by=eventName", handler.Request.RequestUri.Query);
         Assert.Contains("limit=100", handler.Request.RequestUri.Query);
+        Assert.Contains("eventName eq 'Signup'", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
         Assert.Contains("contains(eventName, 'sign''up')", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
     }
 

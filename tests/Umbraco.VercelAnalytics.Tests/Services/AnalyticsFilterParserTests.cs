@@ -9,13 +9,17 @@ public sealed class AnalyticsFilterParserTests
     public void Parses_allowlisted_dimensions_and_values_containing_colons()
     {
         var success = AnalyticsFilterParser.TryParse(
-            ["Country:DK", "RequestPath:/news:archive"],
+            ["Country:DK", "RequestPath:/news:archive", "EventName:Signup"],
             out var filters,
             out var error);
 
         Assert.True(success, error);
         Assert.Equal(
-            [new AnalyticsFilter(AnalyticsDimension.Country, "DK"), new AnalyticsFilter(AnalyticsDimension.RequestPath, "/news:archive")],
+            [
+                new AnalyticsFilter(AnalyticsDimension.Country, "DK"),
+                new AnalyticsFilter(AnalyticsDimension.RequestPath, "/news:archive"),
+                new AnalyticsFilter(AnalyticsDimension.EventName, "Signup")
+            ],
             filters);
     }
 

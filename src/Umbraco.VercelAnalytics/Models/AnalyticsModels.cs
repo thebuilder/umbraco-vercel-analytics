@@ -22,7 +22,8 @@ public enum AnalyticsDimension
     OsName,
     UtmSource,
     UtmMedium,
-    UtmCampaign
+    UtmCampaign,
+    EventName
 }
 
 public sealed record AnalyticsQuery(

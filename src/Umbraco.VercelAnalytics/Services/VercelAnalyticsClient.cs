@@ -24,7 +24,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         using var response = await SendAsync(
             connection,
             CountPath,
-            BuildParameters(connection, query),
+            BuildVisitParameters(connection, query),
             cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<CountEnvelope>(cancellationToken);
         return envelope?.Data is null
@@ -37,7 +37,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
-        var parameters = BuildParameters(connection, query);
+        var parameters = BuildVisitParameters(connection, query);
         parameters["by"] = ToApiValue(query.Interval);
         using var response = await SendAsync(connection, AggregatePath, parameters, cancellationToken);
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
@@ -54,7 +54,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         CancellationToken cancellationToken)
     {
         var apiDimension = ToApiValue(dimension);
-        var parameters = BuildParameters(connection, query);
+        var parameters = BuildVisitParameters(connection, query);
         parameters["by"] = apiDimension;
         parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
         if (!string.IsNullOrWhiteSpace(search))
@@ -75,7 +75,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
-        var parameters = BuildParameters(connection, query);
+        var parameters = BuildEventParameters(connection, query);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
         AddEventDataFilter(parameters, eventDataFilter);
         using var response = await SendAsync(connection, EventCountPath, parameters, cancellationToken);
@@ -92,7 +92,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         string? search,
         CancellationToken cancellationToken)
     {
-        var parameters = BuildParameters(connection, query);
+        var parameters = BuildEventParameters(connection, query);
         parameters["by"] = "eventName";
         parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
         foreach (var filter in query.Filters?.Where(filter => filter.Dimension == AnalyticsDimension.EventName) ?? [])
@@ -117,7 +117,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
-        var parameters = BuildParameters(connection, query);
+        var parameters = BuildEventParameters(connection, query);
         parameters["by"] = "eventData";
         parameters["limit"] = EventPropertyLimit.ToString(CultureInfo.InvariantCulture);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
@@ -142,7 +142,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         CancellationToken cancellationToken)
     {
         var dimension = ToEventDataDimension(propertyName);
-        var parameters = BuildParameters(connection, query);
+        var parameters = BuildEventParameters(connection, query);
         parameters["by"] = dimension;
         parameters["limit"] = limit.ToString(CultureInfo.InvariantCulture);
         AddFilter(parameters, $"eventName eq '{EscapeODataString(eventName)}'");
@@ -181,7 +181,19 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         return response;
     }
 
-    private static Dictionary<string, string?> BuildParameters(
+    private static Dictionary<string, string?> BuildVisitParameters(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query)
+    {
+        if (query.Filters?.Any(filter => filter.Dimension == AnalyticsDimension.EventName) is true)
+        {
+            throw new ArgumentException("EventName filters are only valid for event reports.", nameof(query));
+        }
+
+        return BuildEventParameters(connection, query);
+    }
+
+    private static Dictionary<string, string?> BuildEventParameters(
         VercelAnalyticsConnection connection,
         AnalyticsQuery query)
     {

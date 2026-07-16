@@ -32,8 +32,10 @@ namespace Umbraco.VercelAnalytics.Composers
                 client.BaseAddress = new Uri("https://api.vercel.com/");
                 client.Timeout = TimeSpan.FromSeconds(15);
             });
-            builder.Services.AddSingleton<VercelAnalyticsReportService>();
-            builder.Services.AddTransient<AnalyticsDocumentRouteService>();
+            builder.Services.AddTransient<VercelAnalyticsReportService>();
+            builder.Services.AddTransient<IAnalyticsAuthorizationService, AnalyticsAuthorizationService>();
+            builder.Services.AddTransient<IAnalyticsPublishedContentAccessor, UmbracoAnalyticsPublishedContentAccessor>();
+            builder.Services.AddTransient<IAnalyticsDocumentRouteService, AnalyticsDocumentRouteService>();
             builder.AddNotificationAsyncHandler<UmbracoApplicationStartedNotification, AnalyticsSectionAccessInitializer>();
             builder.Services.AddSingleton<IOperationIdHandler, CustomOperationHandler>();
 

@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Umbraco.Cms.Core.Services;
 
@@ -48,9 +51,8 @@ public sealed class VercelAnalyticsSettingsStore
     private readonly IKeyValueService? _keyValueService;
     private readonly Microsoft.Extensions.Options.IOptions<VercelAnalyticsOptions> _serverOptions;
     private VercelAnalyticsSettings? _cached;
+    private string? _cachedJson;
     private long _revision;
-
-    public long Revision => Interlocked.Read(ref _revision);
 
     public VercelAnalyticsSettingsStore(
         IKeyValueService keyValueService,
@@ -66,17 +68,24 @@ public sealed class VercelAnalyticsSettingsStore
         _serverOptions = serverOptions;
     }
 
-    public VercelAnalyticsSettings Get()
+    public VercelAnalyticsSettings Get() => GetSnapshot().Settings;
+
+    internal VercelAnalyticsSettingsSnapshot GetSnapshot()
     {
         lock (_lock)
         {
-            if (_cached is not null) return _cached;
             var json = _keyValueService?.GetValue(StorageKey);
-            _cached = string.IsNullOrWhiteSpace(json)
-                ? FromServerOptions(_serverOptions.Value)
-                : JsonSerializer.Deserialize<VercelAnalyticsSettings>(json, SerializerOptions)
-                    ?? FromServerOptions(_serverOptions.Value);
-            return _cached;
+            if (_cached is null || (_keyValueService is not null && !string.Equals(json, _cachedJson, StringComparison.Ordinal)))
+            {
+                _cached = string.IsNullOrWhiteSpace(json)
+                    ? VercelAnalyticsSettingsMapper.FromServerOptions(_serverOptions.Value)
+                    : JsonSerializer.Deserialize<VercelAnalyticsSettings>(json, SerializerOptions)
+                        ?? VercelAnalyticsSettingsMapper.FromServerOptions(_serverOptions.Value);
+                _cachedJson = json;
+                _revision = ComputeRevision(json ?? JsonSerializer.Serialize(_cached, SerializerOptions));
+            }
+
+            return new VercelAnalyticsSettingsSnapshot(_cached, _revision);
         }
     }
 
@@ -88,11 +97,60 @@ public sealed class VercelAnalyticsSettingsStore
         {
             _keyValueService?.SetValue(StorageKey, json);
             _cached = normalized;
-            Interlocked.Increment(ref _revision);
+            _cachedJson = json;
+            _revision = ComputeRevision(json);
         }
     }
 
-    private static VercelAnalyticsSettings FromServerOptions(VercelAnalyticsOptions options) => new()
+    private static VercelAnalyticsSettings Normalize(VercelAnalyticsSettings settings) => new()
+    {
+        Enabled = settings.Enabled,
+        DefaultConnection = NullIfWhiteSpace(settings.DefaultConnection),
+        DefaultRangeDays = settings.DefaultRangeDays,
+        CacheDuration = settings.CacheDuration,
+        Connections = settings.Connections.Select(connection => new VercelAnalyticsConnectionSettings
+        {
+            Alias = connection.Alias.Trim(),
+            DisplayName = connection.DisplayName.Trim(),
+            ProjectId = connection.ProjectId.Trim(),
+            TeamId = NullIfWhiteSpace(connection.TeamId),
+            TeamSlug = NullIfWhiteSpace(connection.TeamSlug),
+            Hostnames = connection.Hostnames
+                .Select(VercelAnalyticsConnectionRegistry.NormalizeHostname)
+                .OfType<string>()
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            DocumentRootKeys = NormalizeGuidValues(connection.DocumentRootKeys),
+            EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
+            EnabledDocumentTypeKeys = NormalizeGuidValues(connection.EnabledDocumentTypeKeys),
+            EnabledDocumentTypes = connection.EnabledDocumentTypes
+                .Select(value => value.Trim())
+                .Where(value => value.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+        }).ToList()
+    };
+
+    private static string? NullIfWhiteSpace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static long ComputeRevision(string json) =>
+        BinaryPrimitives.ReadInt64LittleEndian(SHA256.HashData(Encoding.UTF8.GetBytes(json))) & long.MaxValue;
+
+    private static string[] NormalizeGuidValues(IEnumerable<string> values) => values
+        .Select(value => Guid.TryParse(value, out var parsed) ? parsed.ToString() : null)
+        .OfType<string>()
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
+internal sealed record VercelAnalyticsSettingsSnapshot(
+    VercelAnalyticsSettings Settings,
+    long Revision);
+
+internal static class VercelAnalyticsSettingsMapper
+{
+    public static VercelAnalyticsSettings FromServerOptions(VercelAnalyticsOptions options) => new()
     {
         Enabled = options.Enabled,
         DefaultConnection = string.IsNullOrWhiteSpace(options.DefaultConnection)
@@ -114,42 +172,4 @@ public sealed class VercelAnalyticsSettingsStore
             EnabledDocumentTypes = pair.Value.EnabledDocumentTypes
         }).ToList()
     };
-
-    private static VercelAnalyticsSettings Normalize(VercelAnalyticsSettings settings) => new()
-    {
-        Enabled = settings.Enabled,
-        DefaultConnection = NullIfWhiteSpace(settings.DefaultConnection),
-        DefaultRangeDays = settings.DefaultRangeDays,
-        CacheDuration = settings.CacheDuration,
-        Connections = settings.Connections.Select(connection => new VercelAnalyticsConnectionSettings
-        {
-            Alias = connection.Alias.Trim(),
-            DisplayName = connection.DisplayName.Trim(),
-            ProjectId = connection.ProjectId.Trim(),
-            TeamId = NullIfWhiteSpace(connection.TeamId),
-            TeamSlug = NullIfWhiteSpace(connection.TeamSlug),
-            Hostnames = connection.Hostnames
-                .Select(VercelAnalyticsConnectionRegistry.NormalizeHostname)
-                .OfType<string>()
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
-            DocumentRootKeys = connection.DocumentRootKeys
-                .Select(value => Guid.Parse(value).ToString())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
-            EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
-            EnabledDocumentTypeKeys = connection.EnabledDocumentTypeKeys
-                .Select(value => Guid.Parse(value).ToString())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
-            EnabledDocumentTypes = connection.EnabledDocumentTypes
-                .Select(value => value.Trim())
-                .Where(value => value.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray()
-        }).ToList()
-    };
-
-    private static string? NullIfWhiteSpace(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

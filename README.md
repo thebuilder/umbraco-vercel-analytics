@@ -192,14 +192,14 @@ The available reporting window and some dimensions depend on the Vercel plan and
 The client uses pnpm 11. From `src/Umbraco.VercelAnalytics/Client`:
 
 ```sh
-corepack pnpm install
-corepack pnpm check
-corepack pnpm test
-corepack pnpm build
+pnpm install
+pnpm check
+pnpm test
+pnpm build
 ```
 
 Run the example host before regenerating the OpenAPI client, then pass its Swagger URL to:
 
 ```sh
-corepack pnpm generate-client -- <swagger-url>
+pnpm generate-client -- <swagger-url>
 ```

@@ -26,6 +26,24 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
+    public async Task Zero_cache_duration_disables_caching()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(
+            CreateRegistry(cacheDuration: TimeSpan.Zero),
+            client,
+            cache);
+        var query = CreateQuery();
+
+        await service.GetSummaryAsync(query, CancellationToken.None);
+        await service.GetSummaryAsync(query, CancellationToken.None);
+
+        Assert.Equal(4, client.CountCalls);
+        Assert.Equal(2, client.TrendCalls);
+    }
+
+    [Fact]
     public async Task Summary_compares_with_the_immediately_preceding_range()
     {
         var client = new CountingClient();
@@ -53,6 +71,24 @@ public sealed class VercelAnalyticsReportServiceTests
         Assert.NotNull(summary);
         Assert.Null(summary.PreviousTotals);
         Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
+    }
+
+    [Fact]
+    public async Task Summary_omits_comparison_when_the_previous_range_would_precede_date_minimum()
+    {
+        var client = new CountingClient();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var minimumDate = DateOnly.MinValue;
+
+        var summary = await service.GetSummaryAsync(
+            CreateQuery() with { From = minimumDate, To = minimumDate },
+            CancellationToken.None);
+
+        Assert.NotNull(summary);
+        Assert.Null(summary.PreviousTotals);
+        Assert.Equal(1, client.CountCalls);
+        Assert.Equal([minimumDate], client.CountQueries.Select(query => query.From));
     }
 
     [Fact]
@@ -117,7 +153,7 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
-    public async Task Event_details_combine_totals_and_property_values_and_are_cached_by_name()
+    public async Task Event_details_return_property_names_without_eagerly_loading_values()
     {
         var client = new CountingClient();
         using var cache = new MemoryCache(new MemoryCacheOptions());
@@ -129,10 +165,12 @@ public sealed class VercelAnalyticsReportServiceTests
         Assert.NotNull(first);
         Assert.Same(first, second);
         Assert.Equal(new AnalyticsEventTotals(30, 12), first.Totals);
-        Assert.Equal("plan", Assert.Single(first.Properties).Name);
+        var property = Assert.Single(first.Properties);
+        Assert.Equal("plan", property.Name);
+        Assert.Empty(property.Values);
         Assert.Equal(1, client.EventCountCalls);
         Assert.Equal(1, client.EventPropertyNameCalls);
-        Assert.Equal(1, client.EventPropertyValueCalls);
+        Assert.Equal(0, client.EventPropertyValueCalls);
     }
 
     [Fact]
@@ -188,10 +226,11 @@ public sealed class VercelAnalyticsReportServiceTests
         new DateOnly(2026, 7, 15),
         AnalyticsInterval.Day);
 
-    private static VercelAnalyticsConnectionRegistry CreateRegistry() => new(Options.Create(new VercelAnalyticsOptions
+    private static VercelAnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null) => new(Options.Create(new VercelAnalyticsOptions
     {
         Enabled = true,
         DefaultConnection = "main",
+        CacheDuration = cacheDuration ?? TimeSpan.FromMinutes(5),
         Connections = new Dictionary<string, VercelAnalyticsConnectionOptions>(StringComparer.OrdinalIgnoreCase)
         {
             ["main"] = new()

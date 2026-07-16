@@ -6,25 +6,26 @@ public sealed class VercelAnalyticsConnectionRegistry(
     VercelAnalyticsSettingsStore settingsStore,
     IOptions<VercelAnalyticsOptions> serverOptions)
 {
+    private readonly Lock _snapshotLock = new();
+    private RegistrySnapshot? _snapshot;
+
     public VercelAnalyticsConnectionRegistry(IOptions<VercelAnalyticsOptions> serverOptions)
         : this(new VercelAnalyticsSettingsStore(serverOptions), serverOptions)
     {
     }
 
-    public VercelAnalyticsSettings Settings => settingsStore.Get();
+    public VercelAnalyticsSettings Settings => Capture().Settings;
 
-    public long SettingsRevision => settingsStore.Revision;
-
-    public IEnumerable<VercelAnalyticsConnection> Connections => CreateSnapshot().Connections.Values;
+    public IEnumerable<VercelAnalyticsConnection> Connections => Capture().Connections.Values;
 
     public VercelAnalyticsConnection? Get(string alias) =>
-        CreateSnapshot().Connections.GetValueOrDefault(alias);
+        Capture().Get(alias);
 
     public VercelAnalyticsConnection? FindByHostname(string? hostname)
     {
         var normalized = NormalizeHostname(hostname);
         if (normalized is null) return null;
-        var snapshot = CreateSnapshot();
+        var snapshot = Capture();
         return snapshot.HostnameOwners.TryGetValue(normalized, out var alias)
             ? snapshot.Connections.GetValueOrDefault(alias)
             : null;
@@ -32,7 +33,7 @@ public sealed class VercelAnalyticsConnectionRegistry(
 
     public VercelAnalyticsConnection? FindNearestRoot(IEnumerable<Guid> ancestorKeys)
     {
-        var snapshot = CreateSnapshot();
+        var snapshot = Capture();
         foreach (var key in ancestorKeys)
         {
             if (snapshot.RootOwners.TryGetValue(key, out var alias))
@@ -51,10 +52,25 @@ public sealed class VercelAnalyticsConnectionRegistry(
         return Uri.CheckHostName(value) == UriHostNameType.Unknown ? null : value;
     }
 
-    private RegistrySnapshot CreateSnapshot()
+    internal RegistrySnapshot Capture()
+    {
+        var settingsSnapshot = settingsStore.GetSnapshot();
+        lock (_snapshotLock)
+        {
+            if (_snapshot?.Revision == settingsSnapshot.Revision)
+            {
+                return _snapshot;
+            }
+
+            _snapshot = CreateSnapshot(settingsSnapshot);
+            return _snapshot;
+        }
+    }
+
+    private RegistrySnapshot CreateSnapshot(VercelAnalyticsSettingsSnapshot settingsSnapshot)
     {
         var configuredTokens = serverOptions.Value.Connections;
-        var connections = Settings.Connections.ToDictionary(
+        var connections = settingsSnapshot.Settings.Connections.ToDictionary(
             connection => connection.Alias,
             connection => VercelAnalyticsConnection.Create(
                 connection,
@@ -66,13 +82,23 @@ public sealed class VercelAnalyticsConnectionRegistry(
         var roots = connections.Values
             .SelectMany(connection => connection.DocumentRootKeys.Select(rootKey => (rootKey, connection.Alias)))
             .ToDictionary(pair => pair.rootKey, pair => pair.Alias);
-        return new RegistrySnapshot(connections, hostnames, roots);
+        return new RegistrySnapshot(
+            settingsSnapshot.Settings,
+            settingsSnapshot.Revision,
+            connections,
+            hostnames,
+            roots);
     }
 
-    private sealed record RegistrySnapshot(
+    internal sealed record RegistrySnapshot(
+        VercelAnalyticsSettings Settings,
+        long Revision,
         IReadOnlyDictionary<string, VercelAnalyticsConnection> Connections,
         IReadOnlyDictionary<string, string> HostnameOwners,
-        IReadOnlyDictionary<Guid, string> RootOwners);
+        IReadOnlyDictionary<Guid, string> RootOwners)
+    {
+        public VercelAnalyticsConnection? Get(string alias) => Connections.GetValueOrDefault(alias);
+    }
 }
 
 public sealed record VercelAnalyticsConnection(
@@ -108,12 +134,17 @@ public sealed record VercelAnalyticsConnection(
             NullIfWhiteSpace(settings.TeamSlug),
             settings.Hostnames.Select(VercelAnalyticsConnectionRegistry.NormalizeHostname).OfType<string>()
                 .ToHashSet(StringComparer.OrdinalIgnoreCase),
-            settings.DocumentRootKeys.Select(Guid.Parse).ToArray(),
+            ParseGuidValues(settings.DocumentRootKeys),
             settings.EnableAllDocumentTypes,
-            settings.EnabledDocumentTypeKeys.Select(Guid.Parse).ToHashSet(),
+            ParseGuidValues(settings.EnabledDocumentTypeKeys).ToHashSet(),
             settings.EnabledDocumentTypes.Select(value => value.Trim()).Where(value => value.Length > 0)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase));
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static IReadOnlyList<Guid> ParseGuidValues(IEnumerable<string> values) => values
+        .Select(value => Guid.TryParse(value, out var parsed) ? parsed : (Guid?)null)
+        .OfType<Guid>()
+        .ToArray();
 }

@@ -107,7 +107,30 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
-    public async Task Count_combines_allowlisted_filters_and_escapes_values()
+    public async Task Count_rejects_event_filters_in_visit_queries()
+    {
+        var handler = new RecordingHandler("""{"data":{"pageviews":42,"visitors":31}}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+        var query = new AnalyticsQuery(
+            connection.Alias,
+            new DateOnly(2026, 7, 1),
+            new DateOnly(2026, 7, 2),
+            AnalyticsInterval.Day,
+            Filters:
+            [
+                new AnalyticsFilter(AnalyticsDimension.EventName, "Signup")
+            ]);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => client.CountAsync(connection, query, CancellationToken.None));
+
+        Assert.Contains("only valid for event reports", exception.Message);
+        Assert.Null(handler.Request);
+    }
+
+    [Fact]
+    public async Task Count_combines_allowlisted_visit_filters_and_escapes_values()
     {
         var handler = new RecordingHandler("""{"data":{"pageviews":42,"visitors":31}}""");
         var client = CreateClient(handler);
@@ -120,8 +143,7 @@ public sealed class VercelAnalyticsClientTests
             Filters:
             [
                 new AnalyticsFilter(AnalyticsDimension.Country, "DK"),
-                new AnalyticsFilter(AnalyticsDimension.ReferrerHostname, "editor's.example"),
-                new AnalyticsFilter(AnalyticsDimension.EventName, "Signup")
+                new AnalyticsFilter(AnalyticsDimension.ReferrerHostname, "editor's.example")
             ]);
 
         await client.CountAsync(connection, query, CancellationToken.None);
@@ -129,7 +151,6 @@ public sealed class VercelAnalyticsClientTests
         Assert.Contains(
             "filter=country eq 'DK' and referrerHostname eq 'editor''s.example'",
             Uri.UnescapeDataString(handler.Request!.RequestUri!.Query));
-        Assert.DoesNotContain("eventName", Uri.UnescapeDataString(handler.Request.RequestUri.Query));
     }
 
     [Fact]

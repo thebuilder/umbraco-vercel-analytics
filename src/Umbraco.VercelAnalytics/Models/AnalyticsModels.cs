@@ -1,6 +1,12 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Umbraco.VercelAnalytics.Models;
+
+public sealed class AnalyticsProblemDetails : ProblemDetails
+{
+    public string Code { get; init; } = string.Empty;
+}
 
 [JsonConverter(typeof(JsonStringEnumConverter<AnalyticsInterval>))]
 public enum AnalyticsInterval

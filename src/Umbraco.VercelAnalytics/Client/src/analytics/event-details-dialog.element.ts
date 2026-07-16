@@ -101,7 +101,7 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
     const search = this._search.trim().toLocaleLowerCase();
     const searchIsCurrent = this.searchedProperty?.name === property.name
       && this.searchedTerm?.toLocaleLowerCase() === search;
-    const values = search ? (searchIsCurrent ? this.searchedProperty?.values ?? [] : []) : property.values;
+    const values = searchIsCurrent ? this.searchedProperty?.values ?? [] : search ? [] : property.values;
     const maximum = Math.max(...values.map((value) => value.count), 1);
     return html`
       <div id="event-property-panel" role="tabpanel" aria-labelledby=${`event-property-${this.details?.properties.indexOf(property) ?? 0}`}>
@@ -136,9 +136,9 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
               </th></tr>
             ` : ""}
           </thead>
-          <tbody>${search && this.searchLoading ? html`
+          <tbody>${this.searchLoading ? html`
             <tr class="empty-row"><td colspan="3"><umb-empty-state headline="Searching"><p>Looking up matching values…</p></umb-empty-state></td></tr>
-          ` : search && this.searchUnavailable ? html`
+          ` : this.searchUnavailable ? html`
             <tr class="empty-row"><td colspan="3"><umb-empty-state headline="Search unavailable"><p>${this.searchUnavailable}</p></umb-empty-state></td></tr>
           ` : values.length ? values.map((value) => {
             const activeFilter = this.filterProperty === property.name && this.filterValue === value.value;

@@ -25,6 +25,7 @@ public sealed class AnalyticsFilterParserTests
 
     [Theory]
     [InlineData("Unsupported:value")]
+    [InlineData("999:value")]
     [InlineData("Country:")]
     [InlineData("Country:DK", "Country:US")]
     public void Rejects_invalid_or_duplicate_filters(params string[] values)

@@ -27,7 +27,8 @@ public static class AnalyticsFilterParser
         {
             var separator = item.IndexOf(':');
             if (separator <= 0 ||
-                !Enum.TryParse<AnalyticsDimension>(item[..separator], true, out var dimension))
+                !Enum.TryParse<AnalyticsDimension>(item[..separator], true, out var dimension) ||
+                !Enum.IsDefined(dimension))
             {
                 error = "Each analytics filter must contain a supported dimension and value.";
                 return false;

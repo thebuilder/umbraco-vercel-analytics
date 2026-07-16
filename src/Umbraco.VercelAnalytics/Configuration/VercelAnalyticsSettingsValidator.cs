@@ -4,14 +4,20 @@ namespace Umbraco.VercelAnalytics.Configuration;
 
 public static partial class VercelAnalyticsSettingsValidator
 {
-    public static IReadOnlyList<string> Validate(VercelAnalyticsSettings settings)
+    public static IReadOnlyList<string> Validate(VercelAnalyticsSettings settings) =>
+        Validate(settings, VercelAnalyticsValidationMode.PersistedSettings);
+
+    internal static IReadOnlyList<string> Validate(
+        VercelAnalyticsSettings settings,
+        VercelAnalyticsValidationMode mode)
     {
+        var validateEnabledState = mode == VercelAnalyticsValidationMode.PersistedSettings;
         var failures = new List<string>();
         if (settings.DefaultRangeDays is < 1 or > 730)
             failures.Add("Default range must be between 1 and 730 days.");
         if (settings.CacheDuration < TimeSpan.Zero || settings.CacheDuration > TimeSpan.FromHours(1))
             failures.Add("Cache duration must be between zero and one hour.");
-        if (settings.Enabled && settings.Connections.Count == 0)
+        if (validateEnabledState && settings.Enabled && settings.Connections.Count == 0)
             failures.Add("Add at least one connection before enabling analytics.");
 
         var aliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -19,10 +25,16 @@ public static partial class VercelAnalyticsSettingsValidator
         var roots = new Dictionary<Guid, string>();
         foreach (var connection in settings.Connections)
         {
-            ValidateConnection(connection, failures, aliases, hostnames, roots);
+            ValidateConnection(
+                connection,
+                failures,
+                aliases,
+                hostnames,
+                roots,
+                validateEnabledState);
         }
 
-        if (settings.Enabled && (string.IsNullOrWhiteSpace(settings.DefaultConnection) ||
+        if (validateEnabledState && settings.Enabled && (string.IsNullOrWhiteSpace(settings.DefaultConnection) ||
             !aliases.Contains(settings.DefaultConnection)))
         {
             failures.Add("Choose a default connection before enabling analytics.");
@@ -36,19 +48,20 @@ public static partial class VercelAnalyticsSettingsValidator
         ICollection<string> failures,
         ISet<string> aliases,
         IDictionary<string, string> hostnames,
-        IDictionary<Guid, string> roots)
+        IDictionary<Guid, string> roots,
+        bool requireConnectionMetadata)
     {
         var alias = connection.Alias.Trim();
         if (!AliasPattern().IsMatch(alias))
             failures.Add("Connection aliases must start with a letter or number and contain only letters, numbers, hyphens, and underscores.");
         else if (!aliases.Add(alias))
             failures.Add($"Connection alias '{alias}' is used more than once.");
-        if (string.IsNullOrWhiteSpace(connection.DisplayName))
+        if (requireConnectionMetadata && string.IsNullOrWhiteSpace(connection.DisplayName))
             failures.Add($"Connection '{alias}' requires a display name.");
-        if (string.IsNullOrWhiteSpace(connection.ProjectId))
+        if (requireConnectionMetadata && string.IsNullOrWhiteSpace(connection.ProjectId))
             failures.Add($"Connection '{alias}' requires a project ID.");
         if (!string.IsNullOrWhiteSpace(connection.TeamId) && !string.IsNullOrWhiteSpace(connection.TeamSlug))
-            failures.Add($"Connection '{alias}' cannot use both team ID and team slug.");
+            failures.Add($"Connection '{alias}' cannot configure both TeamId and TeamSlug.");
 
         foreach (var hostname in connection.Hostnames)
         {
@@ -80,4 +93,10 @@ public static partial class VercelAnalyticsSettingsValidator
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", RegexOptions.CultureInvariant)]
     private static partial Regex AliasPattern();
+}
+
+internal enum VercelAnalyticsValidationMode
+{
+    PersistedSettings,
+    ServerOptions
 }

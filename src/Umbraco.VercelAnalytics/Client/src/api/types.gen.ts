@@ -102,6 +102,15 @@ export type AnalyticsPoint = {
     visitors: number;
 };
 
+export type AnalyticsProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    code: string;
+};
+
 export type AnalyticsSettingsResponse = {
     enabled: boolean;
     defaultConnection?: string | null;
@@ -228,6 +237,12 @@ export type BreakdownErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    400: AnalyticsProblemDetails;
+    402: AnalyticsProblemDetails;
+    404: AnalyticsProblemDetails;
+    502: AnalyticsProblemDetails;
+    503: AnalyticsProblemDetails;
+    504: AnalyticsProblemDetails;
 };
 
 export type BreakdownResponses = {
@@ -262,6 +277,12 @@ export type EventsErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    400: AnalyticsProblemDetails;
+    402: AnalyticsProblemDetails;
+    404: AnalyticsProblemDetails;
+    502: AnalyticsProblemDetails;
+    503: AnalyticsProblemDetails;
+    504: AnalyticsProblemDetails;
 };
 
 export type EventsResponses = {
@@ -297,6 +318,12 @@ export type EventDetailsErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    400: AnalyticsProblemDetails;
+    402: AnalyticsProblemDetails;
+    404: AnalyticsProblemDetails;
+    502: AnalyticsProblemDetails;
+    503: AnalyticsProblemDetails;
+    504: AnalyticsProblemDetails;
 };
 
 export type EventDetailsResponses = {
@@ -335,6 +362,12 @@ export type EventPropertyValuesErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    400: AnalyticsProblemDetails;
+    402: AnalyticsProblemDetails;
+    404: AnalyticsProblemDetails;
+    502: AnalyticsProblemDetails;
+    503: AnalyticsProblemDetails;
+    504: AnalyticsProblemDetails;
 };
 
 export type EventPropertyValuesResponses = {
@@ -367,6 +400,12 @@ export type SummaryErrors = {
      * The resource is protected and requires an authentication token
      */
     401: unknown;
+    400: AnalyticsProblemDetails;
+    402: AnalyticsProblemDetails;
+    404: AnalyticsProblemDetails;
+    502: AnalyticsProblemDetails;
+    503: AnalyticsProblemDetails;
+    504: AnalyticsProblemDetails;
 };
 
 export type SummaryResponses = {

@@ -14,6 +14,10 @@ describe("UTM capability detection", () => {
     expect(detectUtmCapability(true, true, [])).toBe("available");
   });
 
+  it("keeps the capability available when one UTM dimension succeeds and another returns 402", () => {
+    expect(detectUtmCapability(true, true, [402])).toBe("available");
+  });
+
   it("recognizes only UTM breakdown dimensions", () => {
     expect(isUtmDimension("UtmCampaign")).toBe(true);
     expect(isUtmDimension("Country")).toBe(false);

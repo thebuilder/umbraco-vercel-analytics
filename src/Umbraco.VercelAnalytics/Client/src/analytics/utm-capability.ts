@@ -17,7 +17,7 @@ export function detectUtmCapability(
   utmSucceeded: boolean,
   utmStatuses: ReadonlyArray<number>,
 ): UtmCapability {
-  if (baselineSucceeded && utmStatuses.includes(402)) return "unavailable";
   if (utmSucceeded) return "available";
+  if (baselineSucceeded && utmStatuses.includes(402)) return "unavailable";
   return "unknown";
 }

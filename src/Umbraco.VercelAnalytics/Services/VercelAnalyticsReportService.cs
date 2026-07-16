@@ -13,12 +13,12 @@ public sealed class VercelAnalyticsReportService(
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
-        var connection = registry.Get(query.Connection);
+        var snapshot = registry.Capture();
+        var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:summary:{Normalize(query)}";
-        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        var cacheKey = $"vercel-analytics:{snapshot.Revision}:summary:{Normalize(query)}";
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
         {
-            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var totals = client.CountAsync(connection, query, cancellationToken);
             var previousTotals = TryGetPreviousTotalsAsync(connection, query, cancellationToken);
             var trend = client.GetTrendAsync(connection, query, cancellationToken);
@@ -34,13 +34,13 @@ public sealed class VercelAnalyticsReportService(
         string? search,
         CancellationToken cancellationToken)
     {
-        var connection = registry.Get(query.Connection);
+        var snapshot = registry.Capture();
+        var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedSearch = search?.Trim();
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:breakdown:{dimension}:{limit}:{normalizedSearch}:{Normalize(query)}";
-        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        var cacheKey = $"vercel-analytics:{snapshot.Revision}:breakdown:{dimension}:{limit}:{normalizedSearch}:{Normalize(query)}";
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
         {
-            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, normalizedSearch, cancellationToken);
             return new AnalyticsBreakdown(dimension, rows);
         });
@@ -52,13 +52,13 @@ public sealed class VercelAnalyticsReportService(
         string? search,
         CancellationToken cancellationToken)
     {
-        var connection = registry.Get(query.Connection);
+        var snapshot = registry.Capture();
+        var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedSearch = search?.Trim();
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:events:{limit}:{normalizedSearch}:{Normalize(query)}";
-        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        var cacheKey = $"vercel-analytics:{snapshot.Revision}:events:{limit}:{normalizedSearch}:{Normalize(query)}";
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
         {
-            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var rows = await client.GetEventsAsync(connection, query, limit, normalizedSearch, cancellationToken);
             return new AnalyticsEventsReport(rows);
         });
@@ -70,24 +70,23 @@ public sealed class VercelAnalyticsReportService(
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
-        var connection = registry.Get(query.Connection);
+        var snapshot = registry.Capture();
+        var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedEventName = eventName.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
             : $":{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Property))}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Value))}";
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-details:{normalizedEventName}{eventDataCacheKey}:{Normalize(query)}";
-        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-details:{normalizedEventName}{eventDataCacheKey}:{Normalize(query)}";
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
         {
-            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, cancellationToken);
             var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, cancellationToken);
             await Task.WhenAll(totals, propertyNamesTask);
             var propertyNames = await propertyNamesTask;
-            var propertyTasks = propertyNames.Select(async propertyName => new AnalyticsEventProperty(
-                propertyName,
-                await client.GetEventPropertyValuesAsync(connection, query, normalizedEventName, propertyName, 100, null, eventDataFilter, cancellationToken)));
-            var properties = await Task.WhenAll(propertyTasks);
+            var properties = propertyNames
+                .Select(propertyName => new AnalyticsEventProperty(propertyName, []))
+                .ToArray();
             return new AnalyticsEventDetails(normalizedEventName, await totals, properties);
         });
     }
@@ -101,7 +100,8 @@ public sealed class VercelAnalyticsReportService(
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
-        var connection = registry.Get(query.Connection);
+        var snapshot = registry.Capture();
+        var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedEventName = eventName.Trim();
         var normalizedPropertyName = propertyName.Trim();
@@ -112,10 +112,9 @@ public sealed class VercelAnalyticsReportService(
         var eventNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedEventName));
         var propertyNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedPropertyName));
         var searchCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedSearch ?? string.Empty));
-        var cacheKey = $"vercel-analytics:{registry.SettingsRevision}:event-property-values:{eventNameCacheKey}:{propertyNameCacheKey}:{limit}:{searchCacheKey}{eventDataCacheKey}:{Normalize(query)}";
-        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-property-values:{eventNameCacheKey}:{propertyNameCacheKey}:{limit}:{searchCacheKey}{eventDataCacheKey}:{Normalize(query)}";
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
         {
-            entry.AbsoluteExpirationRelativeToNow = registry.Settings.CacheDuration;
             var values = await client.GetEventPropertyValuesAsync(
                 connection,
                 query,
@@ -127,6 +126,23 @@ public sealed class VercelAnalyticsReportService(
                 cancellationToken);
             return new AnalyticsEventProperty(normalizedPropertyName, values);
         });
+    }
+
+    private Task<T> GetOrCreateAsync<T>(
+        string cacheKey,
+        TimeSpan cacheDuration,
+        Func<Task<T>> factory)
+    {
+        if (cacheDuration <= TimeSpan.Zero)
+        {
+            return factory();
+        }
+
+        return cache.GetOrCreateAsync(cacheKey, entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = cacheDuration;
+            return factory();
+        })!;
     }
 
     private static string Normalize(AnalyticsQuery query)
@@ -143,6 +159,8 @@ public sealed class VercelAnalyticsReportService(
         CancellationToken cancellationToken)
     {
         var inclusiveDays = query.To.DayNumber - query.From.DayNumber + 1;
+        if (query.From.DayNumber < inclusiveDays) return null;
+
         var previousQuery = query with
         {
             From = query.From.AddDays(-inclusiveDays),

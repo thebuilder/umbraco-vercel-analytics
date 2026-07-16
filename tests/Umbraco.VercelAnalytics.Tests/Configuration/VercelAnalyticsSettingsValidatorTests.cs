@@ -1,5 +1,6 @@
 using Umbraco.VercelAnalytics.Configuration;
 using Microsoft.Extensions.Options;
+using Umbraco.Cms.Core.Services;
 
 namespace Umbraco.VercelAnalytics.Tests.Configuration;
 
@@ -82,6 +83,28 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         Assert.Equal("main", store.Get().DefaultConnection);
     }
 
+    [Fact]
+    public void Store_observes_settings_saved_by_another_application_node()
+    {
+        var values = new FakeKeyValueService();
+        var options = Options.Create(new VercelAnalyticsOptions());
+        var firstNode = new VercelAnalyticsSettingsStore(values, options);
+        var secondNode = new VercelAnalyticsSettingsStore(values, options);
+        var initial = CreateSettings();
+        firstNode.Save(initial);
+        var secondNodeInitialRevision = secondNode.GetSnapshot().Revision;
+
+        Assert.Equal(firstNode.GetSnapshot().Revision, secondNodeInitialRevision);
+
+        var changed = CreateSettings();
+        changed.Connections[0].DisplayName = "Changed on another node";
+        firstNode.Save(changed);
+        var observed = secondNode.GetSnapshot();
+
+        Assert.NotEqual(secondNodeInitialRevision, observed.Revision);
+        Assert.Equal("Changed on another node", observed.Settings.Connections[0].DisplayName);
+    }
+
     private static VercelAnalyticsSettings CreateSettings() => new()
     {
         Enabled = true,
@@ -96,4 +119,32 @@ public sealed class VercelAnalyticsSettingsValidatorTests
             }
         ]
     };
+
+    private sealed class FakeKeyValueService : IKeyValueService
+    {
+        private readonly Dictionary<string, string> _values = [];
+
+        public string? GetValue(string key) => _values.GetValueOrDefault(key);
+
+        public IReadOnlyDictionary<string, string?> FindByKeyPrefix(string keyPrefix) => _values
+            .Where(pair => pair.Key.StartsWith(keyPrefix, StringComparison.Ordinal))
+            .ToDictionary(pair => pair.Key, pair => (string?)pair.Value);
+
+        public void SetValue(string key, string value) => _values[key] = value;
+
+        public void SetValue(string key, string originValue, string newValue)
+        {
+            if (!TrySetValue(key, originValue, newValue))
+            {
+                throw new InvalidOperationException("The value changed before it could be updated.");
+            }
+        }
+
+        public bool TrySetValue(string key, string originValue, string newValue)
+        {
+            if (!string.Equals(GetValue(key), originValue, StringComparison.Ordinal)) return false;
+            _values[key] = newValue;
+            return true;
+        }
+    }
 }

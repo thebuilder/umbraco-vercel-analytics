@@ -1,0 +1,77 @@
+import type { AnalyticsDimension } from "../api/types.gen.js";
+import type { AudienceDimension, UtmDimension } from "./dashboard-url-state.js";
+import type { UtmCapability } from "./utm-capability.js";
+
+type DimensionOption<TDimension extends AnalyticsDimension = AnalyticsDimension> = {
+  dimension: TDimension;
+  headline: string;
+  label: string;
+};
+
+export type DashboardCard =
+  | {
+      kind: "breakdown";
+      dimension: AnalyticsDimension;
+      headline: string;
+      span: "normal" | "wide";
+    }
+  | {
+      kind: "tabbed-breakdown";
+      id: "audience" | "utm";
+      options: ReadonlyArray<DimensionOption>;
+      span: "normal" | "wide";
+      planLimited: boolean;
+    };
+
+const AUDIENCE_OPTIONS: ReadonlyArray<DimensionOption<AudienceDimension>> = [
+  { dimension: "DeviceType", headline: "Devices", label: "Devices" },
+  { dimension: "BrowserName", headline: "Browsers", label: "Browsers" },
+];
+
+export const UTM_OPTIONS: ReadonlyArray<DimensionOption<UtmDimension>> = [
+  { dimension: "UtmSource", headline: "UTM sources", label: "Sources" },
+  { dimension: "UtmMedium", headline: "UTM media", label: "Media" },
+  { dimension: "UtmCampaign", headline: "UTM campaigns", label: "Campaigns" },
+];
+
+const SHARED_CARDS: ReadonlyArray<DashboardCard> = [
+  { kind: "breakdown", dimension: "ReferrerHostname", headline: "Referrers", span: "wide" },
+  { kind: "breakdown", dimension: "Country", headline: "Countries", span: "normal" },
+  { kind: "tabbed-breakdown", id: "audience", options: AUDIENCE_OPTIONS, span: "normal", planLimited: false },
+  { kind: "breakdown", dimension: "OsName", headline: "Operating systems", span: "normal" },
+];
+
+const UTM_CARD: DashboardCard = {
+  kind: "tabbed-breakdown",
+  id: "utm",
+  options: UTM_OPTIONS,
+  span: "wide",
+  planLimited: true,
+};
+
+export function dashboardCards(documentScoped: boolean, utmCapability: UtmCapability): ReadonlyArray<DashboardCard> {
+  const cards: DashboardCard[] = [
+    ...(documentScoped ? [] : [{ kind: "breakdown" as const, dimension: "RequestPath" as const, headline: "Pages", span: "wide" as const }]),
+    ...SHARED_CARDS,
+  ];
+  if (utmCapability !== "unavailable") cards.push(UTM_CARD);
+  return cards;
+}
+
+export function requestedDimensions(cards: ReadonlyArray<DashboardCard>): AnalyticsDimension[] {
+  return cards.flatMap((card) => card.kind === "breakdown"
+    ? [card.dimension]
+    : card.options.map(({ dimension }) => dimension));
+}
+
+export function selectedCardDimension(
+  card: DashboardCard,
+  audience: AudienceDimension,
+  utm: UtmDimension,
+): DimensionOption {
+  if (card.kind === "breakdown") {
+    return { dimension: card.dimension, headline: card.headline, label: card.headline };
+  }
+  const selected = card.id === "audience" ? audience : utm;
+  return card.options.find(({ dimension }) => dimension === selected) ?? card.options[0];
+}

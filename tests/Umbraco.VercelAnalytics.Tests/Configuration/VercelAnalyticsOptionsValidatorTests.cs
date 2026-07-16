@@ -87,6 +87,64 @@ public sealed class VercelAnalyticsOptionsValidatorTests
     }
 
     [Fact]
+    public void Document_type_keys_are_validated_from_server_options()
+    {
+        var options = CreateOptions();
+        options.Connections["main"].EnabledDocumentTypeKeys = ["not-a-guid"];
+
+        var result = _sut.Validate(null, options);
+
+        Assert.Contains(result.Failures!, failure => failure.Contains("invalid document type key"));
+    }
+
+    [Fact]
+    public void Registry_does_not_throw_when_invalid_keys_bypass_startup_validation()
+    {
+        var options = CreateOptions();
+        options.Connections["main"].DocumentRootKeys = ["not-a-guid"];
+        options.Connections["main"].EnabledDocumentTypeKeys = ["also-not-a-guid"];
+        var registry = new VercelAnalyticsConnectionRegistry(Options.Create(options));
+
+        var connection = registry.Get("main");
+
+        Assert.NotNull(connection);
+        Assert.Empty(connection.DocumentRootKeys);
+        Assert.Empty(connection.EnabledDocumentTypeKeys);
+    }
+
+    [Fact]
+    public void Registry_reuses_one_snapshot_until_settings_change()
+    {
+        var options = CreateOptions();
+        var optionsAccessor = Options.Create(options);
+        var store = new VercelAnalyticsSettingsStore(optionsAccessor);
+        var registry = new VercelAnalyticsConnectionRegistry(store, optionsAccessor);
+
+        var first = registry.Capture();
+        var second = registry.Capture();
+        store.Save(new VercelAnalyticsSettings
+        {
+            Enabled = true,
+            DefaultConnection = "main",
+            Connections =
+            [
+                new VercelAnalyticsConnectionSettings
+                {
+                    Alias = "main",
+                    DisplayName = "Changed",
+                    ProjectId = "project-id"
+                }
+            ]
+        });
+        var changed = registry.Capture();
+
+        Assert.Same(first, second);
+        Assert.NotSame(first, changed);
+        Assert.NotEqual(first.Revision, changed.Revision);
+        Assert.Equal("Changed", changed.Get("main")?.DisplayName);
+    }
+
+    [Fact]
     public void Registry_prefers_nearest_root_order_and_normalizes_hostname()
     {
         var options = CreateOptions();

@@ -66,8 +66,17 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
         var scale = QueryScale(query);
         var points = timestamps.Select((timestamp, index) =>
         {
-            var wave = 0.78 + (index % 7 * 0.055) + (index % 3 * 0.025);
-            return new AnalyticsPoint(timestamp, Scale(980, scale * wave), Scale(570, scale * wave));
+            var progress = timestamps.Length <= 1 ? 0d : index / (timestamps.Length - 1d);
+            var traffic = 0.88
+                + progress * 0.18
+                + BellCurve(progress, 0.18, 0.12) * 0.10
+                - BellCurve(progress, 0.48, 0.10) * 0.07
+                + BellCurve(progress, 0.76, 0.15) * 0.09;
+            var visitors = traffic * (0.98 - progress * 0.03);
+            return new AnalyticsPoint(
+                timestamp,
+                Scale(980, scale * traffic),
+                Scale(570, scale * visitors));
         }).ToArray();
         return Task.FromResult<IReadOnlyList<AnalyticsPoint>>(points);
     }
@@ -202,6 +211,9 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     private static long Scale(long value, double scale) => Math.Max(0, (long)Math.Round(value * scale));
+
+    private static double BellCurve(double progress, double center, double width) =>
+        Math.Exp(-Math.Pow((progress - center) / width, 2));
 
     private static IEnumerable<DateTimeOffset> Timestamps(AnalyticsQuery query)
     {

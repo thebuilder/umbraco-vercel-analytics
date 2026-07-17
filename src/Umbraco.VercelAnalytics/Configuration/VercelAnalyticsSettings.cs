@@ -113,7 +113,9 @@ public sealed class VercelAnalyticsSettingsStore
         Connections = settings.Connections.Select(connection => new VercelAnalyticsConnectionSettings
         {
             Key = connection.Key == Guid.Empty ? Guid.NewGuid() : connection.Key,
-            DisplayName = connection.DisplayName.Trim(),
+            DisplayName = connection.MockScenario is { } scenario
+                ? MockAnalyticsScenarioMetadata.DisplayName(scenario)
+                : connection.DisplayName.Trim(),
             ProjectId = connection.IsMock ? string.Empty : connection.ProjectId.Trim(),
             Team = connection.IsMock ? null : NullIfWhiteSpace(connection.Team),
             MockScenario = connection.MockScenario,

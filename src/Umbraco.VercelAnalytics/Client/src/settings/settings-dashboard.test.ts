@@ -125,6 +125,7 @@ describe("analytics settings onboarding", () => {
 
     const buttons = dashboard.shadowRoot?.querySelectorAll<HTMLElement>(".mock-scenario uui-button");
     expect(buttons).toHaveLength(4);
+    expect(buttons?.[0].getAttribute("label")).toBe("Add Demo mock connection");
     buttons?.[1].click();
     await dashboard.updateComplete;
 

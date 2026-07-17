@@ -44,6 +44,28 @@ public sealed class MockVercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Demo_exposes_every_report_with_a_non_repeating_trend()
+    {
+        var client = new MockVercelAnalyticsClient();
+        var connection = CreateRegistry(MockAnalyticsScenario.Complete, true).Get(MockKey)!;
+        var query = new AnalyticsQuery(
+            MockKey,
+            new DateOnly(2026, 6, 1),
+            new DateOnly(2026, 7, 15),
+            AnalyticsInterval.Day);
+
+        var trend = await client.GetTrendAsync(connection, query, CancellationToken.None);
+        var utmRows = await client.GetBreakdownAsync(connection, query, AnalyticsDimension.UtmCampaign, 10, null, CancellationToken.None);
+        var flagRows = await client.GetFlagsAsync(connection, query, null, 10, CancellationToken.None);
+        var eventRows = await client.GetEventsAsync(connection, query, 10, null, CancellationToken.None);
+
+        Assert.NotEmpty(utmRows);
+        Assert.NotEmpty(flagRows);
+        Assert.NotEmpty(eventRows);
+        Assert.True(trend.Select(point => point.PageViews).Distinct().Count() >= trend.Count * 0.9);
+    }
+
+    [Fact]
     public async Task Router_serves_mock_reports_without_contacting_Vercel()
     {
         var handler = new RejectingHttpMessageHandler();

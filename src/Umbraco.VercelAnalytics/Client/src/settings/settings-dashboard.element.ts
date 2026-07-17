@@ -84,7 +84,7 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     const key = crypto.randomUUID();
     const connection: AnalyticsConnectionSettingsResponse = {
       key,
-      displayName: isMock ? `Mock · ${details.scenario.name}` : "",
+      displayName: isMock ? details.scenario.displayName : "",
       projectId: "",
       team: null,
       documentRootKeys: [],
@@ -344,9 +344,10 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     .mock-settings { margin-block-end: var(--uui-size-layout-2); }
     .mock-intro { color: var(--uui-color-text-alt); margin: 0 0 var(--uui-size-space-5); max-inline-size: 72ch; text-wrap: pretty; }
     .mock-scenarios { display: grid; gap: var(--uui-size-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .mock-scenario { align-items: center; border: 1px solid var(--uui-color-border); display: flex; gap: var(--uui-size-space-4); justify-content: space-between; min-inline-size: 0; padding: var(--uui-size-space-4); }
+    .mock-scenario { align-items: center; border: 1px solid var(--uui-color-border); display: grid; gap: var(--uui-size-space-4); grid-template-columns: minmax(0, 1fr) max-content; min-inline-size: 0; padding: var(--uui-size-space-4); }
     .mock-scenario > span { display: grid; gap: var(--uui-size-space-1); min-inline-size: 0; }
     .mock-scenario small { color: var(--uui-color-text-alt); text-wrap: pretty; }
+    .mock-scenario uui-button { white-space: nowrap; }
     .general-grid { align-items: start; display: grid; gap: var(--uui-size-space-5) var(--uui-size-space-6); grid-template-columns: minmax(14rem, 1.35fr) minmax(10rem, 0.7fr) minmax(14rem, 1fr); }
     .general-grid > uui-form-layout-item { margin-block: 0; }
     .field-with-help { display: grid; gap: var(--uui-size-space-1); }

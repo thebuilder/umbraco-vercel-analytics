@@ -102,7 +102,7 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         projectNames.Setup(service => service.GetDisplayNameAsync(
                 It.IsAny<VercelAnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync("Mock · Complete dashboard");
+            .ReturnsAsync("Demo");
         var options = Options.Create(new VercelAnalyticsOptions());
         var store = new VercelAnalyticsSettingsStore(options);
         store.Save(new VercelAnalyticsSettings
@@ -113,7 +113,7 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
                 new()
                 {
                     Key = MainKey,
-                    DisplayName = "Mock · Complete dashboard",
+                    DisplayName = "Demo",
                     MockScenario = MockAnalyticsScenario.Complete
                 }
             ]

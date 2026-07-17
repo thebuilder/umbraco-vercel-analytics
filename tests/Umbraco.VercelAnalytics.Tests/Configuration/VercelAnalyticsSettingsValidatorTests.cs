@@ -89,6 +89,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         var connection = Assert.Single(store.Get().Connections);
 
         Assert.Equal(MockAnalyticsScenario.Utm, connection.MockScenario);
+        Assert.Equal("Mock · UTM campaigns", connection.DisplayName);
         Assert.Empty(connection.ProjectId);
         Assert.Null(connection.Team);
     }

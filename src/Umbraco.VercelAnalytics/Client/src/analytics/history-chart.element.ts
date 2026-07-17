@@ -28,6 +28,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
   @property({ attribute: false }) points: Array<{ timestamp: string; visitors: number; pageViews?: number; count?: number }> = [];
   @property() metric: "visitors" | "pageViews" | "count" = "visitors";
   @property() interval: AnalyticsInterval = "Day";
+  @property() timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   #chart?: Chart;
 
   protected updated(): void {
@@ -79,7 +80,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
     this.#chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: this.points.map((point) => formatAnalyticsDate(point.timestamp, this.interval)),
+        labels: this.points.map((point) => formatAnalyticsDate(point.timestamp, this.interval, undefined, this.timeZone)),
         datasets: [{
           label,
           data: this.points.map((point) => point[this.metric] ?? 0),
@@ -111,10 +112,10 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
             borderColor,
             borderWidth: 1,
             callbacks: {
-              label: (context) => `${label}  ${context.formattedValue}`,
+              label: (context) => `${label}  ${this.localize.number(context.parsed.y ?? 0)}`,
               title: (items) => {
                 const point = this.points[items[0]?.dataIndex ?? -1];
-                return point ? formatAnalyticsTooltipDate(point.timestamp, this.interval) : "";
+                return point ? formatAnalyticsTooltipDate(point.timestamp, this.interval, undefined, this.timeZone) : "";
               },
             },
             cornerRadius: 8,
@@ -131,7 +132,10 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
           y: {
             beginAtZero: true,
             ticks: {
-              callback: (value) => formatChartAxisValue(Number(value)),
+              callback: (value) => formatChartAxisValue(
+                Number(value),
+                (number, options) => this.localize.number(number, options),
+              ),
               maxTicksLimit: 5,
             },
           },

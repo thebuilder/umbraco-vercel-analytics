@@ -14,6 +14,8 @@ namespace Umbraco.VercelAnalytics.Tests.Controllers;
 
 public sealed class UmbracoVercelAnalyticsApiControllerTests
 {
+    private static readonly Guid MainKey = Guid.Parse("11111111-1111-1111-1111-111111111110");
+    private static readonly Guid SecondaryKey = Guid.Parse("22222222-2222-2222-2222-222222222220");
     [Fact]
     public void Base_controller_requires_authenticated_backoffice_access()
     {
@@ -33,6 +35,7 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
             authorization.Object,
             null!,
             null!,
+            null!,
             null!);
 
         var response = await controller.Connections(CancellationToken.None);
@@ -49,6 +52,12 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = 0;
         var routes = new Mock<IAnalyticsDocumentRouteService>(MockBehavior.Strict);
+        var projectNames = new Mock<IVercelProjectNameService>(MockBehavior.Strict);
+        projectNames
+            .Setup(service => service.GetDisplayNameAsync(
+                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((VercelAnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
         routes
             .Setup(service => service.GetConnectionBaseUrlAsync(
                 It.IsAny<VercelAnalyticsConnection>(),
@@ -63,7 +72,8 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
             authorization.Object,
             EnabledRegistry("main", "secondary"),
             null!,
-            routes.Object);
+            routes.Object,
+            projectNames.Object);
 
         var responseTask = controller.Connections(CancellationToken.None);
         await allStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -73,6 +83,9 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         var ok = Assert.IsType<OkObjectResult>(response.Result);
         var payload = Assert.IsType<AnalyticsConnectionsResponse>(ok.Value);
         Assert.Equal(2, payload.Connections.Count);
+        Assert.Equal([MainKey, SecondaryKey], payload.Connections.Select(connection => connection.Key));
+        Assert.True(payload.Connections[0].IsDefault);
+        Assert.False(payload.Connections[1].IsDefault);
     }
 
     [Fact]
@@ -85,6 +98,7 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
             .ReturnsAsync(false);
         var controller = new UmbracoVercelAnalyticsApiController(
             authorization.Object,
+            null!,
             null!,
             null!,
             null!);
@@ -109,7 +123,7 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         routes.Setup(service => service.GetRoutesAsync(documentId, "en-US", It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new AnalyticsDocumentRoute(
-                    "main",
+                    MainKey,
                     "en-US",
                     "example.com",
                     "/published",
@@ -121,12 +135,13 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
             authorization.Object,
             EnabledRegistry(),
             null!,
-            routes.Object);
+            routes.Object,
+            null!);
 
         var response = await controller.Summary(
-            "main",
-            new DateOnly(2026, 7, 1),
-            new DateOnly(2026, 7, 2),
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
             AnalyticsInterval.Day,
             documentId,
             "en-US",
@@ -151,12 +166,13 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
             authorization.Object,
             EnabledRegistry(),
             null!,
+            null!,
             null!);
 
         var response = await controller.Summary(
-            "main",
-            new DateOnly(2026, 7, 1),
-            new DateOnly(2026, 7, 2),
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
             AnalyticsInterval.Day,
             documentId,
             "en-US",
@@ -175,9 +191,9 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
 
         var response = await controller.Breakdown(
             (AnalyticsDimension)999,
-            "main",
-            new DateOnly(2026, 7, 1),
-            new DateOnly(2026, 7, 2),
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
             AnalyticsInterval.Day);
 
         AssertInvalidQuery(response.Result);
@@ -189,9 +205,9 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         var controller = CreateBoundaryOnlyController();
 
         var response = await controller.Summary(
-            "main",
-            new DateOnly(2026, 7, 1),
-            new DateOnly(2026, 7, 2),
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
             (AnalyticsInterval)999,
             null,
             null,
@@ -208,9 +224,9 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         var controller = CreateBoundaryOnlyController();
 
         var response = await controller.Summary(
-            "main",
-            new DateOnly(2026, 7, 1),
-            new DateOnly(2026, 7, 2),
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
             AnalyticsInterval.Day,
             null,
             null,
@@ -229,9 +245,9 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         var controller = CreateBoundaryOnlyController();
 
         var response = await controller.EventDetails(
-            "main",
-            new DateOnly(2026, 7, 1),
-            new DateOnly(2026, 7, 2),
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
             AnalyticsInterval.Day,
             "Signup",
             filter: ["EventName:AnotherEvent"]);
@@ -245,9 +261,9 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
         var controller = CreateBoundaryOnlyController();
 
         var response = await controller.EventPropertyValues(
-            "main",
-            new DateOnly(2026, 7, 1),
-            new DateOnly(2026, 7, 2),
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
             AnalyticsInterval.Day,
             "Signup",
             "plan",
@@ -257,24 +273,25 @@ public sealed class UmbracoVercelAnalyticsApiControllerTests
     }
 
     private static UmbracoVercelAnalyticsApiController CreateBoundaryOnlyController() =>
-        new(null!, null!, null!, null!);
+        new(null!, null!, null!, null!, null!);
+
+    private static DateTimeOffset UtcDate(int year, int month, int day) =>
+        new(year, month, day, 0, 0, 0, TimeSpan.Zero);
 
     private static VercelAnalyticsConnectionRegistry EnabledRegistry(params string[] aliases) =>
         new(Options.Create(new VercelAnalyticsOptions
         {
             Enabled = true,
-            DefaultConnection = aliases.FirstOrDefault() ?? "main",
-            Connections = (aliases.Length == 0 ? ["main"] : aliases).ToDictionary(
-                alias => alias,
+            AccessToken = "secret",
+            Connections = (aliases.Length == 0 ? ["main"] : aliases).Select(
                 alias => new VercelAnalyticsConnectionOptions
                 {
+                    Key = alias == "secondary" ? SecondaryKey : MainKey,
                     DisplayName = alias,
                     ProjectId = "project",
-                    AccessToken = "secret",
-                    Hostnames = [$"{alias}.example.com"],
+                    DocumentRootKeys = [Guid.NewGuid().ToString()],
                     EnableAllDocumentTypes = true
-                },
-                StringComparer.OrdinalIgnoreCase)
+                }).ToList()
         }));
 
     private static void AssertInvalidQuery(ActionResult? result)

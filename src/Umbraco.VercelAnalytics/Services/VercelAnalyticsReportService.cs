@@ -19,11 +19,14 @@ public sealed class VercelAnalyticsReportService(
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:summary:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
         {
-            var totals = client.CountAsync(connection, query, cancellationToken);
+            var count = client.CountAsync(connection, query, cancellationToken);
+            var pageViews = client.GetPageViewTotalAsync(connection, query, cancellationToken);
             var previousTotals = TryGetPreviousTotalsAsync(connection, query, cancellationToken);
             var trend = client.GetTrendAsync(connection, query, cancellationToken);
-            await Task.WhenAll(totals, previousTotals, trend);
-            return new AnalyticsSummary(await totals, await previousTotals, await trend);
+            await Task.WhenAll(count, pageViews, previousTotals, trend);
+            var points = await trend;
+            var totals = new AnalyticsTotals(await pageViews, (await count).Visitors);
+            return new AnalyticsSummary(totals, await previousTotals, points);
         });
     }
 
@@ -150,7 +153,7 @@ public sealed class VercelAnalyticsReportService(
         var filters = string.Join(",", (query.Filters ?? [])
             .OrderBy(filter => filter.Dimension)
             .Select(filter => $"{filter.Dimension}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(filter.Value))}"));
-        return $"{query.Connection.ToLowerInvariant()}:{query.From:yyyyMMdd}:{query.To:yyyyMMdd}:{query.Interval}:{query.RequestPath}:{filters}";
+        return $"{query.Connection:N}:{query.From.UtcTicks}:{query.To.UtcTicks}:{query.Interval}:{query.RequestPath}:{filters}";
     }
 
     private async Task<AnalyticsTotals?> TryGetPreviousTotalsAsync(
@@ -158,18 +161,21 @@ public sealed class VercelAnalyticsReportService(
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
-        var inclusiveDays = query.To.DayNumber - query.From.DayNumber + 1;
-        if (query.From.DayNumber < inclusiveDays) return null;
+        var duration = query.To - query.From;
+        if (duration <= TimeSpan.Zero || query.From - DateTimeOffset.MinValue < duration) return null;
 
         var previousQuery = query with
         {
-            From = query.From.AddDays(-inclusiveDays),
-            To = query.From.AddDays(-1)
+            From = query.From - duration,
+            To = query.From
         };
 
         try
         {
-            return await client.CountAsync(connection, previousQuery, cancellationToken);
+            var count = client.CountAsync(connection, previousQuery, cancellationToken);
+            var pageViews = client.GetPageViewTotalAsync(connection, previousQuery, cancellationToken);
+            await Task.WhenAll(count, pageViews);
+            return new AnalyticsTotals(await pageViews, (await count).Visitors);
         }
         catch (VercelAnalyticsApiException)
         {

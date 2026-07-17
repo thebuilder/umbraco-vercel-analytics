@@ -8,6 +8,8 @@ namespace Umbraco.VercelAnalytics.Tests.Services;
 
 public sealed class VercelAnalyticsReportServiceTests
 {
+    private static readonly Guid MainKey = Guid.Parse("11111111-1111-1111-1111-111111111110");
+
     [Fact]
     public async Task Summary_is_cached_by_normalized_query()
     {
@@ -17,12 +19,13 @@ public sealed class VercelAnalyticsReportServiceTests
         var query = CreateQuery();
 
         var first = await service.GetSummaryAsync(query, CancellationToken.None);
-        var second = await service.GetSummaryAsync(query with { Connection = "MAIN" }, CancellationToken.None);
+        var second = await service.GetSummaryAsync(query, CancellationToken.None);
 
         Assert.NotNull(first);
         Assert.Same(first, second);
         Assert.Equal(2, client.CountCalls);
         Assert.Equal(1, client.TrendCalls);
+        Assert.Equal(2, client.PageViewTotalCalls);
     }
 
     [Fact]
@@ -41,6 +44,7 @@ public sealed class VercelAnalyticsReportServiceTests
 
         Assert.Equal(4, client.CountCalls);
         Assert.Equal(2, client.TrendCalls);
+        Assert.Equal(4, client.PageViewTotalCalls);
     }
 
     [Fact]
@@ -54,8 +58,8 @@ public sealed class VercelAnalyticsReportServiceTests
 
         Assert.NotNull(summary);
         Assert.Contains(client.CountQueries, query =>
-            query.From == new DateOnly(2026, 6, 16) &&
-            query.To == new DateOnly(2026, 6, 30));
+            query.From == new DateTimeOffset(2026, 6, 16, 0, 0, 0, TimeSpan.Zero) &&
+            query.To == new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
         Assert.NotNull(summary.PreviousTotals);
     }
 
@@ -79,10 +83,10 @@ public sealed class VercelAnalyticsReportServiceTests
         var client = new CountingClient();
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
-        var minimumDate = DateOnly.MinValue;
+        var minimumDate = DateTimeOffset.MinValue;
 
         var summary = await service.GetSummaryAsync(
-            CreateQuery() with { From = minimumDate, To = minimumDate },
+            CreateQuery() with { From = minimumDate, To = minimumDate.AddDays(1) },
             CancellationToken.None);
 
         Assert.NotNull(summary);
@@ -135,6 +139,7 @@ public sealed class VercelAnalyticsReportServiceTests
 
         Assert.Equal(4, client.CountCalls);
         Assert.Equal(2, client.TrendCalls);
+        Assert.Equal(4, client.PageViewTotalCalls);
     }
 
     [Fact]
@@ -221,7 +226,7 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     private static AnalyticsQuery CreateQuery() => new(
-        "main",
+        MainKey,
         new DateOnly(2026, 7, 1),
         new DateOnly(2026, 7, 15),
         AnalyticsInterval.Day);
@@ -229,25 +234,26 @@ public sealed class VercelAnalyticsReportServiceTests
     private static VercelAnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null) => new(Options.Create(new VercelAnalyticsOptions
     {
         Enabled = true,
-        DefaultConnection = "main",
+        AccessToken = "secret",
         CacheDuration = cacheDuration ?? TimeSpan.FromMinutes(5),
-        Connections = new Dictionary<string, VercelAnalyticsConnectionOptions>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["main"] = new()
+        Connections =
+        [
+            new()
             {
+                Key = MainKey,
                 DisplayName = "Main",
-                AccessToken = "secret",
                 ProjectId = "project",
-                Hostnames = ["example.com"],
+                DocumentRootKeys = [Guid.NewGuid().ToString()],
                 EnabledDocumentTypes = ["articlePage"]
             }
-        }
+        ]
     }));
 
     private sealed class CountingClient : IVercelAnalyticsClient
     {
         public int CountCalls { get; private set; }
         public int TrendCalls { get; private set; }
+        public int PageViewTotalCalls { get; private set; }
         public int BreakdownCalls { get; private set; }
         public int EventCalls { get; private set; }
         public int EventCountCalls { get; private set; }
@@ -258,23 +264,35 @@ public sealed class VercelAnalyticsReportServiceTests
         public bool FailPreviousCount { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
 
+        public Task<string> GetProjectNameAsync(VercelAnalyticsConnection connection, CancellationToken cancellationToken) =>
+            Task.FromResult(connection.DisplayName);
+
         public Task<AnalyticsTotals> CountAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             CountCalls++;
             CountQueries.Add(query);
-            if (FailPreviousCount && query.To < new DateOnly(2026, 7, 1))
+            if (FailPreviousCount && query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero))
             {
                 throw new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired);
             }
             return Task.FromResult(new AnalyticsTotals(20, 10));
         }
 
+        public Task<long> GetPageViewTotalAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PageViewTotalCalls++;
+            return Task.FromResult(20L);
+        }
+
         public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             TrendCalls++;
-            return Task.FromResult<IReadOnlyList<AnalyticsPoint>>([]);
+            return Task.FromResult<IReadOnlyList<AnalyticsPoint>>([
+                new(query.From, 20, 10)
+            ]);
         }
 
         public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, AnalyticsDimension dimension, int limit, string? search, CancellationToken cancellationToken)

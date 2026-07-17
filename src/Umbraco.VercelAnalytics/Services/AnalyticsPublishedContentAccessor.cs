@@ -7,7 +7,10 @@ namespace Umbraco.VercelAnalytics.Services;
 
 public interface IAnalyticsPublishedContentAccessor
 {
-    Task<AnalyticsPublishedDocument?> GetDocumentAsync(Guid documentId, CancellationToken cancellationToken);
+    Task<AnalyticsPublishedDocument?> GetDocumentAsync(
+        Guid documentId,
+        string? currentCulture,
+        CancellationToken cancellationToken);
 
     Task<string?> GetBaseUrlAsync(Guid documentId, CancellationToken cancellationToken);
 }
@@ -29,6 +32,7 @@ public sealed class UmbracoAnalyticsPublishedContentAccessor(
 {
     public async Task<AnalyticsPublishedDocument?> GetDocumentAsync(
         Guid documentId,
+        string? currentCulture,
         CancellationToken cancellationToken)
     {
         using var contextReference = umbracoContextFactory.EnsureUmbracoContext();
@@ -39,18 +43,23 @@ public sealed class UmbracoAnalyticsPublishedContentAccessor(
         if (content is null) return null;
 
         var routes = new List<AnalyticsPublishedRoute>();
-        var cultures = content.Cultures.Count == 0 ? [string.Empty] : content.Cultures.Keys;
+        var cultures = AnalyticsPublishedCultures.Resolve(content.Cultures.Keys, currentCulture);
+        var alternateUrls = publishedUrlProvider.GetOtherUrls(content.Id)
+            .Where(url => url.Url is not null)
+            .Select(url => (url.Culture, url.Url!.ToString()))
+            .ToArray();
         foreach (var culture in cultures)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var url = content.Url(publishedUrlProvider, NullIfEmpty(culture), UrlMode.Absolute);
+            var primaryUrl = content.Url(publishedUrlProvider, NullIfEmpty(culture), UrlMode.Absolute);
+            var url = AnalyticsPublishedCultures.SelectUrl(primaryUrl, alternateUrls, culture);
             if (string.IsNullOrWhiteSpace(url) || url == "#") continue;
 
             var absolute = Uri.TryCreate(url, UriKind.Absolute, out var uri);
             routes.Add(new AnalyticsPublishedRoute(
                 culture,
                 absolute ? uri!.Host : string.Empty,
-                absolute ? uri!.AbsolutePath : NormalizePath(url),
+                AnalyticsRequestPath.Normalize(absolute ? uri!.AbsolutePath : url),
                 url));
         }
 
@@ -81,11 +90,42 @@ public sealed class UmbracoAnalyticsPublishedContentAccessor(
         return null;
     }
 
-    private static string NormalizePath(string url)
+    private static string? NullIfEmpty(string value) => value.Length == 0 ? null : value;
+}
+
+internal static class AnalyticsPublishedCultures
+{
+    public static IReadOnlyList<string> Resolve(IEnumerable<string> publishedCultures, string? currentCulture)
     {
-        var path = url.Split('?', '#')[0];
-        return path.StartsWith('/') ? path : $"/{path}";
+        var cultures = publishedCultures
+            .Where(culture => !string.IsNullOrWhiteSpace(culture))
+            .ToArray();
+        if (!string.IsNullOrWhiteSpace(currentCulture))
+        {
+            var matchingCulture = cultures.FirstOrDefault(culture =>
+                string.Equals(culture, currentCulture, StringComparison.OrdinalIgnoreCase));
+            if (matchingCulture is not null) return [matchingCulture];
+            if (cultures.Length == 0) return [currentCulture];
+        }
+
+        return cultures.Length == 0 ? [string.Empty] : cultures;
     }
 
-    private static string? NullIfEmpty(string value) => value.Length == 0 ? null : value;
+    public static string SelectUrl(
+        string primaryUrl,
+        IEnumerable<(string? Culture, string Url)> alternateUrls,
+        string culture)
+    {
+        if (culture.Length == 0) return primaryUrl;
+
+        foreach (var alternateUrl in alternateUrls)
+        {
+            if (string.Equals(alternateUrl.Culture, culture, StringComparison.OrdinalIgnoreCase))
+            {
+                return alternateUrl.Url;
+            }
+        }
+
+        return primaryUrl;
+    }
 }

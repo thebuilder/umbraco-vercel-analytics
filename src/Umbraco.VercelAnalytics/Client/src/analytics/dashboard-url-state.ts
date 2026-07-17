@@ -20,7 +20,7 @@ const DIMENSIONS = new Set<AnalyticsDimension>([
   "RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType",
   "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "EventName",
 ]);
-const PRESETS = new Set([7, 30, 90, 365]);
+const PRESETS = new Set([1, 7, 30, 90, 365]);
 
 export function serializeFilter(filter: AnalyticsFilter): string {
   return `${filter.dimension}:${filter.value}`;
@@ -32,7 +32,11 @@ export function parseDashboardUrlState(params: URLSearchParams): DashboardUrlSta
   const preset: DatePreset | undefined = rawPreset === "custom"
     ? "custom"
     : PRESETS.has(numericPreset) ? numericPreset as Exclude<DatePreset, "custom"> : undefined;
-  const range = normalizeCustomRange(params.get("from") ?? "", params.get("to") ?? "");
+  const range = normalizeCustomRange(
+    params.get("from") ?? "",
+    params.get("to") ?? "",
+    params.get("tz") || undefined,
+  );
   const filters: AnalyticsFilter[] = [];
   const seen = new Set<AnalyticsDimension>();
   for (const raw of params.getAll("filter").slice(0, 10)) {
@@ -59,11 +63,12 @@ export function parseDashboardUrlState(params: URLSearchParams): DashboardUrlSta
 
 export function writeDashboardUrlState(url: URL, state: Required<Pick<DashboardUrlState, "preset" | "range" | "metric" | "audience" | "utm" | "filters">> & { connection?: string }): URL {
   const params = url.searchParams;
-  for (const name of ["connection", "range", "from", "to", "metric", "audience", "utm", "filter"]) params.delete(name);
+  for (const name of ["connection", "range", "from", "to", "tz", "metric", "audience", "utm", "filter"]) params.delete(name);
   if (state.connection) params.set("connection", state.connection);
   params.set("range", String(state.preset));
   params.set("from", state.range.from);
   params.set("to", state.range.to);
+  params.set("tz", state.range.timeZone);
   params.set("metric", state.metric);
   params.set("audience", state.audience);
   params.set("utm", state.utm);

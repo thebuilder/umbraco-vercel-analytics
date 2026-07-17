@@ -1,9 +1,16 @@
 export const manifests: Array<UmbExtensionManifest> = [
   {
+    type: "condition",
+    alias: "Umbraco.VercelAnalytics.Condition.AnalyticsEnabled",
+    name: "Vercel Analytics Enabled Condition",
+    api: () => import("./section/analytics-enabled.condition.js"),
+  },
+  {
     type: "section",
     alias: "Umbraco.VercelAnalytics.Section",
     name: "Vercel Analytics Section",
     meta: { label: "Analytics", pathname: "analytics" },
+    conditions: [{ alias: "Umbraco.VercelAnalytics.Condition.AnalyticsEnabled" }],
   },
   {
     type: "sectionView",

@@ -5,6 +5,24 @@ import type { DashboardApi } from "./dashboard-api.js";
 import { dateRangeForPreset } from "./date-range.js";
 
 describe("AnalyticsDashboardController", () => {
+  it("uses the first connection when no requested or stored connection is valid", async () => {
+    const api = dashboardApi();
+    api.connections.mockResolvedValue(ok({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [
+        { key: "11111111-1111-1111-1111-111111111111", displayName: "First", isDefault: true, isConfigured: true, baseUrl: "https://first.example.com", warnings: [] },
+        { key: "22222222-2222-2222-2222-222222222222", displayName: "Second", isDefault: false, isConfigured: true, baseUrl: "https://second.example.com", warnings: [] },
+      ],
+    }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+
+    controller.connect();
+
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    expect(controller.state.connection).toBe("11111111-1111-1111-1111-111111111111");
+  });
+
   it("keeps the newest document scope when an older route request finishes last", async () => {
     const first = deferred<ReturnType<typeof ok<AnalyticsDocumentRoute[]>>>();
     const second = deferred<ReturnType<typeof ok<AnalyticsDocumentRoute[]>>>();
@@ -109,6 +127,23 @@ describe("AnalyticsDashboardController", () => {
     expect(controller.state.summary.status === "success" && controller.state.summary.data.totals.visitors).toBe(99);
   });
 
+  it("queries the API with hourly granularity for the last 24 hours", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    api.summary.mockClear();
+
+    controller.setDateRange(1, dateRangeForPreset(1, new Date("2026-07-17T12:00:00Z"), "Europe/Copenhagen"));
+    await vi.waitFor(() => expect(api.summary).toHaveBeenCalled());
+
+    expect(api.summary.mock.calls[0]?.[0]?.query).toEqual(expect.objectContaining({
+      from: "2026-07-16T12:00:00.000Z",
+      to: "2026-07-17T12:00:00.000Z",
+      interval: "Hour",
+    }));
+  });
+
   it("writes user actions to the shareable URL", () => {
     const api = dashboardApi();
     const target = environment();
@@ -121,15 +156,15 @@ describe("AnalyticsDashboardController", () => {
     expect(target.currentUrl().searchParams.get("metric")).toBe("pageViews");
     expect(target.currentUrl().searchParams.get("audience")).toBe("BrowserName");
   });
+
 });
 
 function dashboardApi() {
   return {
     connections: vi.fn<DashboardApi["connections"]>(async () => ok({
       enabled: true,
-      defaultConnection: "main",
       defaultRangeDays: 30,
-      connections: [{ alias: "main", displayName: "Main", isDefault: true, isConfigured: true, baseUrl: "https://example.com", hostnames: ["example.com"], warnings: [] }],
+      connections: [{ key: "11111111-1111-1111-1111-111111111111", displayName: "Main", isDefault: true, isConfigured: true, baseUrl: "https://example.com", warnings: [] }],
     })),
     documentRoutes: vi.fn<DashboardApi["documentRoutes"]>(async () => ok([])),
     summary: vi.fn<DashboardApi["summary"]>(async () => ok({ totals: { visitors: 10, pageViews: 20 }, points: [] })),
@@ -141,7 +176,7 @@ function dashboardApi() {
 }
 
 function route(path: string, culture: string): AnalyticsDocumentRoute {
-  return { connection: "main", culture, hostname: "example.com", path, url: `https://example.com${path}`, isCurrent: true, warnings: [] };
+  return { connection: "11111111-1111-1111-1111-111111111111", culture, hostname: "example.com", path, url: `https://example.com${path}`, isCurrent: true, warnings: [] };
 }
 
 function environment(): DashboardEnvironment {

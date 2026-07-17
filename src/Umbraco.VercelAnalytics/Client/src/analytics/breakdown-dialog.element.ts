@@ -10,7 +10,7 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
-import type { TrafficMetric } from "./breakdown-rows.js";
+import { breakdownMetricTotal, type TrafficMetric } from "./breakdown-rows.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import "./breakdown-table.element.js";
 
@@ -22,7 +22,6 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
   @property() baseUrl?: string;
   @property() dimension?: AnalyticsDimension;
   @property() metric: TrafficMetric = "visitors";
-  @property({ type: Number }) total = 0;
   @property({ type: Boolean }) linkValues = false;
   @property({ attribute: false }) rows: AnalyticsBreakdownRow[] = [];
   @property({ attribute: false }) filters: AnalyticsFilter[] = [];
@@ -77,7 +76,7 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
                 .headline=${this.headline}
                 .dimension=${this.dimension}
                 .metric=${this.metric}
-                .total=${this.total}
+                .total=${breakdownMetricTotal(this.rows, this.metric)}
                 .rows=${this.rows}
                 .loading=${this.loading}
                 .baseUrl=${this.baseUrl}

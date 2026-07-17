@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Extensions;
 using Umbraco.VercelAnalytics.Configuration;
@@ -15,20 +16,24 @@ public sealed class UmbracoVercelAnalyticsSettingsApiController(
     IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
     VercelAnalyticsSettingsStore settingsStore,
     VercelAnalyticsConnectionRegistry registry,
-    IVercelAnalyticsClient vercelClient) : UmbracoVercelAnalyticsApiControllerBase
+    IOptions<VercelAnalyticsOptions> serverOptions,
+    IVercelAnalyticsClient vercelClient,
+    IVercelProjectNameService projectNames) : UmbracoVercelAnalyticsApiControllerBase
 {
     [HttpGet("settings")]
     [ProducesResponseType<AnalyticsSettingsResponse>(StatusCodes.Status200OK)]
-    public ActionResult<AnalyticsSettingsResponse> Settings()
+    public async Task<ActionResult<AnalyticsSettingsResponse>> Settings(CancellationToken cancellationToken)
     {
         if (!IsAdministrator()) return Forbid();
-        return Ok(CreateResponse());
+        return Ok(await CreateResponseAsync(cancellationToken));
     }
 
     [HttpPut("settings")]
     [ProducesResponseType<AnalyticsSettingsResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult<AnalyticsSettingsResponse> SaveSettings(UpdateAnalyticsSettingsRequest request)
+    public async Task<ActionResult<AnalyticsSettingsResponse>> SaveSettings(
+        UpdateAnalyticsSettingsRequest request,
+        CancellationToken cancellationToken)
     {
         if (!IsAdministrator()) return Forbid();
         if (!TimeSpan.TryParse(request.CacheDuration, out var cacheDuration))
@@ -37,17 +42,14 @@ public sealed class UmbracoVercelAnalyticsSettingsApiController(
         var settings = new VercelAnalyticsSettings
         {
             Enabled = request.Enabled,
-            DefaultConnection = request.DefaultConnection,
             DefaultRangeDays = request.DefaultRangeDays,
             CacheDuration = cacheDuration,
             Connections = request.Connections.Select(connection => new VercelAnalyticsConnectionSettings
             {
-                Alias = connection.Alias,
+                Key = connection.Key,
                 DisplayName = connection.DisplayName,
                 ProjectId = connection.ProjectId,
-                TeamId = connection.TeamId,
-                TeamSlug = connection.TeamSlug,
-                Hostnames = connection.Hostnames.ToArray(),
+                Team = connection.Team,
                 DocumentRootKeys = connection.DocumentRootKeys.ToArray(),
                 EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
                 EnabledDocumentTypeKeys = connection.EnabledDocumentTypeKeys.ToArray()
@@ -57,27 +59,27 @@ public sealed class UmbracoVercelAnalyticsSettingsApiController(
         if (failures.Count > 0) return InvalidSettings(failures);
 
         settingsStore.Save(settings);
-        return Ok(CreateResponse());
+        return Ok(await CreateResponseAsync(cancellationToken));
     }
 
-    [HttpPost("settings/connections/{alias}/test")]
+    [HttpPost("settings/connections/{key:guid}/test")]
     [ProducesResponseType<AnalyticsConnectionTestResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AnalyticsConnectionTestResult>> TestConnection(
-        string alias,
+        Guid key,
         CancellationToken cancellationToken)
     {
         if (!IsAdministrator()) return Forbid();
-        var connection = registry.Get(alias);
+        var connection = registry.Get(key);
         if (connection is null) return NotFound();
         if (!connection.IsConfigured)
-            return Ok(new AnalyticsConnectionTestResult(false, "Add a server-side access token for this connection alias."));
+            return Ok(new AnalyticsConnectionTestResult(false, "Add a server-side Vercel access token."));
 
         try
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var now = DateTimeOffset.UtcNow;
             await vercelClient.CountAsync(
                 connection,
-                new AnalyticsQuery(alias, today.AddDays(-1), today, AnalyticsInterval.Day),
+                new AnalyticsQuery(key, now.AddDays(-1), now, AnalyticsInterval.Hour),
                 cancellationToken);
             return Ok(new AnalyticsConnectionTestResult(true, "Vercel accepted the token and project configuration."));
         }
@@ -109,26 +111,35 @@ public sealed class UmbracoVercelAnalyticsSettingsApiController(
         }
     }
 
-    private AnalyticsSettingsResponse CreateResponse()
+    private async Task<AnalyticsSettingsResponse> CreateResponseAsync(CancellationToken cancellationToken)
     {
         var settings = settingsStore.Get();
-        var connections = registry.Connections.ToDictionary(connection => connection.Alias, StringComparer.OrdinalIgnoreCase);
-        return new AnalyticsSettingsResponse(
-            settings.Enabled,
-            settings.DefaultConnection,
-            settings.DefaultRangeDays,
-            settings.CacheDuration.ToString("c"),
-            settings.Connections.Select(connection => new AnalyticsConnectionSettingsResponse(
-                connection.Alias,
-                connection.DisplayName,
+        var serverConfiguration = serverOptions.Value;
+        var connections = registry.Connections.ToDictionary(connection => connection.Key);
+        var responseTasks = settings.Connections.Select(async connection =>
+        {
+            var registered = connections.GetValueOrDefault(connection.Key);
+            var displayName = registered is null
+                ? connection.ProjectId
+                : await projectNames.GetDisplayNameAsync(registered, cancellationToken);
+            return new AnalyticsConnectionSettingsResponse(
+                connection.Key,
+                displayName,
                 connection.ProjectId,
-                connection.TeamId,
-                connection.TeamSlug,
-                connection.Hostnames,
+                connection.Team,
                 connection.DocumentRootKeys,
                 connection.EnableAllDocumentTypes,
                 connection.EnabledDocumentTypeKeys,
-                connections.GetValueOrDefault(connection.Alias)?.HasAccessToken is true)).ToArray());
+                registered?.HasAccessToken is true,
+                !string.IsNullOrWhiteSpace(serverConfiguration.ConnectionAccessTokens.GetValueOrDefault(connection.Key.ToString())));
+        });
+        var responseConnections = await Task.WhenAll(responseTasks);
+        return new AnalyticsSettingsResponse(
+            settings.Enabled,
+            !string.IsNullOrWhiteSpace(serverConfiguration.AccessToken),
+            settings.DefaultRangeDays,
+            settings.CacheDuration.ToString("c"),
+            responseConnections);
     }
 
     private bool IsAdministrator() =>

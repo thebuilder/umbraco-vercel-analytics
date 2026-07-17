@@ -109,7 +109,7 @@ export class UmbracoVercelAnalyticsService {
             ...options
         });
     }
-    
+
     public static settings<ThrowOnError extends boolean = false>(options?: Options<SettingsData, ThrowOnError>) {
         return (options?.client ?? client).get<SettingsResponses, SettingsErrors, ThrowOnError>({
             security: [
@@ -148,7 +148,7 @@ export class UmbracoVercelAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{alias}/test',
+            url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{key}/test',
             ...options
         });
     }

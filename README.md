@@ -41,66 +41,62 @@ Configuration uses two sources:
 
 Create a token in the Vercel account settings and scope it to the account or team that owns the project. Copy it when it is created; Vercel does not show it again.
 
-For a team-owned project, also copy either the team ID or team slug. Personal projects do not need either value. Vercel API requests use the token as a bearer token and the team identifier to access team resources. See the [Vercel REST API authentication documentation](https://vercel.com/docs/rest-api).
+For a team-owned project, also copy either the team ID (`team_...`) or team slug. Personal projects do not need either value. The backoffice presents these as one **Team ID or slug** field. See the [Vercel REST API authentication documentation](https://vercel.com/docs/rest-api).
 
 ### 2. Add the token to the Umbraco deployment
 
-Choose a short connection alias that is safe to use in an environment variable, for example `main`. Configure the token using the same alias:
+Configure one shared token for the package:
 
 ```text
-VercelAnalytics__Connections__main__AccessToken
+VercelAnalytics__AccessToken
 ```
 
 Examples:
 
 ```sh
 # Local shell or container environment
-export VercelAnalytics__Connections__main__AccessToken="your_token"
+export VercelAnalytics__AccessToken="your_token"
 
 # .NET user-secrets
 dotnet user-secrets init \
   --project path/to/Your.Umbraco.Web.csproj
 
 dotnet user-secrets set \
-  "VercelAnalytics:Connections:main:AccessToken" \
+  "VercelAnalytics:AccessToken" \
   "your_token" \
   --project path/to/Your.Umbraco.Web.csproj
 ```
 
 Use the equivalent secret/app-setting facility in Azure App Service, Kubernetes, Docker, or the hosting platform. Do not commit the token to `appsettings.json` or source control.
 
-Restart every Umbraco application instance after adding, rotating, or renaming a token. Tokens are loaded from server configuration at application startup.
+Restart every Umbraco application instance after adding or rotating a token. Tokens are loaded from server configuration at application startup.
+
+The shared token is used by every connection. If a project must use a different token, expand **Token override** for that connection and copy the generated environment-variable name. Overrides use `VercelAnalytics__ConnectionAccessTokens__{connection-guid}`.
 
 ### 3. Configure the connection in Umbraco
 
 Sign in as an administrator and open **Settings → Vercel Analytics**.
 
 1. Select **Add connection**.
-2. Set **Alias** to the alias used in the secret key, such as `main`.
-3. Enter a display name and the Vercel project ID.
-4. For a team project, enter either the team ID or team slug, not both.
-5. Configure page analytics mappings if document-level reports are required.
-6. Select the document types that should display the Analytics workspace view, or enable all document types.
-7. Enable the package and select the default connection.
-8. Select **Save and test**.
+2. Enter the Vercel project ID. The project name is loaded from Vercel.
+3. For a team project, enter its team ID or slug in the combined **Team ID or slug** field.
+4. Configure page analytics mappings if document-level reports are required.
+5. Select the document types that should display the Analytics workspace view, or enable all document types.
+6. Enable the package. The first connection is used as the initial default.
+7. Select **Save settings**, then **Test connection**.
 
-The test confirms that Vercel accepts the token, project, and team configuration. The settings screen reports whether a server-side token was found for the alias; it never displays or stores the token itself.
+The test confirms that Vercel accepts the token, project, and team configuration. The settings screen reports whether the shared token or a connection override was found; it never displays or stores the token itself.
 
 ## Document analytics mappings
 
 Mappings are optional. A connection without mappings is available in the global Analytics section but does not add reports to document workspaces.
 
-For document analytics, configure one or both of the following:
-
-- **Document roots:** Select each Umbraco site's root document. This is the recommended mapping for multi-site installations.
-- **Hostname fallback:** Enter exact published hostnames, one per line, without a scheme, port, or path. For example, `www.example.com`.
-
-When both mappings match, the nearest mapped document root is used. Hostname matching is used as the fallback.
+For document analytics, select each Umbraco site's root document. The nearest mapped ancestor determines which Vercel connection a document uses.
 
 The document Analytics view is shown only when all of these conditions are met:
 
 - The document is published and has a published route.
-- Its document root or hostname resolves to a connection.
+- Its nearest configured document root resolves to a connection.
 - Its document type is enabled for that connection.
 - The current user has Content-section access and read permission for the document.
 
@@ -120,19 +116,13 @@ The backoffice settings screen is the normal configuration path. A deployment ca
 {
   "VercelAnalytics": {
     "Enabled": true,
-    "DefaultConnection": "main",
     "DefaultRangeDays": 30,
     "CacheDuration": "00:05:00",
-    "Connections": {
-      "main": {
-        "DisplayName": "Main website",
+    "Connections": [
+      {
+        "Key": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "ProjectId": "prj_...",
-        "TeamId": "team_...",
-        "TeamSlug": null,
-        "Hostnames": [
-          "www.example.com",
-          "example.com"
-        ],
+        "Team": "team_...",
         "DocumentRootKeys": [
           "11111111-1111-1111-1111-111111111111"
         ],
@@ -141,25 +131,44 @@ The backoffice settings screen is the normal configuration path. A deployment ca
           "22222222-2222-2222-2222-222222222222"
         ]
       }
-    }
+    ]
   }
 }
 ```
 
-Keep `AccessToken` out of the JSON file and supply it through secret configuration using the key shown above.
+`Team` accepts either a Vercel team ID beginning with `team_` or a team slug. Leave it empty for a personal project.
 
-Before the settings screen has saved anything, Umbraco uses these server options as the initial configuration. After an administrator saves the settings screen, the non-secret settings are stored in Umbraco's database and become the source of truth. The access token continues to come from server configuration by connection alias.
+### Configuration reference
+
+Package settings use the `VercelAnalytics` section.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `Enabled` | `false` | Enables the Analytics section and configured document workspace views. |
+| `AccessToken` | Empty | Shared Vercel access token used by every connection. Supply through secret configuration. |
+| `DefaultRangeDays` | `30` | Initial report range in days. Valid values are 1–730. |
+| `CacheDuration` | `00:05:00` | Per-instance in-memory cache duration. Valid values are zero to one hour. |
+| `Connections` | `[]` | Vercel project connection definitions. The first connection becomes the initial default. |
+| `ConnectionAccessTokens` | Empty | Optional secret dictionary keyed by a connection GUID. Prefer the copyable environment-variable name shown in the settings UI. |
+
+Each entry under `Connections` supports:
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `Key` | Generated GUID | Stable internal identity. The settings UI creates this automatically; provide a fixed GUID for deterministic configuration-only setup. |
+| `DisplayName` | Empty | Cached project name used until the name can be loaded from Vercel. |
+| `ProjectId` | Required | Vercel project ID beginning with `prj_`. |
+| `Team` | Empty | Optional team ID (`team_...`) or team slug. Leave empty for a personal project. |
+| `DocumentRootKeys` | `[]` | Umbraco document-root GUIDs that map document analytics to this connection. |
+| `EnableAllDocumentTypes` | `false` | Shows document analytics for every document type beneath a mapped root. |
+| `EnabledDocumentTypeKeys` | `[]` | Document-type GUIDs that show document analytics when all types are not enabled. |
+| `EnabledDocumentTypes` | `[]` | Document-type aliases used by configuration-only bootstrapping. Prefer stable document-type keys for settings managed in Umbraco. |
+
+Keep tokens out of the JSON file. Supply the shared token through `VercelAnalytics__AccessToken`; only use `VercelAnalytics__ConnectionAccessTokens__{connection-guid}` when one connection requires an override.
+
+Before the settings screen has saved anything, Umbraco uses these server options as the initial configuration. After an administrator saves the settings screen, the non-secret settings are stored in Umbraco's database and become the source of truth. Access tokens continue to come from server configuration, with a connection-specific token taking precedence over the shared token.
 
 In a load-balanced deployment, restart all Umbraco instances after changing saved connection settings or server-side tokens so every process uses the same configuration.
-
-## Operational settings
-
-| Setting | Purpose | Valid values |
-| --- | --- | --- |
-| Package status | Enables or disables analytics throughout the backoffice. | On/off |
-| Default connection | Connection selected when no valid connection is present in the URL or browser state. | A configured alias |
-| Default range | Initial reporting period. | 1–730 days |
-| Cache duration | Server-side in-memory cache for Vercel responses. | `00:00:00`–`01:00:00` |
 
 The default cache duration is five minutes. Each Umbraco instance maintains its own in-memory report cache.
 
@@ -167,8 +176,8 @@ The default cache duration is five minutes. Each Umbraco instance maintains its 
 
 After deployment:
 
-1. Open **Settings → Vercel Analytics** and confirm the connection says **Token configured**.
-2. Run **Save and test**.
+1. Open **Settings → Vercel Analytics** and confirm the shared access token says **Configured on the server**.
+2. Select **Save settings**, then **Test connection**.
 3. Open the global **Analytics** section and confirm totals and history load.
 4. If document analytics is enabled, open a mapped published document and select its **Analytics** workspace view.
 5. Grant the Analytics section to any non-administrator user groups that need global reports.
@@ -179,11 +188,11 @@ The available reporting window and some dimensions depend on the Vercel plan and
 
 | Symptom | Check |
 | --- | --- |
-| **Token missing** | The environment/user-secret alias must exactly match the connection alias. Restart the application after changing the secret. |
+| **Token missing** | Configure `VercelAnalytics__AccessToken`, or a connection-specific override, and restart the application. |
 | Vercel returns `401` or `403` | Confirm the token is valid, scoped to the owning account/team, and has access to the configured project. |
-| Vercel returns `400` | Verify the project ID and team ID/slug. Do not configure both team fields. |
+| Vercel returns `400` | Verify the project ID and the optional `Team` value. |
 | Analytics section is not visible | Add the Analytics section to the user's Umbraco user group. The automatic administrator grant runs only once. |
-| Document Analytics view is not visible | Confirm the document is published, mapped by root or hostname, uses an enabled document type, and the user can read it. |
+| Document Analytics view is not visible | Confirm the document is published, beneath a configured document root, uses an enabled document type, and the user can read it. |
 | No data appears | Confirm Web Analytics is enabled and installed on the public site, production traffic has been recorded, and the selected date is inside Vercel's reporting window. |
 | Settings differ between application instances | Restart every instance after changing settings or tokens. |
 

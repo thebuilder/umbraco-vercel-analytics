@@ -79,7 +79,7 @@ export class VercelAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
         ${this.report.status === "loading"
           ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
           : html`<span class="metric-value">
-              <strong>${stateData(this.report)?.totals[metric].toLocaleString()}</strong>
+              <strong>${this.localize.number(stateData(this.report)?.totals[metric] ?? 0)}</strong>
               ${this.#renderComparison(metric)}
             </span>`}
       </button>
@@ -114,7 +114,7 @@ export class VercelAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
             <span class="visually-hidden" role="status">Loading traffic summary and history</span>
             <div class="chart-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
           ` : stateData(this.report)?.points.length
-              ? html`<vercel-analytics-history-chart .points=${stateData(this.report)!.points} .metric=${this.metric} .interval=${this.range.interval}></vercel-analytics-history-chart>`
+              ? html`<vercel-analytics-history-chart .points=${stateData(this.report)!.points} .metric=${this.metric} .interval=${this.range.interval} .timeZone=${this.range.timeZone}></vercel-analytics-history-chart>`
               : html`<umb-empty-state headline="No history"><p>No traffic was recorded in this period.</p></umb-empty-state>`}
         </div>
       </uui-box>

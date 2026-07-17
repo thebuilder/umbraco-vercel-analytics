@@ -10,6 +10,7 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import {
+  analyticsDateOnly,
   calendarMonthDays,
   dateRangeForPreset,
   formatAnalyticsRangeLabel,
@@ -26,6 +27,7 @@ export type AnalyticsDateRangeChangeDetail = {
 };
 
 const PRESETS: ReadonlyArray<{ value: Exclude<DatePreset, "custom">; label: string }> = [
+  { value: 1, label: "Last 24 hours" },
   { value: 7, label: "Last 7 days" },
   { value: 30, label: "Last 30 days" },
   { value: 90, label: "Last 90 days" },
@@ -39,9 +41,9 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
   @property({ attribute: false }) range: AnalyticsDateRange = dateRangeForPreset(30);
   @property({ attribute: false }) preset: DatePreset = 30;
 
-  @state() private _draftFrom = this.range.from;
-  @state() private _draftTo = this.range.to;
-  @state() private _viewMonth = this.range.to;
+  @state() private _draftFrom = analyticsDateOnly(this.range.from, this.range.timeZone);
+  @state() private _draftTo = analyticsDateOnly(this.range.to, this.range.timeZone);
+  @state() private _viewMonth = this._draftTo;
   @state() private _selectingEnd = false;
 
   get #details(): HTMLDetailsElement | null {
@@ -63,9 +65,9 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
   }
 
   #resetDraft(): void {
-    this._draftFrom = this.range.from;
-    this._draftTo = this.range.to;
-    this._viewMonth = this.range.to;
+    this._draftFrom = analyticsDateOnly(this.range.from, this.range.timeZone);
+    this._draftTo = analyticsDateOnly(this.range.to, this.range.timeZone);
+    this._viewMonth = this._draftTo;
     this._selectingEnd = false;
   }
 
@@ -122,7 +124,7 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
   }
 
   #applyCustomRange(): void {
-    const range = normalizeCustomRange(this._draftFrom, this._draftTo);
+    const range = normalizeCustomRange(this._draftFrom, this._draftTo, this.range.timeZone);
     if (range) this.#commit("custom", range);
   }
 
@@ -161,7 +163,7 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
       year: "numeric",
       timeZone: "UTC",
     }).format(monthDate);
-    const validCustomRange = normalizeCustomRange(this._draftFrom, this._draftTo);
+    const validCustomRange = normalizeCustomRange(this._draftFrom, this._draftTo, this.range.timeZone);
 
     return html`
       <details @toggle=${(event: Event) => this.#onToggle(event)}>

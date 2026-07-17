@@ -4,12 +4,12 @@ import { parseDashboardUrlState, writeDashboardUrlState } from "./dashboard-url-
 describe("analytics dashboard URL state", () => {
   it("parses shareable report state and ignores malformed filters", () => {
     const state = parseDashboardUrlState(new URLSearchParams(
-      "connection=main&range=30&from=2026-06-17&to=2026-07-16&metric=pageViews&audience=BrowserName&utm=UtmCampaign&filter=Country%3ADK&filter=RequestPath%3A%2Fnews%3Aarchive&filter=EventName%3ASignup&filter=Nope%3Ax&filter=Country%3AUS",
+      "connection=main&range=30&from=2026-06-17T00%3A00%3A00Z&to=2026-07-16T00%3A00%3A00Z&tz=UTC&metric=pageViews&audience=BrowserName&utm=UtmCampaign&filter=Country%3ADK&filter=RequestPath%3A%2Fnews%3Aarchive&filter=EventName%3ASignup&filter=Nope%3Ax&filter=Country%3AUS",
     ));
 
     expect(state.connection).toBe("main");
     expect(state.preset).toBe(30);
-    expect(state.range).toEqual({ from: "2026-06-17", to: "2026-07-16", interval: "Day" });
+    expect(state.range).toEqual({ from: "2026-06-17T00:00:00.000Z", to: "2026-07-16T00:00:00.000Z", interval: "Day", timeZone: "UTC" });
     expect(state.metric).toBe("pageViews");
     expect(state.audience).toBe("BrowserName");
     expect(state.utm).toBe("UtmCampaign");
@@ -24,7 +24,7 @@ describe("analytics dashboard URL state", () => {
     const url = writeDashboardUrlState(new URL("https://example.com/umbraco/section/analytics?umbDebug=true&filter=Country%3AUS"), {
       connection: "main",
       preset: "custom",
-      range: { from: "2026-01-01", to: "2026-01-31", interval: "Day" },
+      range: { from: "2026-01-01T00:00:00.000Z", to: "2026-01-31T00:00:00.000Z", interval: "Day", timeZone: "Europe/Copenhagen" },
       metric: "visitors",
       audience: "DeviceType",
       utm: "UtmMedium",
@@ -34,7 +34,22 @@ describe("analytics dashboard URL state", () => {
     expect(url.searchParams.get("umbDebug")).toBe("true");
     expect(url.searchParams.get("range")).toBe("custom");
     expect(url.searchParams.get("utm")).toBe("UtmMedium");
+    expect(url.searchParams.get("tz")).toBe("Europe/Copenhagen");
     expect(url.searchParams.getAll("filter")).toEqual(["Country:DK"]);
+  });
+
+  it("restores the hourly last 24 hours preset", () => {
+    const state = parseDashboardUrlState(new URLSearchParams(
+      "range=1&from=2026-07-16T12%3A00%3A00Z&to=2026-07-17T12%3A00%3A00Z&tz=Europe%2FCopenhagen",
+    ));
+
+    expect(state.preset).toBe(1);
+    expect(state.range).toEqual({
+      from: "2026-07-16T12:00:00.000Z",
+      to: "2026-07-17T12:00:00.000Z",
+      interval: "Hour",
+      timeZone: "Europe/Copenhagen",
+    });
   });
 
   it("defaults invalid UTM tabs to source", () => {

@@ -26,9 +26,6 @@ public sealed class AnalyticsDocumentRouteService(
         VercelAnalyticsConnection connection,
         CancellationToken cancellationToken)
     {
-        var configuredHostname = connection.Hostnames.Order(StringComparer.OrdinalIgnoreCase).FirstOrDefault();
-        if (configuredHostname is not null) return $"https://{configuredHostname}";
-
         foreach (var rootKey in connection.DocumentRootKeys)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -48,33 +45,25 @@ public sealed class AnalyticsDocumentRouteService(
         if (content is null) return [];
 
         var rootConnection = FindRootConnection(content);
-        var published = await publishedContent.GetDocumentAsync(documentId, cancellationToken);
+        var published = await publishedContent.GetDocumentAsync(documentId, currentCulture, cancellationToken);
         if (published is null) return [];
 
         var routes = new List<AnalyticsDocumentRoute>();
         foreach (var publishedRoute in published.Routes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var hostnameConnection = registry.FindByHostname(publishedRoute.Hostname);
-            var connection = rootConnection ?? hostnameConnection;
+            var connection = rootConnection;
             if (connection is null ||
                 !connection.IsDocumentTypeEnabled(published.ContentTypeAlias, published.ContentTypeKey)) continue;
 
-            var warnings = new List<string>();
-            if (rootConnection is not null && hostnameConnection is not null &&
-                !string.Equals(rootConnection.Alias, hostnameConnection.Alias, StringComparison.OrdinalIgnoreCase))
-            {
-                warnings.Add($"Document root maps to '{rootConnection.Alias}', but hostname '{publishedRoute.Hostname}' maps to '{hostnameConnection.Alias}'. The document-root mapping is used.");
-            }
-
             routes.Add(new AnalyticsDocumentRoute(
-                connection.Alias,
+                connection.Key,
                 publishedRoute.Culture,
                 publishedRoute.Hostname,
                 publishedRoute.Path,
                 publishedRoute.Url,
                 string.Equals(publishedRoute.Culture, currentCulture, StringComparison.OrdinalIgnoreCase),
-                warnings));
+                []));
         }
 
         return routes;

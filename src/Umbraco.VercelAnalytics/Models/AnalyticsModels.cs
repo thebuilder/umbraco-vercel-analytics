@@ -11,6 +11,7 @@ public sealed class AnalyticsProblemDetails : ProblemDetails
 [JsonConverter(typeof(JsonStringEnumConverter<AnalyticsInterval>))]
 public enum AnalyticsInterval
 {
+    Hour,
     Day,
     Week,
     Month
@@ -33,12 +34,30 @@ public enum AnalyticsDimension
 }
 
 public sealed record AnalyticsQuery(
-    string Connection,
-    DateOnly From,
-    DateOnly To,
+    Guid Connection,
+    DateTimeOffset From,
+    DateTimeOffset To,
     AnalyticsInterval Interval,
     string? RequestPath = null,
-    IReadOnlyList<AnalyticsFilter>? Filters = null);
+    IReadOnlyList<AnalyticsFilter>? Filters = null)
+{
+    internal AnalyticsQuery(
+        Guid Connection,
+        DateOnly From,
+        DateOnly To,
+        AnalyticsInterval Interval,
+        string? RequestPath = null,
+        IReadOnlyList<AnalyticsFilter>? Filters = null)
+        : this(
+            Connection,
+            new DateTimeOffset(From.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+            new DateTimeOffset(To.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+            Interval,
+            RequestPath,
+            Filters)
+    {
+    }
+}
 
 public sealed record AnalyticsFilter(AnalyticsDimension Dimension, string Value);
 
@@ -77,22 +96,20 @@ public sealed record AnalyticsEventDetails(
     IReadOnlyList<AnalyticsEventProperty> Properties);
 
 public sealed record AnalyticsConnectionSummary(
-    string Alias,
+    Guid Key,
     string DisplayName,
     bool IsDefault,
     bool IsConfigured,
     string? BaseUrl,
-    IReadOnlyList<string> Hostnames,
     IReadOnlyList<string> Warnings);
 
 public sealed record AnalyticsConnectionsResponse(
     bool Enabled,
-    string? DefaultConnection,
     int DefaultRangeDays,
     IReadOnlyList<AnalyticsConnectionSummary> Connections);
 
 public sealed record AnalyticsDocumentRoute(
-    string Connection,
+    Guid Connection,
     string Culture,
     string Hostname,
     string Path,
@@ -102,37 +119,33 @@ public sealed record AnalyticsDocumentRoute(
 
 public sealed record AnalyticsSettingsResponse(
     bool Enabled,
-    string? DefaultConnection,
+    bool HasAccessToken,
     int DefaultRangeDays,
     string CacheDuration,
     IReadOnlyList<AnalyticsConnectionSettingsResponse> Connections);
 
 public sealed record AnalyticsConnectionSettingsResponse(
-    string Alias,
+    Guid Key,
     string DisplayName,
     string ProjectId,
-    string? TeamId,
-    string? TeamSlug,
-    IReadOnlyList<string> Hostnames,
+    string? Team,
     IReadOnlyList<string> DocumentRootKeys,
     bool EnableAllDocumentTypes,
     IReadOnlyList<string> EnabledDocumentTypeKeys,
-    bool HasAccessToken);
+    bool HasAccessToken,
+    bool HasAccessTokenOverride);
 
 public sealed record UpdateAnalyticsSettingsRequest(
     bool Enabled,
-    string? DefaultConnection,
     int DefaultRangeDays,
     string CacheDuration,
     IReadOnlyList<UpdateAnalyticsConnectionRequest> Connections);
 
 public sealed record UpdateAnalyticsConnectionRequest(
-    string Alias,
+    Guid Key,
     string DisplayName,
     string ProjectId,
-    string? TeamId,
-    string? TeamSlug,
-    IReadOnlyList<string> Hostnames,
+    string? Team,
     IReadOnlyList<string> DocumentRootKeys,
     bool EnableAllDocumentTypes,
     IReadOnlyList<string> EnabledDocumentTypeKeys);

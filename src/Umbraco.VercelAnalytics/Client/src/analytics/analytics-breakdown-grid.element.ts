@@ -2,7 +2,7 @@ import { LitElement, css, customElement, html, property } from "@umbraco-cms/bac
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { AnalyticsBreakdown, AnalyticsDimension, AnalyticsEventsReport } from "../api/types.gen.js";
-import { topBreakdownRows } from "./breakdown-rows.js";
+import { breakdownMetricTotal, topBreakdownRows } from "./breakdown-rows.js";
 import { selectedCardDimension, type DashboardCard, UTM_OPTIONS } from "./dashboard-cards.js";
 import type { AnalyticsFilter, AudienceDimension, DashboardMetric, UtmDimension } from "./dashboard-url-state.js";
 import { topEventRows } from "./event-rows.js";
@@ -19,7 +19,6 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
   @property() metric: DashboardMetric = "visitors";
   @property() audienceDimension: AudienceDimension = "DeviceType";
   @property() utmDimension: UtmDimension = "UtmSource";
-  @property({ type: Number }) total = 0;
   @property() baseUrl?: string;
 
   #dispatch(name: string, detail?: unknown): void {
@@ -60,7 +59,9 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     const selected = selectedCardDimension(card, this.audienceDimension, this.utmDimension);
     const state = this.breakdowns[selected.dimension];
     const loading = !state || state.status === "idle" || state.status === "loading";
-    const rows = topBreakdownRows(state ? stateData(state)?.rows ?? [] : [], 10);
+    const allRows = state ? stateData(state)?.rows ?? [] : [];
+    const rows = topBreakdownRows(allRows, 10);
+    const total = breakdownMetricTotal(allRows, this.metric);
     const unavailable = state?.status === "error" ? state.message : undefined;
     const planLimited = card.kind === "tabbed-breakdown" && card.planLimited;
     const linkValues = selected.dimension === "RequestPath" || selected.dimension === "Route";
@@ -71,7 +72,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
             .headline=${selected.headline}
             .dimension=${selected.dimension}
             .metric=${this.metric}
-            .total=${this.total}
+            .total=${total}
             .rows=${rows}
             .loading=${loading}
             .filters=${this.filters}
@@ -112,10 +113,14 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
   render() {
     const standardCards = this.cards.filter((card) => card.kind !== "tabbed-breakdown" || card.id !== "utm");
     const utmCard = this.cards.find((card) => card.kind === "tabbed-breakdown" && card.id === "utm");
+    const documentScoped = !standardCards.some((card) => card.kind === "breakdown" && card.dimension === "RequestPath");
+    const cardsBeforeEvents = documentScoped ? standardCards.slice(0, 1) : standardCards;
+    const cardsAfterEvents = documentScoped ? standardCards.slice(1) : [];
     return html`
       <section class="grid" aria-label="Traffic breakdowns">
-        ${standardCards.map((card) => this.#renderCard(card))}
+        ${cardsBeforeEvents.map((card) => this.#renderCard(card))}
         ${this.#renderEvents()}
+        ${cardsAfterEvents.map((card) => this.#renderCard(card))}
         ${utmCard ? this.#renderCard(utmCard) : ""}
       </section>
     `;

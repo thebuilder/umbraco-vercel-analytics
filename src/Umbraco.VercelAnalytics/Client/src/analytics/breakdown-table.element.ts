@@ -8,6 +8,7 @@ import {
   breakdownMetricValue,
   breakdownPercentage,
   isPercentageDimension,
+  referrerExternalHref,
   referrerFaviconUrl,
   visibleBreakdownRows,
   type TrafficMetric,
@@ -56,14 +57,22 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
         <caption>${this.headline}</caption>
         <thead><tr><th scope="col"><slot name="heading">${this.headline}</slot></th><th scope="col">${this.#metricLabel()}</th></tr></thead>
         <tbody>${rows.map((row, index) => {
-          const href = this.linkValues ? analyticsRowHref(this.baseUrl, row.value) : undefined;
+          const href = this.dimension === "ReferrerHostname"
+            ? referrerExternalHref(row.value)
+            : this.linkValues
+              ? analyticsRowHref(this.baseUrl, row.value)
+              : undefined;
           const countryCode = this.dimension === "Country" ? normalizeCountryCode(row.value) : undefined;
           const faviconUrl = this.dimension === "ReferrerHostname" ? referrerFaviconUrl(row.value) : undefined;
           const displayValue = countryCode
             ? countryDisplayName(countryCode, navigator.languages)
             : breakdownDisplayValue(row.value, this.dimension);
           const metricValue = breakdownMetricValue(row, this.metric);
-          const percentage = breakdownPercentage(metricValue, this.total);
+          const percentage = breakdownPercentage(
+            metricValue,
+            this.total,
+            (value, options) => this.localize.number(value, options),
+          );
           const barRatio = breakdownBarRatio(metricValue, maximum);
           const tooltipId = `breakdown-value-${index}`;
           const activeFilter = this.filters.some((filter) => filter.dimension === this.dimension && filter.value === row.value);
@@ -97,13 +106,13 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
               ${percentageDimension ? html`
                 <span class="percentage-value" tabindex="0" aria-describedby=${tooltipId}>
                   <span aria-hidden="true">${percentage.display}</span>
-                  <span class="visually-hidden">${metricValue.toLocaleString()} ${this.#metricLabel().toLocaleLowerCase()}, ${percentage.precise} of the total</span>
+                  <span class="visually-hidden">${this.localize.number(metricValue)} ${this.#metricLabel().toLocaleLowerCase()}, ${percentage.precise} of the total</span>
                   <span id=${tooltipId} class=${`percentage-tooltip${index === 0 ? " below" : ""}`} role="tooltip">
-                    <strong>${metricValue.toLocaleString()}</strong>
+                    <strong>${this.localize.number(metricValue)}</strong>
                     <span>${percentage.precise}</span>
                   </span>
                 </span>
-              ` : html`<span class="metric-number">${metricValue.toLocaleString()}</span>`}
+              ` : html`<span class="metric-number">${this.localize.number(metricValue)}</span>`}
             </span></td>
           </tr>
         `;})}</tbody>
@@ -132,7 +141,7 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     td { font-variant-numeric: tabular-nums; position: relative; text-align: right; z-index: 1; }
     tbody tr:hover, tbody tr:focus-within { position: relative; z-index: 2; }
     .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
-    .metric-number { min-inline-size: 0; }
+    .metric-number { font-weight: 700; min-inline-size: 0; }
     .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
     tbody tr:hover .filter-action, .filter-action:focus-visible, .filter-action[aria-pressed="true"] { opacity: 1; }
     .filter-action:hover, .filter-action[aria-pressed="true"] { background: var(--uui-color-surface-alt); color: var(--uui-color-interactive-emphasis); }

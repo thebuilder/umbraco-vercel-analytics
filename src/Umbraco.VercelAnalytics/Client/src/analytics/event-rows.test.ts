@@ -10,8 +10,8 @@ const rows = [
 ];
 
 describe("analytics event rows", () => {
-  it("removes blank, unknown, and aggregate event names", () => {
-    expect(visibleEventRows(rows).map((row) => row.eventName)).toEqual(["Signup", "Purchase"]);
+  it("removes blank and aggregate event names but keeps unknown", () => {
+    expect(visibleEventRows(rows).map((row) => row.eventName)).toEqual(["Signup", "Unknown", "Purchase"]);
   });
 
   it("limits panels after filtering hidden event names", () => {

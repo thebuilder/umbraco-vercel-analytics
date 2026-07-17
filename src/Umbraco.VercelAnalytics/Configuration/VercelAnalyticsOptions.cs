@@ -6,29 +6,27 @@ public sealed class VercelAnalyticsOptions
 
     public bool Enabled { get; set; }
 
-    public string? DefaultConnection { get; set; }
+    public string AccessToken { get; set; } = string.Empty;
 
     public int DefaultRangeDays { get; set; } = 30;
 
     public TimeSpan CacheDuration { get; set; } = TimeSpan.FromMinutes(5);
 
-    public Dictionary<string, VercelAnalyticsConnectionOptions> Connections { get; set; } =
+    public List<VercelAnalyticsConnectionOptions> Connections { get; set; } = [];
+
+    public Dictionary<string, string> ConnectionAccessTokens { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 }
 
 public sealed class VercelAnalyticsConnectionOptions
 {
-    public string DisplayName { get; set; } = string.Empty;
+    public Guid Key { get; set; }
 
-    public string AccessToken { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
 
     public string ProjectId { get; set; } = string.Empty;
 
-    public string? TeamId { get; set; }
-
-    public string? TeamSlug { get; set; }
-
-    public string[] Hostnames { get; set; } = [];
+    public string? Team { get; set; }
 
     public string[] DocumentRootKeys { get; set; } = [];
 

@@ -6,8 +6,9 @@ namespace Umbraco.VercelAnalytics.Tests.Configuration;
 
 public sealed class VercelAnalyticsSettingsValidatorTests
 {
+    private static readonly Guid MainKey = Guid.Parse("11111111-1111-1111-1111-111111111110");
     [Fact]
-    public void Hostnames_and_roots_are_optional_for_global_reports()
+    public void Roots_are_optional_for_global_reports()
     {
         var settings = CreateSettings();
 
@@ -15,16 +16,16 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     }
 
     [Fact]
-    public void Duplicate_mappings_across_connections_are_rejected()
+    public void Duplicate_root_mappings_across_connections_are_rejected()
     {
         var settings = CreateSettings();
-        settings.Connections[0].Hostnames = ["example.com"];
+        settings.Connections[0].DocumentRootKeys = ["11111111-1111-1111-1111-111111111111"];
         settings.Connections.Add(new VercelAnalyticsConnectionSettings
         {
-            Alias = "other",
+            Key = Guid.Parse("22222222-2222-2222-2222-222222222220"),
             DisplayName = "Other",
             ProjectId = "other-project",
-            Hostnames = ["EXAMPLE.COM."]
+            DocumentRootKeys = ["11111111-1111-1111-1111-111111111111"]
         });
 
         var failures = VercelAnalyticsSettingsValidator.Validate(settings);
@@ -57,30 +58,47 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     {
         var store = new VercelAnalyticsSettingsStore(Options.Create(new VercelAnalyticsOptions()));
         var settings = CreateSettings();
-        settings.Connections[0].Hostnames = ["EXAMPLE.COM."];
         settings.Connections[0].DocumentRootKeys = ["11111111-1111-1111-1111-111111111111"];
 
         store.Save(settings);
         var connection = Assert.Single(store.Get().Connections);
 
-        Assert.Equal("example.com", Assert.Single(connection.Hostnames));
+        Assert.Equal("11111111-1111-1111-1111-111111111111", Assert.Single(connection.DocumentRootKeys));
         Assert.DoesNotContain("token", System.Text.Json.JsonSerializer.Serialize(connection), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Store_uses_first_token_alias_as_initial_default_connection()
+    public void Store_generates_and_preserves_a_missing_connection_key()
     {
+        var store = new VercelAnalyticsSettingsStore(Options.Create(new VercelAnalyticsOptions()));
+        var settings = CreateSettings();
+        settings.Connections[0].Key = Guid.Empty;
+
+        store.Save(settings);
+        var first = Assert.Single(store.Get().Connections).Key;
+        var second = Assert.Single(store.Get().Connections).Key;
+
+        Assert.NotEqual(Guid.Empty, first);
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void Store_preserves_connection_order_from_server_options()
+    {
+        var secondKey = Guid.Parse("22222222-2222-2222-2222-222222222220");
         var options = new VercelAnalyticsOptions
         {
             Enabled = true,
-            Connections = new Dictionary<string, VercelAnalyticsConnectionOptions>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["main"] = new() { AccessToken = "server-secret" }
-            }
+            AccessToken = "server-secret",
+            Connections =
+            [
+                new() { Key = MainKey, ProjectId = "first-project" },
+                new() { Key = secondKey, ProjectId = "second-project" }
+            ]
         };
         var store = new VercelAnalyticsSettingsStore(Options.Create(options));
 
-        Assert.Equal("main", store.Get().DefaultConnection);
+        Assert.Equal([MainKey, secondKey], store.Get().Connections.Select(connection => connection.Key));
     }
 
     [Fact]
@@ -108,12 +126,11 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     private static VercelAnalyticsSettings CreateSettings() => new()
     {
         Enabled = true,
-        DefaultConnection = "main",
         Connections =
         [
             new VercelAnalyticsConnectionSettings
             {
-                Alias = "main",
+                Key = MainKey,
                 DisplayName = "Main",
                 ProjectId = "project"
             }

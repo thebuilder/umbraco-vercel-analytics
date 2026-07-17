@@ -5,7 +5,16 @@ namespace Umbraco.VercelAnalytics.Services;
 
 public interface IVercelAnalyticsClient
 {
+    Task<string> GetProjectNameAsync(
+        VercelAnalyticsConnection connection,
+        CancellationToken cancellationToken);
+
     Task<AnalyticsTotals> CountAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        CancellationToken cancellationToken);
+
+    Task<long> GetPageViewTotalAsync(
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken);

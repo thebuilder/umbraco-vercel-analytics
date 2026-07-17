@@ -18,38 +18,21 @@ public sealed class VercelAnalyticsConnectionRegistry(
 
     public IEnumerable<VercelAnalyticsConnection> Connections => Capture().Connections.Values;
 
-    public VercelAnalyticsConnection? Get(string alias) =>
-        Capture().Get(alias);
-
-    public VercelAnalyticsConnection? FindByHostname(string? hostname)
-    {
-        var normalized = NormalizeHostname(hostname);
-        if (normalized is null) return null;
-        var snapshot = Capture();
-        return snapshot.HostnameOwners.TryGetValue(normalized, out var alias)
-            ? snapshot.Connections.GetValueOrDefault(alias)
-            : null;
-    }
+    public VercelAnalyticsConnection? Get(Guid key) =>
+        Capture().Get(key);
 
     public VercelAnalyticsConnection? FindNearestRoot(IEnumerable<Guid> ancestorKeys)
     {
         var snapshot = Capture();
         foreach (var key in ancestorKeys)
         {
-            if (snapshot.RootOwners.TryGetValue(key, out var alias))
+            if (snapshot.RootOwners.TryGetValue(key, out var connectionKey))
             {
-                return snapshot.Connections.GetValueOrDefault(alias);
+                return snapshot.Connections.GetValueOrDefault(connectionKey);
             }
         }
 
         return null;
-    }
-
-    public static string? NormalizeHostname(string? hostname)
-    {
-        if (string.IsNullOrWhiteSpace(hostname)) return null;
-        var value = hostname.Trim().TrimEnd('.').ToLowerInvariant();
-        return Uri.CheckHostName(value) == UriHostNameType.Unknown ? null : value;
     }
 
     internal RegistrySnapshot Capture()
@@ -69,46 +52,45 @@ public sealed class VercelAnalyticsConnectionRegistry(
 
     private RegistrySnapshot CreateSnapshot(VercelAnalyticsSettingsSnapshot settingsSnapshot)
     {
-        var configuredTokens = serverOptions.Value.Connections;
+        var serverConfiguration = serverOptions.Value;
         var connections = settingsSnapshot.Settings.Connections.ToDictionary(
-            connection => connection.Alias,
+            connection => connection.Key,
             connection => VercelAnalyticsConnection.Create(
                 connection,
-                configuredTokens.GetValueOrDefault(connection.Alias)?.AccessToken),
-            StringComparer.OrdinalIgnoreCase);
-        var hostnames = connections.Values
-            .SelectMany(connection => connection.Hostnames.Select(hostname => (hostname, connection.Alias)))
-            .ToDictionary(pair => pair.hostname, pair => pair.Alias, StringComparer.OrdinalIgnoreCase);
+                ResolveAccessToken(
+                    serverConfiguration.AccessToken,
+                    serverConfiguration.ConnectionAccessTokens.GetValueOrDefault(connection.Key.ToString()))));
         var roots = connections.Values
-            .SelectMany(connection => connection.DocumentRootKeys.Select(rootKey => (rootKey, connection.Alias)))
-            .ToDictionary(pair => pair.rootKey, pair => pair.Alias);
+            .SelectMany(connection => connection.DocumentRootKeys.Select(rootKey => (rootKey, connection.Key)))
+            .ToDictionary(pair => pair.rootKey, pair => pair.Key);
         return new RegistrySnapshot(
             settingsSnapshot.Settings,
             settingsSnapshot.Revision,
             connections,
-            hostnames,
             roots);
     }
+
+    private static string ResolveAccessToken(string? sharedAccessToken, string? connectionAccessToken) =>
+        !string.IsNullOrWhiteSpace(connectionAccessToken)
+            ? connectionAccessToken
+            : sharedAccessToken ?? string.Empty;
 
     internal sealed record RegistrySnapshot(
         VercelAnalyticsSettings Settings,
         long Revision,
-        IReadOnlyDictionary<string, VercelAnalyticsConnection> Connections,
-        IReadOnlyDictionary<string, string> HostnameOwners,
-        IReadOnlyDictionary<Guid, string> RootOwners)
+        IReadOnlyDictionary<Guid, VercelAnalyticsConnection> Connections,
+        IReadOnlyDictionary<Guid, Guid> RootOwners)
     {
-        public VercelAnalyticsConnection? Get(string alias) => Connections.GetValueOrDefault(alias);
+        public VercelAnalyticsConnection? Get(Guid key) => Connections.GetValueOrDefault(key);
     }
 }
 
 public sealed record VercelAnalyticsConnection(
-    string Alias,
+    Guid Key,
     string DisplayName,
     string AccessToken,
     string ProjectId,
-    string? TeamId,
-    string? TeamSlug,
-    IReadOnlySet<string> Hostnames,
+    string? Team,
     IReadOnlyList<Guid> DocumentRootKeys,
     bool EnableAllDocumentTypes,
     IReadOnlySet<Guid> EnabledDocumentTypeKeys,
@@ -118,22 +100,19 @@ public sealed record VercelAnalyticsConnection(
 
     public bool IsConfigured => HasAccessToken && !string.IsNullOrWhiteSpace(ProjectId);
 
-    public bool HasMappings => Hostnames.Count > 0 || DocumentRootKeys.Count > 0;
+    public bool HasMappings => DocumentRootKeys.Count > 0;
 
-    public bool IsDocumentTypeEnabled(string alias, Guid key) =>
-        EnableAllDocumentTypes || EnabledDocumentTypeKeys.Contains(key) || EnabledDocumentTypes.Contains(alias);
+    public bool IsDocumentTypeEnabled(string documentTypeAlias, Guid documentTypeKey) =>
+        EnableAllDocumentTypes || EnabledDocumentTypeKeys.Contains(documentTypeKey) || EnabledDocumentTypes.Contains(documentTypeAlias);
 
     internal static VercelAnalyticsConnection Create(
         VercelAnalyticsConnectionSettings settings,
         string? accessToken) => new(
-            settings.Alias,
-            settings.DisplayName,
+            settings.Key,
+            string.IsNullOrWhiteSpace(settings.DisplayName) ? settings.ProjectId : settings.DisplayName,
             accessToken ?? string.Empty,
             settings.ProjectId,
-            NullIfWhiteSpace(settings.TeamId),
-            NullIfWhiteSpace(settings.TeamSlug),
-            settings.Hostnames.Select(VercelAnalyticsConnectionRegistry.NormalizeHostname).OfType<string>()
-                .ToHashSet(StringComparer.OrdinalIgnoreCase),
+            NullIfWhiteSpace(settings.Team),
             ParseGuidValues(settings.DocumentRootKeys),
             settings.EnableAllDocumentTypes,
             ParseGuidValues(settings.EnabledDocumentTypeKeys).ToHashSet(),

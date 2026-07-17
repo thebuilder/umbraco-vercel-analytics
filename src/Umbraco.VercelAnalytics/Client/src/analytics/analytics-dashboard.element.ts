@@ -23,7 +23,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
   readonly #controller = new AnalyticsDashboardController(() => {
     this._revision += 1;
   });
-
   override connectedCallback(): void {
     super.connectedCallback();
     this.#controller.connect(this.documentId, this.culture);
@@ -79,7 +78,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     if (state.configurationError) return html`
       <main><umb-empty-state headline="Analytics is not available"><p>${state.configurationError}</p></umb-empty-state></main>
     `;
-    const total = stateData(state.summary)?.totals[state.metric] ?? 0;
     const expanded = state.expandedBreakdown;
     const expandedEvents = state.expandedEvents;
     const selected = state.selectedEvent;
@@ -110,7 +108,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           .metric=${state.metric}
           .audienceDimension=${state.audienceDimension}
           .utmDimension=${state.utmDimension}
-          .total=${total}
           .baseUrl=${this.#controller.linkBaseUrl()}
           @view-breakdown=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
           @view-events=${() => this.#controller.openEvents()}
@@ -127,7 +124,6 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
             .loading=${expanded.report.status === "loading"}
             .unavailable=${this.#error(expanded.report)}
             .metric=${state.metric}
-            .total=${total}
             .baseUrl=${this.#controller.linkBaseUrl()}
             .linkValues=${expanded.dimension === "RequestPath" || expanded.dimension === "Route"}
             @search-breakdown=${(event: CustomEvent<{ search: string }>) => this.#controller.searchBreakdown(event.detail.search)}

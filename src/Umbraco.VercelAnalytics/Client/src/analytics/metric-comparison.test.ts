@@ -18,6 +18,12 @@ describe("metricComparison", () => {
     });
   });
 
+  it("describes a rolling one-day comparison as 24 hours", () => {
+    expect(metricComparison(120, 100, "visitors", 1)?.description).toBe(
+      "20% more visitors than the previous 24 hours",
+    );
+  });
+
   it("omits a percentage when no finite baseline exists", () => {
     expect(metricComparison(10, 0, "visitors", 30)).toBeUndefined();
     expect(metricComparison(10, undefined, "visitors", 30)).toBeUndefined();

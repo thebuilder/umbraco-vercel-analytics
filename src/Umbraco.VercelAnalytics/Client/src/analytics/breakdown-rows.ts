@@ -19,10 +19,7 @@ export function withoutAggregatedOthers(rows: AnalyticsBreakdownRow[]): Analytic
 export function visibleBreakdownRows(
   rows: AnalyticsBreakdownRow[],
 ): AnalyticsBreakdownRow[] {
-  return withoutAggregatedOthers(rows).filter((row) => {
-    const value = row.value.trim().toLocaleLowerCase();
-    return value.length > 0 && value !== UNKNOWN_LABEL;
-  });
+  return withoutAggregatedOthers(rows).filter((row) => row.value.trim().length > 0);
 }
 
 export function isPercentageDimension(dimension?: AnalyticsDimension): boolean {
@@ -33,15 +30,23 @@ export function breakdownMetricValue(row: AnalyticsBreakdownRow, metric: Traffic
   return row[metric];
 }
 
+export function breakdownMetricTotal(rows: AnalyticsBreakdownRow[], metric: TrafficMetric): number {
+  return visibleBreakdownRows(rows).reduce((total, row) => total + breakdownMetricValue(row, metric), 0);
+}
+
 export function breakdownBarRatio(value: number, maximum: number): number {
   return maximum > 0 ? Math.min(Math.max(value / maximum, 0), 1) : 0;
 }
 
-export function breakdownPercentage(value: number, total: number): { display: string; precise: string } {
+export function breakdownPercentage(
+  value: number,
+  total: number,
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string = (number, options) => number.toLocaleString(undefined, options),
+): { display: string; precise: string } {
   const percentage = total > 0 ? (value / total) * 100 : 0;
   return {
     display: percentage > 0 && percentage < 0.5 ? "<1%" : `${Math.round(percentage)}%`,
-    precise: `${percentage.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`,
+    precise: `${formatNumber(percentage, { maximumFractionDigits: 2 })}%`,
   };
 }
 
@@ -63,6 +68,19 @@ export function referrerFaviconUrl(domain: string): string | undefined {
   const value = domain.trim();
   if (!value || value.toLocaleLowerCase() === UNKNOWN_LABEL) return undefined;
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(value)}&sz=32`;
+}
+
+export function referrerExternalHref(domain: string): string | undefined {
+  const value = domain.trim();
+  if (!value || value.toLocaleLowerCase() === UNKNOWN_LABEL || /\s/.test(value)) return undefined;
+
+  try {
+    const url = new URL(`https://${value}`);
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return undefined;
+    return url.href;
+  } catch {
+    return undefined;
+  }
 }
 
 export function analyticsRowHref(baseUrl: string | undefined, value: string): string | undefined {

@@ -10,8 +10,6 @@ public sealed class VercelAnalyticsSettings
 {
     public bool Enabled { get; set; }
 
-    public string? DefaultConnection { get; set; }
-
     public int DefaultRangeDays { get; set; } = 30;
 
     public TimeSpan CacheDuration { get; set; } = TimeSpan.FromMinutes(5);
@@ -21,17 +19,13 @@ public sealed class VercelAnalyticsSettings
 
 public sealed class VercelAnalyticsConnectionSettings
 {
-    public string Alias { get; set; } = string.Empty;
+    public Guid Key { get; set; }
 
     public string DisplayName { get; set; } = string.Empty;
 
     public string ProjectId { get; set; } = string.Empty;
 
-    public string? TeamId { get; set; }
-
-    public string? TeamSlug { get; set; }
-
-    public string[] Hostnames { get; set; } = [];
+    public string? Team { get; set; }
 
     public string[] DocumentRootKeys { get; set; } = [];
 
@@ -39,13 +33,13 @@ public sealed class VercelAnalyticsConnectionSettings
 
     public string[] EnabledDocumentTypeKeys { get; set; } = [];
 
-    // Retains compatibility with alias-based appsettings configuration.
+    // Supports document-type aliases in configuration-only bootstrapping.
     public string[] EnabledDocumentTypes { get; set; } = [];
 }
 
 public sealed class VercelAnalyticsSettingsStore
 {
-    private const string StorageKey = "Umbraco.VercelAnalytics.Settings.v1";
+    private const string StorageKey = "Umbraco.VercelAnalytics.Settings.v2";
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly Lock _lock = new();
     private readonly IKeyValueService? _keyValueService;
@@ -77,12 +71,14 @@ public sealed class VercelAnalyticsSettingsStore
             var json = _keyValueService?.GetValue(StorageKey);
             if (_cached is null || (_keyValueService is not null && !string.Equals(json, _cachedJson, StringComparison.Ordinal)))
             {
-                _cached = string.IsNullOrWhiteSpace(json)
+                var settings = string.IsNullOrWhiteSpace(json)
                     ? VercelAnalyticsSettingsMapper.FromServerOptions(_serverOptions.Value)
                     : JsonSerializer.Deserialize<VercelAnalyticsSettings>(json, SerializerOptions)
                         ?? VercelAnalyticsSettingsMapper.FromServerOptions(_serverOptions.Value);
-                _cachedJson = json;
-                _revision = ComputeRevision(json ?? JsonSerializer.Serialize(_cached, SerializerOptions));
+                _cached = Normalize(settings);
+                _cachedJson = JsonSerializer.Serialize(_cached, SerializerOptions);
+                if (string.IsNullOrWhiteSpace(json)) _keyValueService?.SetValue(StorageKey, _cachedJson);
+                _revision = ComputeRevision(_cachedJson);
             }
 
             return new VercelAnalyticsSettingsSnapshot(_cached, _revision);
@@ -105,21 +101,14 @@ public sealed class VercelAnalyticsSettingsStore
     private static VercelAnalyticsSettings Normalize(VercelAnalyticsSettings settings) => new()
     {
         Enabled = settings.Enabled,
-        DefaultConnection = NullIfWhiteSpace(settings.DefaultConnection),
         DefaultRangeDays = settings.DefaultRangeDays,
         CacheDuration = settings.CacheDuration,
         Connections = settings.Connections.Select(connection => new VercelAnalyticsConnectionSettings
         {
-            Alias = connection.Alias.Trim(),
+            Key = connection.Key == Guid.Empty ? Guid.NewGuid() : connection.Key,
             DisplayName = connection.DisplayName.Trim(),
             ProjectId = connection.ProjectId.Trim(),
-            TeamId = NullIfWhiteSpace(connection.TeamId),
-            TeamSlug = NullIfWhiteSpace(connection.TeamSlug),
-            Hostnames = connection.Hostnames
-                .Select(VercelAnalyticsConnectionRegistry.NormalizeHostname)
-                .OfType<string>()
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
+            Team = NullIfWhiteSpace(connection.Team),
             DocumentRootKeys = NormalizeGuidValues(connection.DocumentRootKeys),
             EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
             EnabledDocumentTypeKeys = NormalizeGuidValues(connection.EnabledDocumentTypeKeys),
@@ -150,26 +139,25 @@ internal sealed record VercelAnalyticsSettingsSnapshot(
 
 internal static class VercelAnalyticsSettingsMapper
 {
-    public static VercelAnalyticsSettings FromServerOptions(VercelAnalyticsOptions options) => new()
+    public static VercelAnalyticsSettings FromServerOptions(VercelAnalyticsOptions options)
     {
-        Enabled = options.Enabled,
-        DefaultConnection = string.IsNullOrWhiteSpace(options.DefaultConnection)
-            ? options.Connections.Keys.FirstOrDefault()
-            : options.DefaultConnection,
-        DefaultRangeDays = options.DefaultRangeDays,
-        CacheDuration = options.CacheDuration,
-        Connections = options.Connections.Select(pair => new VercelAnalyticsConnectionSettings
+        var connections = options.Connections.Select(connection => new VercelAnalyticsConnectionSettings
         {
-            Alias = pair.Key,
-            DisplayName = pair.Value.DisplayName,
-            ProjectId = pair.Value.ProjectId,
-            TeamId = pair.Value.TeamId,
-            TeamSlug = pair.Value.TeamSlug,
-            Hostnames = pair.Value.Hostnames,
-            DocumentRootKeys = pair.Value.DocumentRootKeys,
-            EnableAllDocumentTypes = pair.Value.EnableAllDocumentTypes,
-            EnabledDocumentTypeKeys = pair.Value.EnabledDocumentTypeKeys,
-            EnabledDocumentTypes = pair.Value.EnabledDocumentTypes
-        }).ToList()
-    };
+            Key = connection.Key == Guid.Empty ? Guid.NewGuid() : connection.Key,
+            DisplayName = connection.DisplayName,
+            ProjectId = connection.ProjectId,
+            Team = connection.Team,
+            DocumentRootKeys = connection.DocumentRootKeys,
+            EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
+            EnabledDocumentTypeKeys = connection.EnabledDocumentTypeKeys,
+            EnabledDocumentTypes = connection.EnabledDocumentTypes
+        }).ToList();
+        return new VercelAnalyticsSettings
+        {
+            Enabled = options.Enabled,
+            DefaultRangeDays = options.DefaultRangeDays,
+            CacheDuration = options.CacheDuration,
+            Connections = connections
+        };
+    }
 }

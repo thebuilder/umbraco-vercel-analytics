@@ -3,7 +3,7 @@ import type { AnalyticsEventRow } from "../api/types.gen.js";
 export function visibleEventRows(rows: AnalyticsEventRow[]): AnalyticsEventRow[] {
   return rows.filter(({ eventName }) => {
     const value = eventName.trim().toLocaleLowerCase();
-    return value.length > 0 && value !== "unknown" && value !== "others";
+    return value.length > 0 && value !== "others";
   });
 }
 

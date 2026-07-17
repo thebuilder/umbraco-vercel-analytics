@@ -1,8 +1,6 @@
-using System.Text.RegularExpressions;
-
 namespace Umbraco.VercelAnalytics.Configuration;
 
-public static partial class VercelAnalyticsSettingsValidator
+public static class VercelAnalyticsSettingsValidator
 {
     public static IReadOnlyList<string> Validate(VercelAnalyticsSettings settings) =>
         Validate(settings, VercelAnalyticsValidationMode.PersistedSettings);
@@ -20,24 +18,16 @@ public static partial class VercelAnalyticsSettingsValidator
         if (validateEnabledState && settings.Enabled && settings.Connections.Count == 0)
             failures.Add("Add at least one connection before enabling analytics.");
 
-        var aliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var hostnames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var roots = new Dictionary<Guid, string>();
+        var keys = new HashSet<Guid>();
+        var roots = new Dictionary<Guid, Guid>();
         foreach (var connection in settings.Connections)
         {
             ValidateConnection(
                 connection,
                 failures,
-                aliases,
-                hostnames,
+                keys,
                 roots,
                 validateEnabledState);
-        }
-
-        if (validateEnabledState && settings.Enabled && (string.IsNullOrWhiteSpace(settings.DefaultConnection) ||
-            !aliases.Contains(settings.DefaultConnection)))
-        {
-            failures.Add("Choose a default connection before enabling analytics.");
         }
 
         return failures;
@@ -46,53 +36,33 @@ public static partial class VercelAnalyticsSettingsValidator
     private static void ValidateConnection(
         VercelAnalyticsConnectionSettings connection,
         ICollection<string> failures,
-        ISet<string> aliases,
-        IDictionary<string, string> hostnames,
-        IDictionary<Guid, string> roots,
+        ISet<Guid> keys,
+        IDictionary<Guid, Guid> roots,
         bool requireConnectionMetadata)
     {
-        var alias = connection.Alias.Trim();
-        if (!AliasPattern().IsMatch(alias))
-            failures.Add("Connection aliases must start with a letter or number and contain only letters, numbers, hyphens, and underscores.");
-        else if (!aliases.Add(alias))
-            failures.Add($"Connection alias '{alias}' is used more than once.");
-        if (requireConnectionMetadata && string.IsNullOrWhiteSpace(connection.DisplayName))
-            failures.Add($"Connection '{alias}' requires a display name.");
+        var label = string.IsNullOrWhiteSpace(connection.ProjectId) ? connection.Key.ToString() : connection.ProjectId;
+        if (connection.Key == Guid.Empty)
+            failures.Add("Every connection requires a valid key.");
+        else if (!keys.Add(connection.Key))
+            failures.Add($"Connection key '{connection.Key}' is used more than once.");
         if (requireConnectionMetadata && string.IsNullOrWhiteSpace(connection.ProjectId))
-            failures.Add($"Connection '{alias}' requires a project ID.");
-        if (!string.IsNullOrWhiteSpace(connection.TeamId) && !string.IsNullOrWhiteSpace(connection.TeamSlug))
-            failures.Add($"Connection '{alias}' cannot configure both TeamId and TeamSlug.");
-
-        foreach (var hostname in connection.Hostnames)
-        {
-            var normalized = VercelAnalyticsConnectionRegistry.NormalizeHostname(hostname);
-            if (normalized is null)
-                failures.Add($"Connection '{alias}' contains invalid hostname '{hostname}'.");
-            else if (hostnames.TryGetValue(normalized, out var owner))
-                failures.Add($"Hostname '{normalized}' is assigned to both '{owner}' and '{alias}'.");
-            else
-                hostnames[normalized] = alias;
-        }
-
+            failures.Add($"Connection '{label}' requires a project ID.");
         foreach (var value in connection.DocumentRootKeys)
         {
             if (!Guid.TryParse(value, out var key))
-                failures.Add($"Connection '{alias}' contains invalid document root key '{value}'.");
+                failures.Add($"Connection '{label}' contains invalid document root key '{value}'.");
             else if (roots.TryGetValue(key, out var owner))
-                failures.Add($"Document root '{key}' is assigned to both '{owner}' and '{alias}'.");
+                failures.Add($"Document root '{key}' is assigned to both '{owner}' and '{connection.Key}'.");
             else
-                roots[key] = alias;
+                roots[key] = connection.Key;
         }
 
         foreach (var value in connection.EnabledDocumentTypeKeys)
         {
             if (!Guid.TryParse(value, out _))
-                failures.Add($"Connection '{alias}' contains invalid document type key '{value}'.");
+                failures.Add($"Connection '{label}' contains invalid document type key '{value}'.");
         }
     }
-
-    [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", RegexOptions.CultureInvariant)]
-    private static partial Regex AliasPattern();
 }
 
 internal enum VercelAnalyticsValidationMode

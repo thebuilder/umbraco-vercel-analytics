@@ -33,6 +33,7 @@ namespace Umbraco.VercelAnalytics.Composers
                 client.Timeout = TimeSpan.FromSeconds(15);
             });
             builder.Services.AddTransient<VercelAnalyticsReportService>();
+            builder.Services.AddTransient<IVercelProjectNameService, VercelProjectNameService>();
             builder.Services.AddTransient<IAnalyticsAuthorizationService, AnalyticsAuthorizationService>();
             builder.Services.AddTransient<IAnalyticsPublishedContentAccessor, UmbracoAnalyticsPublishedContentAccessor>();
             builder.Services.AddTransient<IAnalyticsDocumentRouteService, AnalyticsDocumentRouteService>();

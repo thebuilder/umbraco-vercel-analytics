@@ -16,6 +16,21 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
     private const string EventCountPath = "v1/query/web-analytics/events/count";
     private const string EventAggregatePath = "v1/query/web-analytics/events/aggregate";
 
+    public async Task<string> GetProjectNameAsync(
+        VercelAnalyticsConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var parameters = new Dictionary<string, string?>();
+        AddTeamScope(parameters, connection.Team);
+
+        var path = $"v9/projects/{Uri.EscapeDataString(connection.ProjectId)}";
+        using var response = await SendAsync(connection, path, parameters, cancellationToken);
+        var project = await response.Content.ReadFromJsonAsync<ProjectResponse>(cancellationToken);
+        return !string.IsNullOrWhiteSpace(project?.Name)
+            ? project.Name
+            : throw new JsonException("Vercel project response did not contain a name.");
+    }
+
     public async Task<AnalyticsTotals> CountAsync(
         VercelAnalyticsConnection connection,
         AnalyticsQuery query,
@@ -30,6 +45,22 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         return envelope?.Data is null
             ? throw new JsonException("Vercel Analytics count response did not contain data.")
             : new AnalyticsTotals(envelope.Data.PageViews, envelope.Data.Visitors);
+    }
+
+    public async Task<long> GetPageViewTotalAsync(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        CancellationToken cancellationToken)
+    {
+        var parameters = BuildVisitParameters(connection, query);
+        parameters["by"] = "requestPath";
+        parameters["limit"] = "100";
+        using var response = await SendAsync(connection, AggregatePath, parameters, cancellationToken);
+        var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
+        // `Others` is intentionally included here: it is Vercel's remainder bucket and
+        // makes this partition reconcile with the exact page-view total for the range.
+        return envelope?.Data.Sum(item => GetInt64(item, "pageviews"))
+            ?? throw new JsonException("Vercel Analytics aggregate response did not contain data.");
     }
 
     public async Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(
@@ -155,7 +186,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
         return envelope?.Data
             .Select(item => ParseEventPropertyValue(item, propertyName))
-            .Where(value => value.Value is not "Others" and not "Unknown")
+            .Where(value => value.Value is not "Others")
             .ToArray()
             ?? throw new JsonException("Vercel Analytics event property values response did not contain data.");
     }
@@ -200,11 +231,12 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         var parameters = new Dictionary<string, string?>
         {
             ["projectId"] = connection.ProjectId,
-            ["since"] = query.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            ["until"] = query.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            ["since"] = query.From.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            // Vercel's `until` value is inclusive. AnalyticsQuery.To is exclusive so
+            // calendar ranges remain exact across time zones and DST transitions.
+            ["until"] = query.To.AddMilliseconds(-1).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
         };
-        if (connection.TeamId is not null) parameters["teamId"] = connection.TeamId;
-        if (connection.TeamSlug is not null) parameters["slug"] = connection.TeamSlug;
+        AddTeamScope(parameters, connection.Team);
         if (query.RequestPath is not null)
         {
             parameters["filter"] = $"requestPath eq '{EscapeODataString(query.RequestPath)}'";
@@ -215,6 +247,12 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         }
 
         return parameters;
+    }
+
+    private static void AddTeamScope(IDictionary<string, string?> parameters, string? team)
+    {
+        if (team is null) return;
+        parameters[team.StartsWith("team_", StringComparison.Ordinal) ? "teamId" : "slug"] = team;
     }
 
     internal static string EscapeODataString(string value) => value.Replace("'", "''", StringComparison.Ordinal);
@@ -240,6 +278,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
 
     internal static string ToApiValue(AnalyticsInterval interval) => interval switch
     {
+        AnalyticsInterval.Hour => "hour",
         AnalyticsInterval.Day => "day",
         AnalyticsInterval.Week => "week",
         AnalyticsInterval.Month => "month",
@@ -305,4 +344,6 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
     private sealed record EventCountData(long Count, long Visitors);
 
     private sealed record AggregateEnvelope(JsonElement[] Data);
+
+    private sealed record ProjectResponse(string Name);
 }

@@ -170,8 +170,8 @@ export class AnalyticsDashboardController {
       try { return new URL(this.state.route.url).origin; }
       catch { return `https://${this.state.route.hostname}`; }
     }
-    const connection = this.state.connections.find(({ alias }) => alias === this.state.connection);
-    return connection?.baseUrl ?? (connection?.hostnames[0] ? `https://${connection.hostnames[0]}` : undefined);
+    const connection = this.state.connections.find(({ key }) => key === this.state.connection);
+    return connection?.baseUrl ?? undefined;
   }
 
   async loadReports(): Promise<void> {
@@ -345,15 +345,15 @@ export class AnalyticsDashboardController {
       }
       let { preset, range } = this.state;
       if (!this.#hasUrlDateState) {
-        preset = [7, 30, 90, 365].includes(data.defaultRangeDays) ? data.defaultRangeDays as Exclude<DatePreset, "custom"> : "custom";
+        preset = [1, 7, 30, 90, 365].includes(data.defaultRangeDays) ? data.defaultRangeDays as Exclude<DatePreset, "custom"> : "custom";
         range = dateRangeForPreset(data.defaultRangeDays);
       }
       const stored = this.#environment.getStoredConnection();
-      const requested = data.connections.some(({ alias }) => alias === this.state.connection) ? this.state.connection : undefined;
-      const storedValid = data.connections.some(({ alias }) => alias === stored) ? stored ?? undefined : undefined;
+      const requested = data.connections.some(({ key }) => key === this.state.connection) ? this.state.connection : undefined;
+      const storedValid = data.connections.some(({ key }) => key === stored) ? stored ?? undefined : undefined;
       this.#set({
         connections: data.connections,
-        connection: requested ?? storedValid ?? data.defaultConnection ?? data.connections[0]?.alias,
+        connection: requested ?? storedValid ?? data.connections[0]?.key,
         preset,
         range,
       });
@@ -439,7 +439,8 @@ export class AnalyticsDashboardController {
   }
 
   #reportQuery(connection: string, filter: { filter?: string[] }): DashboardReportQuery {
-    return { connection, ...this.state.range, ...this.#scope(), ...filter } as DashboardReportQuery;
+    const { from, to, interval } = this.state.range;
+    return { connection, from, to, interval, ...this.#scope(), ...filter } as DashboardReportQuery;
   }
 
   #scope(): ReportScope {

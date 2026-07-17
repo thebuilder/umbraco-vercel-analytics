@@ -1,23 +1,28 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyticsSettingsResponse } from "../api/types.gen.js";
-import { createSettingsUpdate, validateEditableSettings } from "./settings-model.js";
+import {
+  createSettingsUpdate,
+  parseTeamReference,
+  teamReference,
+  validateConnection,
+  validateEditableSettings,
+} from "./settings-model.js";
 
 const settings = (): AnalyticsSettingsResponse => ({
   enabled: true,
-  defaultConnection: "main",
+  hasAccessToken: false,
   defaultRangeDays: 30,
   cacheDuration: "00:05:00",
   connections: [{
-    alias: "main",
+    key: "11111111-1111-1111-1111-111111111111",
     displayName: "Main",
     projectId: "project",
-    teamId: null,
-    teamSlug: null,
-    hostnames: [],
+    team: null,
     documentRootKeys: [],
     enableAllDocumentTypes: false,
     enabledDocumentTypeKeys: [],
     hasAccessToken: false,
+    hasAccessTokenOverride: false,
   }],
 });
 
@@ -26,11 +31,27 @@ describe("analytics settings model", () => {
     expect(validateEditableSettings(settings())).toBeUndefined();
   });
 
-  it("rejects simultaneous team id and slug", () => {
+  it("returns field-level errors for missing connection essentials", () => {
     const model = settings();
-    model.connections[0].teamId = "team-id";
-    model.connections[0].teamSlug = "team-slug";
-    expect(validateEditableSettings(model)).toContain("both team ID and team slug");
+    model.connections[0].projectId = "";
+
+    expect(validateConnection(model.connections[0])).toEqual({
+      projectId: "Enter the Vercel project ID.",
+    });
+  });
+
+  it("normalizes the team ID or slug into one API field", () => {
+    expect(parseTeamReference(" team_example ")).toEqual({ team: "team_example" });
+    expect(parseTeamReference("my-team")).toEqual({ team: "my-team" });
+    expect(parseTeamReference("  ")).toEqual({ team: null });
+  });
+
+  it("reads the configured team reference", () => {
+    const connection = settings().connections[0];
+    connection.team = "my-team";
+    expect(teamReference(connection)).toBe("my-team");
+    connection.team = "team_example";
+    expect(teamReference(connection)).toBe("team_example");
   });
 
   it("clears explicit selections when all document types is enabled", () => {
@@ -38,5 +59,11 @@ describe("analytics settings model", () => {
     model.connections[0].enableAllDocumentTypes = true;
     model.connections[0].enabledDocumentTypeKeys = ["11111111-1111-1111-1111-111111111111"];
     expect(createSettingsUpdate(model).connections[0].enabledDocumentTypeKeys).toEqual([]);
+  });
+
+  it("keeps the immutable connection key in updates", () => {
+    const model = settings();
+
+    expect(createSettingsUpdate(model).connections[0].key).toBe(model.connections[0].key);
   });
 });

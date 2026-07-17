@@ -16,25 +16,23 @@ export type AnalyticsBreakdownRow = {
 };
 
 export type AnalyticsConnectionSettingsResponse = {
-    alias: string;
+    key: string;
     displayName: string;
     projectId: string;
-    teamId?: string | null;
-    teamSlug?: string | null;
-    hostnames: Array<string>;
+    team?: string | null;
     documentRootKeys: Array<string>;
     enableAllDocumentTypes: boolean;
     enabledDocumentTypeKeys: Array<string>;
     hasAccessToken: boolean;
+    hasAccessTokenOverride: boolean;
 };
 
 export type AnalyticsConnectionSummary = {
-    alias: string;
+    key: string;
     displayName: string;
     isDefault: boolean;
     isConfigured: boolean;
     baseUrl?: string | null;
-    hostnames: Array<string>;
     warnings: Array<string>;
 };
 
@@ -45,7 +43,6 @@ export type AnalyticsConnectionTestResult = {
 
 export type AnalyticsConnectionsResponse = {
     enabled: boolean;
-    defaultConnection?: string | null;
     defaultRangeDays: number;
     connections: Array<AnalyticsConnectionSummary>;
 };
@@ -94,7 +91,7 @@ export type AnalyticsEventsReport = {
     rows: Array<AnalyticsEventRow>;
 };
 
-export type AnalyticsInterval = 'Day' | 'Week' | 'Month';
+export type AnalyticsInterval = 'Hour' | 'Day' | 'Week' | 'Month';
 
 export type AnalyticsPoint = {
     timestamp: string;
@@ -113,7 +110,7 @@ export type AnalyticsProblemDetails = {
 
 export type AnalyticsSettingsResponse = {
     enabled: boolean;
-    defaultConnection?: string | null;
+    hasAccessToken: boolean;
     defaultRangeDays: number;
     cacheDuration: string;
     connections: Array<AnalyticsConnectionSettingsResponse>;
@@ -139,12 +136,10 @@ export type NotificationHeaderModel = {
 };
 
 export type UpdateAnalyticsConnectionRequest = {
-    alias: string;
+    key: string;
     displayName: string;
     projectId: string;
-    teamId?: string | null;
-    teamSlug?: string | null;
-    hostnames: Array<string>;
+    team?: string | null;
     documentRootKeys: Array<string>;
     enableAllDocumentTypes: boolean;
     enabledDocumentTypeKeys: Array<string>;
@@ -152,7 +147,6 @@ export type UpdateAnalyticsConnectionRequest = {
 
 export type UpdateAnalyticsSettingsRequest = {
     enabled: boolean;
-    defaultConnection?: string | null;
     defaultRangeDays: number;
     cacheDuration: string;
     connections: Array<UpdateAnalyticsConnectionRequest>;
@@ -470,10 +464,10 @@ export type SaveSettingsResponse = SaveSettingsResponses[keyof SaveSettingsRespo
 export type TestConnectionData = {
     body?: never;
     path: {
-        alias: string;
+        key: string;
     };
     query?: never;
-    url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{alias}/test';
+    url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{key}/test';
 };
 
 export type TestConnectionErrors = {

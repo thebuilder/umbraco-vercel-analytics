@@ -9,49 +9,48 @@ namespace Umbraco.VercelAnalytics.Tests.Services;
 
 public sealed class AnalyticsDocumentRouteServiceTests
 {
+    private static readonly Guid RootConnectionKey = Guid.Parse("11111111-1111-1111-1111-111111111110");
+    private static readonly Guid SiteConnectionKey = Guid.Parse("22222222-2222-2222-2222-222222222220");
     [Fact]
-    public async Task Root_mapping_wins_over_conflicting_hostname_mapping()
+    public async Task Root_mapping_resolves_document_route()
     {
         var rootKey = Guid.NewGuid();
         var documentKey = Guid.NewGuid();
         var contentService = CreateContentTree(rootKey, documentKey);
         var published = CreatePublishedDocument("conflict.example", "/news", "en-US");
         var accessor = new Mock<IAnalyticsPublishedContentAccessor>();
-        accessor.Setup(value => value.GetDocumentAsync(documentKey, It.IsAny<CancellationToken>()))
+        accessor.Setup(value => value.GetDocumentAsync(documentKey, "en-US", It.IsAny<CancellationToken>()))
             .ReturnsAsync(published);
         var service = new AnalyticsDocumentRouteService(
             contentService.Object,
             accessor.Object,
             CreateRegistry(
-                Connection("root", roots: [rootKey]),
-                Connection("hostname", hostnames: ["conflict.example"])));
+                Connection("root", roots: [rootKey])));
 
         var route = Assert.Single(await service.GetRoutesAsync(documentKey, "en-US", CancellationToken.None));
 
-        Assert.Equal("root", route.Connection);
+        Assert.Equal(RootConnectionKey, route.Connection);
         Assert.True(route.IsCurrent);
-        Assert.Contains(route.Warnings, warning => warning.Contains("document-root mapping is used", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(route.Warnings);
     }
 
     [Fact]
-    public async Task Hostname_mapping_is_used_when_no_ancestor_root_is_mapped()
+    public async Task Document_without_mapped_root_has_no_routes()
     {
         var rootKey = Guid.NewGuid();
         var documentKey = Guid.NewGuid();
         var contentService = CreateContentTree(rootKey, documentKey);
         var accessor = new Mock<IAnalyticsPublishedContentAccessor>();
-        accessor.Setup(value => value.GetDocumentAsync(documentKey, It.IsAny<CancellationToken>()))
+        accessor.Setup(value => value.GetDocumentAsync(documentKey, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreatePublishedDocument("www.example.com", "/about", string.Empty));
         var service = new AnalyticsDocumentRouteService(
             contentService.Object,
             accessor.Object,
-            CreateRegistry(Connection("site", hostnames: ["www.example.com"])));
+            CreateRegistry(Connection("site")));
 
-        var route = Assert.Single(await service.GetRoutesAsync(documentKey, null, CancellationToken.None));
+        var routes = await service.GetRoutesAsync(documentKey, null, CancellationToken.None);
 
-        Assert.Equal("site", route.Connection);
-        Assert.Equal("/about", route.Path);
-        Assert.Empty(route.Warnings);
+        Assert.Empty(routes);
     }
 
     [Fact]
@@ -61,12 +60,12 @@ public sealed class AnalyticsDocumentRouteServiceTests
         var documentKey = Guid.NewGuid();
         var contentService = CreateContentTree(rootKey, documentKey);
         var accessor = new Mock<IAnalyticsPublishedContentAccessor>();
-        accessor.Setup(value => value.GetDocumentAsync(documentKey, It.IsAny<CancellationToken>()))
+        accessor.Setup(value => value.GetDocumentAsync(documentKey, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreatePublishedDocument("www.example.com", "/about", string.Empty));
         var service = new AnalyticsDocumentRouteService(
             contentService.Object,
             accessor.Object,
-            CreateRegistry(Connection("site", hostnames: ["www.example.com"], documentTypes: ["homePage"])));
+            CreateRegistry(Connection("site", roots: [rootKey], documentTypes: ["homePage"])));
 
         var routes = await service.GetRoutesAsync(documentKey, null, CancellationToken.None);
 
@@ -80,7 +79,7 @@ public sealed class AnalyticsDocumentRouteServiceTests
         var documentKey = Guid.NewGuid();
         var contentService = CreateContentTree(rootKey, documentKey);
         var accessor = new Mock<IAnalyticsPublishedContentAccessor>();
-        accessor.Setup(value => value.GetDocumentAsync(documentKey, It.IsAny<CancellationToken>()))
+        accessor.Setup(value => value.GetDocumentAsync(documentKey, "da-DK", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AnalyticsPublishedDocument(
                 "articlePage",
                 Guid.NewGuid(),
@@ -91,7 +90,7 @@ public sealed class AnalyticsDocumentRouteServiceTests
         var service = new AnalyticsDocumentRouteService(
             contentService.Object,
             accessor.Object,
-            CreateRegistry(Connection("site", hostnames: ["www.example.com", "www.example.dk"])));
+            CreateRegistry(Connection("site", roots: [rootKey])));
 
         var routes = await service.GetRoutesAsync(documentKey, "da-DK", CancellationToken.None);
 
@@ -107,12 +106,12 @@ public sealed class AnalyticsDocumentRouteServiceTests
         var documentKey = Guid.NewGuid();
         var contentService = CreateContentTree(rootKey, documentKey);
         var accessor = new Mock<IAnalyticsPublishedContentAccessor>();
-        accessor.Setup(value => value.GetDocumentAsync(documentKey, It.IsAny<CancellationToken>()))
+        accessor.Setup(value => value.GetDocumentAsync(documentKey, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AnalyticsPublishedDocument?)null);
         var service = new AnalyticsDocumentRouteService(
             contentService.Object,
             accessor.Object,
-            CreateRegistry(Connection("site", hostnames: ["www.example.com"])));
+            CreateRegistry(Connection("site", roots: [rootKey])));
 
         var routes = await service.GetRoutesAsync(documentKey, null, CancellationToken.None);
 
@@ -120,7 +119,7 @@ public sealed class AnalyticsDocumentRouteServiceTests
     }
 
     [Fact]
-    public async Task Document_root_provides_base_url_when_no_hostname_is_configured()
+    public async Task Document_root_provides_base_url()
     {
         var rootKey = Guid.NewGuid();
         var accessor = new Mock<IAnalyticsPublishedContentAccessor>();
@@ -132,7 +131,7 @@ public sealed class AnalyticsDocumentRouteServiceTests
             CreateRegistry(Connection("root", roots: [rootKey])));
 
         var baseUrl = await service.GetConnectionBaseUrlAsync(
-            CreateRegistry(Connection("root", roots: [rootKey])).Get("root")!,
+            CreateRegistry(Connection("root", roots: [rootKey])).Get(RootConnectionKey)!,
             CancellationToken.None);
 
         Assert.Equal("https://root.example", baseUrl);
@@ -162,25 +161,25 @@ public sealed class AnalyticsDocumentRouteServiceTests
         Guid.NewGuid(),
         [new AnalyticsPublishedRoute(culture, hostname, path, $"https://{hostname}{path}")]);
 
-    private static KeyValuePair<string, VercelAnalyticsConnectionOptions> Connection(
+    private static VercelAnalyticsConnectionOptions Connection(
         string alias,
-        IReadOnlyList<string>? hostnames = null,
         IReadOnlyList<Guid>? roots = null,
-        IReadOnlyList<string>? documentTypes = null) => new(alias, new VercelAnalyticsConnectionOptions
+        IReadOnlyList<string>? documentTypes = null) => new()
         {
+            Key = KeyFor(alias),
             DisplayName = alias,
-            AccessToken = "secret",
             ProjectId = $"project-{alias}",
-            Hostnames = hostnames?.ToArray() ?? [],
             DocumentRootKeys = roots?.Select(value => value.ToString()).ToArray() ?? [],
             EnabledDocumentTypes = documentTypes?.ToArray() ?? ["articlePage"]
-        });
+        };
 
     private static VercelAnalyticsConnectionRegistry CreateRegistry(
-        params KeyValuePair<string, VercelAnalyticsConnectionOptions>[] connections) => new(Options.Create(new VercelAnalyticsOptions
+        params VercelAnalyticsConnectionOptions[] connections) => new(Options.Create(new VercelAnalyticsOptions
         {
             Enabled = true,
-            DefaultConnection = connections[0].Key,
-            Connections = connections.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase)
+            AccessToken = "secret",
+            Connections = connections.ToList()
         }));
+
+    private static Guid KeyFor(string alias) => alias == "root" ? RootConnectionKey : SiteConnectionKey;
 }

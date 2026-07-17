@@ -17,22 +17,20 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
   @property({ type: Boolean }) documentScoped = false;
 
   #connection(): AnalyticsConnectionSummary | undefined {
-    return this.connections.find(({ alias }) => alias === this.connection);
+    return this.connections.find(({ key }) => key === this.connection);
   }
 
   #hostname(): string | undefined {
     if (this.route?.hostname) return this.route.hostname;
-    const connection = this.#connection();
-    if (connection?.hostnames[0]) return connection.hostnames[0];
     if (!this.siteUrl) return undefined;
     try { return new URL(this.siteUrl).hostname; } catch { return undefined; }
   }
 
   #selectOptions() {
-    return this.connections.map(({ alias, displayName }) => ({
-      value: alias,
+    return this.connections.map(({ key, displayName }) => ({
+      value: key,
       name: displayName,
-      selected: alias === this.connection,
+      selected: key === this.connection,
     }));
   }
 
@@ -78,14 +76,26 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
 
   static styles = [UmbTextStyles, css`
     header { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-4); justify-content: space-between; margin-bottom: var(--uui-size-space-2); min-block-size: 2.5rem; }
-    .site-context { align-items: center; display: flex; min-block-size: 2.5rem; min-inline-size: 0; }
+    .site-context { align-items: center; display: flex; gap: var(--uui-size-space-3); min-block-size: 2.5rem; min-inline-size: 0; }
     .site-link, .site-name { align-items: center; color: var(--uui-color-text); display: inline-flex; font-weight: 700; gap: var(--uui-size-space-2); min-inline-size: 0; text-decoration: none; }
     .site-link:hover .site-link-label { text-decoration: underline; text-underline-offset: 0.18em; }
     .site-link:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 3px; }
     .site-context uui-icon, .external-indicator { color: var(--uui-color-text-alt); flex: 0 0 auto; }
     .external-indicator { font-size: 0.875em; }
     .controls { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); justify-content: flex-end; margin-inline-start: auto; min-inline-size: 0; }
-    .project-select { min-inline-size: 10rem; }
+    .project-select {
+      --uui-select-background-color: var(--uui-color-surface);
+      --uui-select-border-color: color-mix(in srgb, var(--uui-color-border) 55%, var(--uui-color-text-alt));
+      --uui-select-border-color-hover: var(--uui-color-interactive);
+      --uui-select-font-size: inherit;
+      --uui-select-height: 2.25rem;
+      --uui-select-outline-color: var(--uui-color-selected);
+      --uui-select-padding-x: var(--uui-size-space-3);
+      --uui-select-padding-y: 0;
+      font-weight: 600;
+      min-inline-size: 11rem;
+    }
+    .project-select:hover { --uui-select-background-color: var(--uui-color-surface-alt); }
     .warnings { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); }
     .warnings:empty { display: none; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }

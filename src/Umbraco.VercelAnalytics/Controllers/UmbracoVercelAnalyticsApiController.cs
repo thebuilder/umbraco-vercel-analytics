@@ -15,7 +15,8 @@ public sealed class UmbracoVercelAnalyticsApiController(
     IAnalyticsAuthorizationService authorizationService,
     VercelAnalyticsConnectionRegistry registry,
     VercelAnalyticsReportService reportService,
-    IAnalyticsDocumentRouteService routeService) : UmbracoVercelAnalyticsApiControllerBase
+    IAnalyticsDocumentRouteService routeService,
+    IVercelProjectNameService projectNames) : UmbracoVercelAnalyticsApiControllerBase
 {
     private enum ReportScope
     {
@@ -32,25 +33,29 @@ public sealed class UmbracoVercelAnalyticsApiController(
         if (!authorizationService.HasAnalyticsSectionAccess()) return Forbid();
 
         var snapshot = registry.Capture();
-        var connectionTasks = snapshot.Connections.Values
-            .OrderBy(connection => connection.DisplayName)
-            .Select(async connection => new AnalyticsConnectionSummary(
-                connection.Alias,
-                connection.DisplayName,
-                string.Equals(connection.Alias, snapshot.Settings.DefaultConnection, StringComparison.OrdinalIgnoreCase),
-                connection.IsConfigured,
-                await routeService.GetConnectionBaseUrlAsync(connection, cancellationToken),
-                connection.Hostnames.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
-                ConnectionWarnings(connection)))
+        var connectionTasks = snapshot.Settings.Connections
+            .Select(settings => snapshot.Get(settings.Key))
+            .OfType<VercelAnalyticsConnection>()
+            .Select((connection, index) => BuildConnectionSummaryAsync(connection, index == 0, cancellationToken))
             .ToArray();
         var connections = await Task.WhenAll(connectionTasks);
 
         var response = new AnalyticsConnectionsResponse(
             snapshot.Settings.Enabled,
-            snapshot.Settings.DefaultConnection,
             snapshot.Settings.DefaultRangeDays,
             connections);
         return Ok(response);
+
+        async Task<AnalyticsConnectionSummary> BuildConnectionSummaryAsync(
+            VercelAnalyticsConnection connection,
+            bool isDefault,
+            CancellationToken token) => new(
+                connection.Key,
+                await projectNames.GetDisplayNameAsync(connection, token),
+                isDefault,
+                connection.IsConfigured,
+                await routeService.GetConnectionBaseUrlAsync(connection, token),
+                ConnectionWarnings(connection));
     }
 
     [HttpGet("documents/{documentId:guid}/routes")]
@@ -69,9 +74,9 @@ public sealed class UmbracoVercelAnalyticsApiController(
     [ProducesResponseType<AnalyticsSummary>(StatusCodes.Status200OK)]
     [ApiConventionMethod(typeof(AnalyticsApiConventions), nameof(AnalyticsApiConventions.Report))]
     public async Task<ActionResult<AnalyticsSummary>> Summary(
-        [FromQuery] string connection,
-        [FromQuery] DateOnly from,
-        [FromQuery] DateOnly to,
+        [FromQuery] Guid connection,
+        [FromQuery] DateTimeOffset from,
+        [FromQuery] DateTimeOffset to,
         [FromQuery] AnalyticsInterval interval,
         [FromQuery] Guid? documentId,
         [FromQuery] string? culture,
@@ -91,9 +96,9 @@ public sealed class UmbracoVercelAnalyticsApiController(
     [ApiConventionMethod(typeof(AnalyticsApiConventions), nameof(AnalyticsApiConventions.Report))]
     public async Task<ActionResult<AnalyticsBreakdown>> Breakdown(
         AnalyticsDimension dimension,
-        [FromQuery] string connection,
-        [FromQuery] DateOnly from,
-        [FromQuery] DateOnly to,
+        [FromQuery] Guid connection,
+        [FromQuery] DateTimeOffset from,
+        [FromQuery] DateTimeOffset to,
         [FromQuery] AnalyticsInterval interval,
         [FromQuery] int limit = 10,
         [FromQuery] string? search = null,
@@ -120,9 +125,9 @@ public sealed class UmbracoVercelAnalyticsApiController(
     [ProducesResponseType<AnalyticsEventsReport>(StatusCodes.Status200OK)]
     [ApiConventionMethod(typeof(AnalyticsApiConventions), nameof(AnalyticsApiConventions.Report))]
     public async Task<ActionResult<AnalyticsEventsReport>> Events(
-        [FromQuery] string connection,
-        [FromQuery] DateOnly from,
-        [FromQuery] DateOnly to,
+        [FromQuery] Guid connection,
+        [FromQuery] DateTimeOffset from,
+        [FromQuery] DateTimeOffset to,
         [FromQuery] AnalyticsInterval interval,
         [FromQuery] int limit = 10,
         [FromQuery] string? search = null,
@@ -145,9 +150,9 @@ public sealed class UmbracoVercelAnalyticsApiController(
     [ProducesResponseType<AnalyticsEventDetails>(StatusCodes.Status200OK)]
     [ApiConventionMethod(typeof(AnalyticsApiConventions), nameof(AnalyticsApiConventions.Report))]
     public async Task<ActionResult<AnalyticsEventDetails>> EventDetails(
-        [FromQuery] string connection,
-        [FromQuery] DateOnly from,
-        [FromQuery] DateOnly to,
+        [FromQuery] Guid connection,
+        [FromQuery] DateTimeOffset from,
+        [FromQuery] DateTimeOffset to,
         [FromQuery] AnalyticsInterval interval,
         [FromQuery] string eventName,
         [FromQuery] string? eventProperty = null,
@@ -185,9 +190,9 @@ public sealed class UmbracoVercelAnalyticsApiController(
     [ProducesResponseType<AnalyticsEventProperty>(StatusCodes.Status200OK)]
     [ApiConventionMethod(typeof(AnalyticsApiConventions), nameof(AnalyticsApiConventions.Report))]
     public async Task<ActionResult<AnalyticsEventProperty>> EventPropertyValues(
-        [FromQuery] string connection,
-        [FromQuery] DateOnly from,
-        [FromQuery] DateOnly to,
+        [FromQuery] Guid connection,
+        [FromQuery] DateTimeOffset from,
+        [FromQuery] DateTimeOffset to,
         [FromQuery] AnalyticsInterval interval,
         [FromQuery] string eventName,
         [FromQuery] string propertyName,
@@ -238,9 +243,9 @@ public sealed class UmbracoVercelAnalyticsApiController(
     }
 
     private async Task<(AnalyticsQuery? Query, ActionResult? Error)> AuthorizeAndBuildQueryAsync(
-        string connection,
-        DateOnly from,
-        DateOnly to,
+        Guid connection,
+        DateTimeOffset from,
+        DateTimeOffset to,
         AnalyticsInterval interval,
         Guid? documentId,
         string? culture,
@@ -253,7 +258,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
         {
             return (null, ValidationProblem("The requested analytics interval is not supported."));
         }
-        if (from > to || to.DayNumber - from.DayNumber > 730)
+        if (from >= to || to - from > TimeSpan.FromDays(730))
         {
             return (null, ValidationProblem("The date range must be ordered and no longer than 730 days."));
         }
@@ -288,7 +293,7 @@ public sealed class UmbracoVercelAnalyticsApiController(
         }
         var routes = await routeService.GetRoutesAsync(documentId.Value, culture, cancellationToken);
         var selectedRoute = routes.FirstOrDefault(route =>
-            string.Equals(route.Connection, connection, StringComparison.OrdinalIgnoreCase) &&
+            route.Connection == connection &&
             string.Equals(route.Path, path, StringComparison.Ordinal));
         return selectedRoute is null
             ? (null, ValidationProblem("The selected path is not a published route for this document and connection."))
@@ -312,8 +317,8 @@ public sealed class UmbracoVercelAnalyticsApiController(
     private static IReadOnlyList<string> ConnectionWarnings(VercelAnalyticsConnection connection)
     {
         var warnings = new List<string>();
-        if (!connection.IsConfigured) warnings.Add("No server-side access token is configured for this connection alias.");
-        if (!connection.HasMappings) warnings.Add("Global reports only: add a hostname or document root to enable document analytics.");
+        if (!connection.IsConfigured) warnings.Add("No server-side access token is configured for this connection.");
+        if (!connection.HasMappings) warnings.Add("Global reports only: add a document root to enable document analytics.");
         return warnings;
     }
 }

@@ -1,15 +1,31 @@
-import type { AnalyticsSettingsResponse, UpdateAnalyticsSettingsRequest } from "../api/types.gen.js";
+import type {
+  AnalyticsConnectionSettingsResponse,
+  AnalyticsSettingsResponse,
+  UpdateAnalyticsSettingsRequest,
+} from "../api/types.gen.js";
+
+export type ConnectionValidationErrors = Partial<Record<"projectId" | "team", string>>;
+
+export function teamReference(connection: AnalyticsConnectionSettingsResponse): string {
+  return connection.team?.trim() || "";
+}
+
+export function parseTeamReference(value: string): Pick<AnalyticsConnectionSettingsResponse, "team"> {
+  return { team: value.trim() || null };
+}
+
+export function validateConnection(connection: AnalyticsConnectionSettingsResponse): ConnectionValidationErrors {
+  const errors: ConnectionValidationErrors = {};
+  if (!connection.projectId.trim()) errors.projectId = "Enter the Vercel project ID.";
+  return errors;
+}
 
 export function validateEditableSettings(settings: AnalyticsSettingsResponse): string | undefined {
   if (settings.enabled && settings.connections.length === 0) return "Add a connection before enabling analytics.";
-  if (settings.enabled && !settings.defaultConnection) return "Choose a default connection before enabling analytics.";
   for (const connection of settings.connections) {
-    if (!connection.alias.trim() || !connection.displayName.trim() || !connection.projectId.trim()) {
-      return "Every connection requires an alias, display name, and Vercel project ID.";
-    }
-    if (connection.teamId?.trim() && connection.teamSlug?.trim()) {
-      return `Connection “${connection.displayName}” cannot use both team ID and team slug.`;
-    }
+    const errors = validateConnection(connection);
+    if (errors.projectId) return `Complete the required fields for “${connection.displayName || connection.projectId || "New connection"}”.`;
+    if (errors.team) return `Fix the team ownership for “${connection.displayName || connection.projectId || "New connection"}”.`;
   }
   return undefined;
 }
@@ -17,16 +33,13 @@ export function validateEditableSettings(settings: AnalyticsSettingsResponse): s
 export function createSettingsUpdate(settings: AnalyticsSettingsResponse): UpdateAnalyticsSettingsRequest {
   return {
     enabled: settings.enabled,
-    defaultConnection: settings.defaultConnection,
     defaultRangeDays: settings.defaultRangeDays,
     cacheDuration: settings.cacheDuration,
     connections: settings.connections.map((connection) => ({
-      alias: connection.alias,
+      key: connection.key,
       displayName: connection.displayName,
       projectId: connection.projectId,
-      teamId: connection.teamId,
-      teamSlug: connection.teamSlug,
-      hostnames: connection.hostnames,
+      team: connection.team,
       documentRootKeys: connection.documentRootKeys,
       enableAllDocumentTypes: connection.enableAllDocumentTypes,
       enabledDocumentTypeKeys: connection.enableAllDocumentTypes ? [] : connection.enabledDocumentTypeKeys,

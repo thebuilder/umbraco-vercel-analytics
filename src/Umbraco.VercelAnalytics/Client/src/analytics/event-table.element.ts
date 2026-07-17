@@ -54,9 +54,9 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
                     }))}>
                     <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
                   </button>
-                  <span>${row.visitors.toLocaleString()}</span>
+                  <span>${this.localize.number(row.visitors)}</span>
                 </span></td>
-                <td>${row.count.toLocaleString()}</td>
+                <td>${this.localize.number(row.count)}</td>
               </tr>
             `;})}</tbody>
       </table>

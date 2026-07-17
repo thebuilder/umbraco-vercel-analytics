@@ -9,13 +9,28 @@ namespace Umbraco.VercelAnalytics.Tests.Services;
 public sealed class VercelAnalyticsClientTests
 {
     [Fact]
+    public async Task Project_name_uses_project_endpoint_and_team_scope()
+    {
+        var handler = new RecordingHandler("""{"name":"health-platform"}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection(team: "team_123");
+
+        var result = await client.GetProjectNameAsync(connection, CancellationToken.None);
+
+        Assert.Equal("health-platform", result);
+        Assert.Equal("/v9/projects/project", handler.Request!.RequestUri!.AbsolutePath);
+        Assert.Contains("teamId=team_123", handler.Request.RequestUri.Query);
+        Assert.Equal("secret", handler.Request.Headers.Authorization?.Parameter);
+    }
+
+    [Fact]
     public async Task Count_builds_encoded_team_query_and_bearer_header()
     {
         var handler = new RecordingHandler("""{"data":{"pageviews":42,"visitors":31}}""");
         var client = CreateClient(handler);
-        var connection = CreateConnection(teamId: "team_123");
+        var connection = CreateConnection(team: "team_123");
         var query = new AnalyticsQuery(
-            connection.Alias,
+            connection.Key,
             new DateOnly(2026, 7, 1),
             new DateOnly(2026, 7, 15),
             AnalyticsInterval.Day,
@@ -31,6 +46,22 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Count_sends_team_slug_using_slug_parameter()
+    {
+        var handler = new RecordingHandler("""{"data":{"pageviews":42,"visitors":31}}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection(team: "my-team");
+
+        await client.CountAsync(
+            connection,
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            CancellationToken.None);
+
+        Assert.Contains("slug=my-team", handler.Request!.RequestUri!.Query);
+        Assert.DoesNotContain("teamId=", handler.Request.RequestUri.Query);
+    }
+
+    [Fact]
     public async Task Trend_parses_aggregate_points()
     {
         var handler = new RecordingHandler(
@@ -40,12 +71,52 @@ public sealed class VercelAnalyticsClientTests
 
         var result = await client.GetTrendAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal(10, result[0].PageViews);
         Assert.Contains("by=day", handler.Request!.RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task Trend_preserves_exact_instants_and_converts_exclusive_end_to_inclusive_until()
+    {
+        var handler = new RecordingHandler("""{"data":[]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        await client.GetTrendAsync(
+            connection,
+            new AnalyticsQuery(
+                connection.Key,
+                new DateTimeOffset(2026, 7, 11, 0, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 7, 17, 0, 0, 0, TimeSpan.FromHours(2)),
+                AnalyticsInterval.Hour),
+            CancellationToken.None);
+
+        var query = Uri.UnescapeDataString(handler.Request!.RequestUri!.Query);
+        Assert.Contains("since=2026-07-10T22:00:00.0000000+00:00", query);
+        Assert.Contains("until=2026-07-16T21:59:59.9990000+00:00", query);
+        Assert.Contains("by=hour", query);
+    }
+
+    [Fact]
+    public async Task Page_view_total_sums_all_partition_rows_including_others_and_unknown()
+    {
+        var handler = new RecordingHandler(
+            """{"data":[{"requestPath":"/news","pageviews":20,"visitors":14},{"requestPath":"Unknown","pageviews":3,"visitors":2},{"requestPath":"Others","pageviews":19,"visitors":10}]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        var result = await client.GetPageViewTotalAsync(
+            connection,
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            CancellationToken.None);
+
+        Assert.Equal(42, result);
+        Assert.Contains("by=requestPath", handler.Request!.RequestUri!.Query);
+        Assert.Contains("limit=100", handler.Request.RequestUri.Query);
     }
 
     [Fact]
@@ -58,7 +129,7 @@ public sealed class VercelAnalyticsClientTests
 
         var result = await client.GetBreakdownAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             AnalyticsDimension.Country,
             10,
             null,
@@ -66,6 +137,25 @@ public sealed class VercelAnalyticsClientTests
 
         Assert.Equal(new AnalyticsBreakdownRow("DK", 20, 14), Assert.Single(result));
         Assert.Contains("by=country", handler.Request!.RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task Breakdown_keeps_unknown_and_others_for_the_presentation_layer_to_classify()
+    {
+        var handler = new RecordingHandler(
+            """{"data":[{"country":"Unknown","pageviews":20,"visitors":14},{"country":"Others","pageviews":10,"visitors":8}]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        var result = await client.GetBreakdownAsync(
+            connection,
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            AnalyticsDimension.Country,
+            100,
+            null,
+            CancellationToken.None);
+
+        Assert.Equal(["Unknown", "Others"], result.Select(row => row.Value));
     }
 
     [Fact]
@@ -77,7 +167,7 @@ public sealed class VercelAnalyticsClientTests
 
         await client.GetBreakdownAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             AnalyticsDimension.RequestPath,
             100,
             null,
@@ -95,7 +185,7 @@ public sealed class VercelAnalyticsClientTests
 
         await client.GetBreakdownAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/news"),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/news"),
             AnalyticsDimension.ReferrerHostname,
             100,
             "editor's",
@@ -113,7 +203,7 @@ public sealed class VercelAnalyticsClientTests
         var client = CreateClient(handler);
         var connection = CreateConnection();
         var query = new AnalyticsQuery(
-            connection.Alias,
+            connection.Key,
             new DateOnly(2026, 7, 1),
             new DateOnly(2026, 7, 2),
             AnalyticsInterval.Day,
@@ -136,7 +226,7 @@ public sealed class VercelAnalyticsClientTests
         var client = CreateClient(handler);
         var connection = CreateConnection();
         var query = new AnalyticsQuery(
-            connection.Alias,
+            connection.Key,
             new DateOnly(2026, 7, 1),
             new DateOnly(2026, 7, 2),
             AnalyticsInterval.Day,
@@ -162,7 +252,7 @@ public sealed class VercelAnalyticsClientTests
 
         var result = await client.CountEventsAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/editor's"),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/editor's"),
             "CTA's click",
             null,
             CancellationToken.None);
@@ -185,7 +275,7 @@ public sealed class VercelAnalyticsClientTests
         var result = await client.GetEventsAsync(
             connection,
             new AnalyticsQuery(
-                connection.Alias,
+                connection.Key,
                 new DateOnly(2026, 7, 1),
                 new DateOnly(2026, 7, 2),
                 AnalyticsInterval.Day,
@@ -212,7 +302,7 @@ public sealed class VercelAnalyticsClientTests
 
         var result = await client.GetEventPropertyNamesAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             "Signup",
             null,
             CancellationToken.None);
@@ -232,7 +322,7 @@ public sealed class VercelAnalyticsClientTests
 
         var result = await client.GetEventPropertyValuesAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/news"),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/news"),
             "Signup",
             "signup-source",
             100,
@@ -249,6 +339,27 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Event_property_values_keep_unknown_but_remove_others()
+    {
+        var handler = new RecordingHandler(
+            """{"data":[{"plan":"Unknown","count":12,"visitors":10},{"plan":"Others","count":8,"visitors":7}]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        var result = await client.GetEventPropertyValuesAsync(
+            connection,
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            "Signup",
+            "plan",
+            100,
+            null,
+            null,
+            CancellationToken.None);
+
+        Assert.Equal("Unknown", Assert.Single(result).Value);
+    }
+
+    [Fact]
     public async Task Error_response_throws_sanitized_exception()
     {
         var handler = new RecordingHandler("forbidden", HttpStatusCode.Forbidden);
@@ -257,7 +368,7 @@ public sealed class VercelAnalyticsClientTests
 
         var exception = await Assert.ThrowsAsync<VercelAnalyticsApiException>(() => client.CountAsync(
             connection,
-            new AnalyticsQuery(connection.Alias, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             CancellationToken.None));
 
         Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
@@ -267,9 +378,8 @@ public sealed class VercelAnalyticsClientTests
     private static VercelAnalyticsClient CreateClient(HttpMessageHandler handler) =>
         new(new HttpClient(handler) { BaseAddress = new Uri("https://api.vercel.com/") });
 
-    private static VercelAnalyticsConnection CreateConnection(string? teamId = null) => new(
-        "main", "Main", "secret", "project", teamId, null,
-        new HashSet<string> { "example.com" },
+    private static VercelAnalyticsConnection CreateConnection(string? team = null) => new(
+        Guid.Parse("11111111-1111-1111-1111-111111111110"), "Main", "secret", "project", team,
         [Guid.Parse("11111111-1111-1111-1111-111111111111")],
         false,
         new HashSet<Guid>(),

@@ -12,7 +12,11 @@ const sdk = vi.hoisted(() => ({
 }));
 vi.mock("../api/sdk.gen.js", () => ({ UmbracoVercelAnalyticsService: sdk }));
 vi.mock("@umbraco-cms/backoffice/element-api", () => ({
-  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => base,
+  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => class extends base {
+    readonly localize = {
+      number: (value: string | number, options?: Intl.NumberFormatOptions) => new Intl.NumberFormat(this.lang || "en-US", options).format(Number(value)),
+    };
+  },
 }));
 vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
 
@@ -21,6 +25,7 @@ import { successState } from "./async-state.js";
 import { dashboardCards } from "./dashboard-cards.js";
 import type { VercelAnalyticsSummaryElement } from "./analytics-summary.element.js";
 import type { VercelAnalyticsBreakdownGridElement } from "./analytics-breakdown-grid.element.js";
+import type { VercelAnalyticsBreakdownTableElement } from "./breakdown-table.element.js";
 import type { VercelAnalyticsDashboardElement } from "./analytics-dashboard.element.js";
 import "./analytics-summary.element.js";
 import "./analytics-breakdown-grid.element.js";
@@ -29,9 +34,8 @@ import "./analytics-dashboard.element.js";
 beforeEach(() => {
   sdk.connections.mockResolvedValue(apiOk({
     enabled: true,
-    defaultConnection: "main",
     defaultRangeDays: 30,
-    connections: [{ alias: "main", displayName: "Main", isDefault: true, isConfigured: true, baseUrl: "https://example.com", hostnames: ["example.com"], warnings: [] }],
+    connections: [{ key: "11111111-1111-1111-1111-111111111111", displayName: "Main", isDefault: true, isConfigured: true, baseUrl: "https://example.com", warnings: [] }],
   }));
   sdk.documentRoutes.mockResolvedValue(apiOk([]));
   sdk.summary.mockResolvedValue(apiOk({ totals: { visitors: 12, pageViews: 34 }, points: [] }));
@@ -62,6 +66,18 @@ describe("analytics presentation components", () => {
     expect((onChange.mock.calls[0][0] as CustomEvent).detail).toEqual({ metric: "pageViews" });
   });
 
+  it("formats summary totals with the active backoffice locale", async () => {
+    const element = document.createElement("vercel-analytics-summary") as VercelAnalyticsSummaryElement;
+    element.lang = "da-DK";
+    element.range = dateRangeForPreset(30);
+    element.metric = "visitors";
+    element.report = successState({ totals: { visitors: 185_508, pageViews: 34 }, points: [] });
+    document.body.append(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector("#metric-visitors-tab strong")?.textContent).toBe("185.508");
+  });
+
   it("emits audience changes from the breakdown tabs", async () => {
     const element = document.createElement("vercel-analytics-breakdown-grid") as VercelAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(false, "unavailable").filter((card) => card.kind === "tabbed-breakdown" && card.id === "audience");
@@ -82,6 +98,55 @@ describe("analytics presentation components", () => {
 
     expect(onChange).toHaveBeenCalledOnce();
     expect((onChange.mock.calls[0][0] as CustomEvent).detail).toEqual({ dimension: "BrowserName" });
+  });
+
+  it("normalizes percentage cards against all visible grouped rows", async () => {
+    const element = document.createElement("vercel-analytics-breakdown-grid") as VercelAnalyticsBreakdownGridElement;
+    element.cards = dashboardCards(false, "unavailable").filter((card) => card.kind === "tabbed-breakdown" && card.id === "audience");
+    element.audienceDimension = "DeviceType";
+    element.metric = "visitors";
+    element.breakdowns = {
+      DeviceType: successState({
+        dimension: "DeviceType",
+        rows: [
+          { value: "Desktop", visitors: 11_259, pageViews: 17_380 },
+          { value: "Unknown", visitors: 80, pageViews: 10 },
+          { value: "Others", visitors: 36, pageViews: 5 },
+        ],
+      }),
+    };
+    element.events = successState({ rows: [] });
+    document.body.append(element);
+    await element.updateComplete;
+
+    const table = element.shadowRoot?.querySelector<HTMLElement & { total: number }>("vercel-analytics-breakdown-table");
+    expect(table?.total).toBe(11_339);
+  });
+
+  it("renders referrers as secure external links with an emphasized metric", async () => {
+    const element = document.createElement("vercel-analytics-breakdown-table") as VercelAnalyticsBreakdownTableElement;
+    element.dimension = "ReferrerHostname";
+    element.rows = [{ value: "google.com", visitors: 22_304, pageViews: 30_000 }];
+    document.body.append(element);
+    await element.updateComplete;
+
+    const link = element.shadowRoot?.querySelector<HTMLAnchorElement>(".row-label a");
+    expect(link?.href).toBe("https://google.com/");
+    expect(link?.target).toBe("_blank");
+    expect(link?.rel).toBe("noopener noreferrer");
+    expect(element.shadowRoot?.querySelector(".metric-number")?.textContent).toBe("22,304");
+  });
+
+  it("places events beside referrers in document analytics", async () => {
+    const element = document.createElement("vercel-analytics-breakdown-grid") as VercelAnalyticsBreakdownGridElement;
+    element.cards = dashboardCards(true, "unavailable");
+    element.events = successState({ rows: [{ eventName: "Signup", visitors: 12, count: 18 }] });
+    document.body.append(element);
+    await element.updateComplete;
+
+    const cards = [...element.shadowRoot?.querySelectorAll("uui-box") ?? []];
+    expect(cards[0]?.querySelector<HTMLElement & { headline: string }>("vercel-analytics-breakdown-table")?.headline).toBe("Referrers");
+    expect(cards[1]?.querySelector("vercel-analytics-event-table")).not.toBeNull();
   });
 
   it("wires a summary interaction through the mounted dashboard controller", async () => {

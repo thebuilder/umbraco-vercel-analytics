@@ -159,10 +159,10 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
                       @click=${() => this.#toggleFilter(property.name, value.value)}>
                       <uui-icon name=${activeFilter ? "icon-delete" : "icon-filter"}></uui-icon>
                     </button>
-                    <span>${value.visitors.toLocaleString()}</span>
+                    <span>${this.localize.number(value.visitors)}</span>
                   </span>
                 </td>
-                <td>${value.count.toLocaleString()}</td>
+                <td>${this.localize.number(value.count)}</td>
               </tr>
             `;
           }) : html`<tr class="empty-row"><td colspan="3"><umb-empty-state headline=${search ? "No matching values" : "No values"}><p>${search ? "Try a different search." : "No values were recorded for this property in the selected period."}</p></umb-empty-state></td></tr>`}</tbody>

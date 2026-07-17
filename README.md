@@ -1,6 +1,6 @@
 # Umbraco Vercel Analytics
 
-`Umbraco.VercelAnalytics` displays Vercel Web Analytics in the Umbraco 17 backoffice.
+`Umbraco.VercelAnalytics` displays Vercel Web Analytics in the Umbraco 17 and 18 backoffice.
 
 It provides:
 
@@ -13,7 +13,7 @@ The package reads analytics already collected by Vercel. It does not add Vercel 
 
 ## Requirements
 
-- Umbraco CMS 17.1 or later.
+- Umbraco CMS 17.1 or later, up to (but not including) Umbraco 19.
 - A Vercel project with [Web Analytics enabled and installed](https://vercel.com/docs/analytics/quickstart).
 - A [Vercel access token](https://vercel.com/kb/guide/how-do-i-use-a-vercel-api-access-token) scoped to the personal account or team that owns the project.
 - The Vercel project ID (`prj_...`).
@@ -209,8 +209,34 @@ pnpm test
 pnpm build
 ```
 
-Run the example host before regenerating the OpenAPI client, then pass its Swagger URL to:
+The generated API client is checked in with the package source. The example host registers the package's OpenAPI document for development without adding version-specific OpenAPI dependencies to the distributed package.
+
+Run the example host against the Umbraco version whose document you want to use:
 
 ```sh
-pnpm generate-client -- <swagger-url>
+# Umbraco 17
+dotnet run \
+  --project samples/Umbraco.VercelAnalytics.Example \
+  -p:UmbracoVersion=17.1.0
+
+# Umbraco 18
+dotnet run \
+  --project samples/Umbraco.VercelAnalytics.Example \
+  -p:UmbracoVersion=18.0.0
+```
+
+Use a separate database for each major when switching the example host between versions. Umbraco upgrades its database schema and does not support downgrading that database to an earlier major.
+
+Then regenerate the client from the matching development endpoint:
+
+```sh
+cd src/Umbraco.VercelAnalytics/Client
+
+# Umbraco 17
+corepack pnpm generate-client -- \
+  https://localhost:44389/umbraco/swagger/umbracovercelanalytics/swagger.json
+
+# Umbraco 18
+corepack pnpm generate-client -- \
+  https://localhost:44389/umbraco/openapi/umbracovercelanalytics.json
 ```

@@ -6,8 +6,8 @@
 **/.vite/
 artifacts/
 src/TheBuilder.WebAnalytics/wwwroot/App_Plugins/
-samples/TheBuilder.WebAnalytics.Example/umbraco/Data/
-samples/TheBuilder.WebAnalytics.Example/umbraco/Logs/
+**/umbraco/Data/
+**/umbraco/Logs/
 samples/TheBuilder.WebAnalytics.Example/wwwroot/App_Plugins/
 samples/TheBuilder.WebAnalytics.Example/appsettings-schema.json
 *.db

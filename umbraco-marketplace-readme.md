@@ -25,6 +25,6 @@ The package reads analytics already collected by Vercel. **It does not add track
 - A Vercel project with Web Analytics enabled
 - A Vercel access token
 
-Installation, configuration, permissions, and troubleshooting are covered in the [documentation](https://github.com/thebuilder/umbraco-vercel-analytics#readme).
+Installation, configuration, permissions, and troubleshooting are covered in the [documentation](https://github.com/thebuilder/web-analytics#readme).
 
-Web Analytics is open source under the MIT License. Bugs and feature requests are welcome on [GitHub](https://github.com/thebuilder/umbraco-vercel-analytics/issues).
+Web Analytics is open source under the MIT License. Bugs and feature requests are welcome on [GitHub](https://github.com/thebuilder/web-analytics/issues).

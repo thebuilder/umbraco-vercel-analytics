@@ -1,6 +1,6 @@
 # Web Analytics
 
-`TheBuilder.WebAnalytics` displays Vercel Web Analytics in the Umbraco 17 and 18 backoffice.
+`TheBuilder.WebAnalytics` displays Vercel Web Analytics in the Umbraco backoffice.
 
 It provides:
 
@@ -13,7 +13,7 @@ The package reads analytics already collected by Vercel. It does not add Vercel 
 
 ## Requirements
 
-- Umbraco CMS 17.1 or later, up to (but not including) Umbraco 19.
+- Umbraco CMS 17.1 or later.
 - A Vercel project with [Web Analytics enabled and installed](https://vercel.com/docs/analytics/quickstart).
 - A [Vercel access token](https://vercel.com/kb/guide/how-do-i-use-a-vercel-api-access-token) scoped to the personal account or team that owns the project.
 - The Vercel project ID (`prj_...`).

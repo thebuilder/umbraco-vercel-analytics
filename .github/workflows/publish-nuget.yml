@@ -54,14 +54,12 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: src/TheBuilder.WebAnalytics/Client/pnpm-lock.yaml
 
       - name: Install backoffice dependencies
         working-directory: src/TheBuilder.WebAnalytics/Client
         run: |
           corepack enable
-          corepack pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Restore
         run: dotnet restore TheBuilder.WebAnalytics.slnx

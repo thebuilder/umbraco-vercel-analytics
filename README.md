@@ -15,7 +15,7 @@ The package reads analytics already collected by Vercel. It does not add Vercel 
 
 ## Requirements
 
-- Umbraco CMS 17.1 or later.
+- Umbraco CMS 17.1–18.x.
 - A Vercel project with [Web Analytics enabled and installed](https://vercel.com/docs/analytics/quickstart).
 - A [Vercel access token](https://vercel.com/kb/guide/how-do-i-use-a-vercel-api-access-token) scoped to the personal account or team that owns the project.
 - The Vercel project ID (`prj_...`).

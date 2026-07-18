@@ -28,6 +28,7 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          IS_TEST_RELEASE: ${{ github.event_name == 'workflow_dispatch' || github.event.release.prerelease }}
           TEST_VERSION: ${{ inputs.version }}
         run: |
           raw_version="${RELEASE_TAG:-$TEST_VERSION}"
@@ -38,8 +39,13 @@ jobs:
             exit 1
           fi
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "$version" != *-* ]]; then
+          if [[ "$IS_TEST_RELEASE" == "true" && "$version" != *-* ]]; then
             echo "Test packages must use a prerelease version so a production version is never consumed." >&2
+            exit 1
+          fi
+
+          if [[ "$IS_TEST_RELEASE" != "true" && "$version" == *-* ]]; then
+            echo "Production releases must use a stable version; got '$version'." >&2
             exit 1
           fi
 
@@ -87,7 +93,7 @@ jobs:
 
   publish-test:
     name: Publish to int.nugettest.org
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.prerelease)
     needs: build
     runs-on: ubuntu-latest
     environment: nuget-test
@@ -117,7 +123,7 @@ jobs:
 
   publish-production:
     name: Publish to nuget.org
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && !github.event.release.prerelease
     needs: build
     runs-on: ubuntu-latest
     environment: nuget

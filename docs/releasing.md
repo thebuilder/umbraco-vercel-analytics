@@ -24,12 +24,15 @@ Package versions are release-driven. The version in the project file is the loca
 2. Enter a unique prerelease version such as `0.2.0-preview.1`.
 3. Install and inspect that version from `https://apiint.nugettest.org/v3/index.json`.
 
+Alternatively, publish a GitHub Release marked as a prerelease with a prerelease tag. GitHub prereleases are routed to `int.nugettest.org`; they are never published to nuget.org.
+
 Test packages must use prerelease versions, and NuGet package versions are immutable. Increment the prerelease number for every test publish.
 
 ## Publish to nuget.org
 
 1. Create a GitHub Release from the commit to publish.
 2. Give it a new SemVer tag such as `v0.2.0`.
-3. Publish the release.
+3. Ensure **Set as a pre-release** is not selected.
+4. Publish the release.
 
-Publishing the release triggers the workflow. It removes the optional leading `v`, packs `TheBuilder.WebAnalytics` as version `0.2.0`, runs the test suite, uploads the package as a workflow artifact, and publishes it with a short-lived OIDC credential.
+Publishing the stable release triggers the workflow. It removes the optional leading `v`, packs `TheBuilder.WebAnalytics` as version `0.2.0`, runs the test suite, uploads the package as a workflow artifact, and publishes it with a short-lived OIDC credential. The workflow rejects prerelease version tags in the production path.

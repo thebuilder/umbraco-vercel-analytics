@@ -217,7 +217,7 @@ Run the example host against the Umbraco version whose document you want to use:
 # Umbraco 17
 dotnet run \
   --project samples/TheBuilder.WebAnalytics.Example \
-  -p:UmbracoVersion=17.1.0
+  -p:UmbracoVersion=17.4.0
 
 # Umbraco 18
 dotnet run \

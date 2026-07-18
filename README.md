@@ -1,6 +1,6 @@
 # Web Analytics
 
-`TheBuilder.WebAnalytics` displays Vercel Web Analytics in the Umbraco backoffice.
+`TheBuilder.WebAnalytics` displays [Vercel Web Analytics](https://vercel.com/docs/analytics) in the Umbraco backoffice.
 
 It provides:
 

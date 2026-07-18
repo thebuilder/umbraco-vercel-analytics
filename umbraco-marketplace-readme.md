@@ -1,6 +1,6 @@
 # Web Analytics
 
-> Vercel Web Analytics inside the Umbraco backoffice.
+> [Vercel Web Analytics](https://vercel.com/docs/analytics) inside the Umbraco backoffice.
 
 **Web Analytics brings Vercel Web Analytics into the Umbraco backoffice.** View traffic, audience, referrers, pages, campaigns, and custom events without leaving Umbraco.
 

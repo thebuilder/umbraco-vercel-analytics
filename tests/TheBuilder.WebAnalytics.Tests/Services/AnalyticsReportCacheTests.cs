@@ -134,6 +134,58 @@ public sealed class AnalyticsReportCacheTests
     }
 
     [Fact]
+    public async Task Last_waiter_cancellation_at_operation_completion_never_uses_a_disposed_token_source()
+    {
+        using var cache = new AnalyticsReportCache(maximumEntries: 300, maximumConcurrentRequests: 1);
+
+        for (var iteration = 0; iteration < 250; iteration++)
+        {
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var firstCancellation = new CancellationTokenSource();
+            using var lastCancellation = new CancellationTokenSource();
+            var key = $"summary-{iteration}";
+
+            var first = cache.GetOrCreateAsync(key, TimeSpan.FromMinutes(1), async operationToken =>
+            {
+                started.SetResult();
+                await release.Task.WaitAsync(operationToken);
+                return 42;
+            }, firstCancellation.Token);
+
+            await started.Task;
+            var last = cache.GetOrCreateAsync(
+                key,
+                TimeSpan.FromMinutes(1),
+                _ => Task.FromResult(0),
+                lastCancellation.Token);
+
+            firstCancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+
+            using var completionBarrier = new Barrier(3);
+            var completeOperation = Task.Run(() =>
+            {
+                completionBarrier.SignalAndWait();
+                release.SetResult();
+            });
+            var cancelLastWaiter = Task.Run(() =>
+            {
+                completionBarrier.SignalAndWait();
+                lastCancellation.Cancel();
+            });
+
+            completionBarrier.SignalAndWait();
+            await Task.WhenAll(completeOperation, cancelLastWaiter);
+
+            var exception = await Record.ExceptionAsync(() => last);
+            Assert.True(
+                exception is null or OperationCanceledException,
+                $"Expected success or caller cancellation, but received {exception?.GetType().Name}: {exception?.Message}");
+        }
+    }
+
+    [Fact]
     public async Task Failed_operations_are_removed_before_a_later_retry()
     {
         using var cache = new AnalyticsReportCache(maximumEntries: 10, maximumConcurrentRequests: 1);

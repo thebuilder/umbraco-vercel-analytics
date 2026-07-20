@@ -212,6 +212,23 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
+    public async Task Already_cancelled_summary_does_not_call_the_Vercel_client()
+    {
+        var client = new CountingClient();
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetSummaryAsync(CreateQuery(), cancellation.Token));
+
+        Assert.Equal(0, client.CountCalls);
+        Assert.Equal(0, client.PageViewTotalCalls);
+        Assert.Equal(0, client.TrendCalls);
+    }
+
+    [Fact]
     public async Task Concurrent_identical_summaries_share_one_client_fanout()
     {
         var countStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -65,8 +65,8 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
                     class="site-favicon"
                     src=${googleFaviconUrl(hostname)}
                     alt=""
-                    width="24"
-                    height="24"
+                    width="20"
+                    height="20"
                     decoding="async"
                     fetchpriority="low"
                     referrerpolicy="no-referrer"
@@ -103,8 +103,8 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
     .site-link:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 3px; }
     .site-context uui-icon, .external-indicator { color: var(--uui-color-text-alt); flex: 0 0 auto; }
     .site-mark { align-items: center; block-size: 1.5rem; display: inline-flex; flex: 0 0 auto; inline-size: 1.5rem; justify-content: center; position: relative; }
-    .site-mark uui-icon, .site-favicon { block-size: 1.5rem; inline-size: 1.5rem; }
-    .site-favicon { inset: 0; object-fit: contain; position: absolute; }
+    .site-mark uui-icon { block-size: 1.5rem; inline-size: 1.5rem; }
+    .site-favicon { block-size: 1.25rem; inline-size: 1.25rem; inset: 0.125rem; object-fit: contain; position: absolute; }
     .external-indicator { font-size: 0.875em; }
     .controls { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); justify-content: flex-end; margin-inline-start: auto; min-inline-size: 0; }
     .project-select {

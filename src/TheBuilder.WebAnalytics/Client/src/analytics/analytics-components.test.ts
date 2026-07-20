@@ -79,6 +79,8 @@ describe("analytics presentation components", () => {
     expect(link?.textContent).toContain("Open page in a new tab");
     expect(favicon?.src).toBe("https://www.google.com/s2/favicons?domain=example.com&sz=32");
     expect(favicon?.alt).toBe("");
+    expect(favicon?.width).toBe(20);
+    expect(favicon?.height).toBe(20);
     expect(favicon?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(element.shadowRoot?.querySelector(".site-mark uui-icon")).toBeNull();
 

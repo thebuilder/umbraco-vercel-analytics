@@ -39,8 +39,8 @@ export function dateRangeForPreset(
 
 export function intervalForRange(days: number): AnalyticsInterval {
   if (days <= 1) return "Hour";
-  if (days <= 90) return "Day";
-  if (days <= 365) return "Week";
+  if (days <= 30) return "Day";
+  if (days <= 90) return "Week";
   return "Month";
 }
 

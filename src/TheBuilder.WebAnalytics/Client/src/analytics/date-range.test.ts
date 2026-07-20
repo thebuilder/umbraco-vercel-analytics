@@ -57,15 +57,16 @@ describe("analytics date ranges", () => {
     expect(intervalForRange(2)).toBe("Day");
     expect(intervalForRange(7)).toBe("Day");
     expect(intervalForRange(30)).toBe("Day");
-    expect(intervalForRange(90)).toBe("Day");
-    expect(intervalForRange(91)).toBe("Week");
-    expect(intervalForRange(365)).toBe("Week");
+    expect(intervalForRange(31)).toBe("Week");
+    expect(intervalForRange(90)).toBe("Week");
+    expect(intervalForRange(91)).toBe("Month");
+    expect(intervalForRange(365)).toBe("Month");
     expect(intervalForRange(366)).toBe("Month");
   });
 
   it("uses supported granularity for the long presets", () => {
-    expect(dateRangeForPreset(90, new Date("2026-07-15T12:00:00Z")).interval).toBe("Day");
-    expect(dateRangeForPreset(365, new Date("2026-07-15T12:00:00Z")).interval).toBe("Week");
+    expect(dateRangeForPreset(90, new Date("2026-07-15T12:00:00Z")).interval).toBe("Week");
+    expect(dateRangeForPreset(365, new Date("2026-07-15T12:00:00Z")).interval).toBe("Month");
   });
 
   it("rejects inverted custom ranges", () => {

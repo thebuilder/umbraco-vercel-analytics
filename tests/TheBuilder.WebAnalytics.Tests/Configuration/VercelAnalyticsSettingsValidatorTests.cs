@@ -217,7 +217,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         var options = new VercelAnalyticsOptions
         {
             Enabled = true,
-            AccessToken = "server-secret",
+            Providers = { Vercel = { AccessToken = "server-secret" } },
             Connections =
             [
                 new() { Key = MainKey, ProjectId = "first-project" },

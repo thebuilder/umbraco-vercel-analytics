@@ -328,7 +328,7 @@ public sealed class WebAnalyticsApiControllerTests
         new(Options.Create(new VercelAnalyticsOptions
         {
             Enabled = true,
-            AccessToken = "secret",
+            Providers = { Vercel = { AccessToken = "secret" } },
             Connections = (aliases.Length == 0 ? ["main"] : aliases).Select(
                 alias => new VercelAnalyticsConnectionOptions
                 {

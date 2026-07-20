@@ -5,7 +5,7 @@ namespace TheBuilder.WebAnalytics.Services;
 
 public sealed class AnalyticsProviderApiException(
     HttpStatusCode statusCode,
-    AnalyticsProvider provider = AnalyticsProvider.Vercel)
+    AnalyticsProvider provider)
     : Exception($"{provider} Analytics returned HTTP {(int)statusCode}.")
 {
     public HttpStatusCode StatusCode { get; } = statusCode;

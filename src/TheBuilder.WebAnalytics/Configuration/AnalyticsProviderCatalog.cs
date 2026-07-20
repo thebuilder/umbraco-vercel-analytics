@@ -5,11 +5,26 @@ namespace TheBuilder.WebAnalytics.Configuration;
 
 public sealed class AnalyticsProviderCatalog
 {
-    private static readonly AnalyticsDimension[] VercelDimensions = Enum.GetValues<AnalyticsDimension>();
+    private static readonly AnalyticsDimension[] VercelDimensions =
+    [
+        AnalyticsDimension.RequestPath,
+        AnalyticsDimension.Route,
+        AnalyticsDimension.ReferrerHostname,
+        AnalyticsDimension.Country,
+        AnalyticsDimension.DeviceType,
+        AnalyticsDimension.BrowserName,
+        AnalyticsDimension.OsName,
+        AnalyticsDimension.UtmSource,
+        AnalyticsDimension.UtmMedium,
+        AnalyticsDimension.UtmCampaign,
+        AnalyticsDimension.UtmTerm,
+        AnalyticsDimension.UtmContent,
+        AnalyticsDimension.EventName
+    ];
     private static readonly AnalyticsDimension[] PlausibleDimensions =
     [
         AnalyticsDimension.RequestPath,
-        AnalyticsDimension.ReferrerHostname,
+        AnalyticsDimension.Referrer,
         AnalyticsDimension.Country,
         AnalyticsDimension.DeviceType,
         AnalyticsDimension.BrowserName,
@@ -26,7 +41,7 @@ public sealed class AnalyticsProviderCatalog
 
     private readonly IReadOnlyDictionary<AnalyticsProvider, AnalyticsProviderDefinition> _definitions;
 
-    public AnalyticsProviderCatalog()
+    private AnalyticsProviderCatalog()
     {
         Definitions =
         [

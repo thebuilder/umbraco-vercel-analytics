@@ -16,8 +16,6 @@ public sealed class PlausibleAnalyticsClient(
 
     public AnalyticsProvider Provider => AnalyticsProvider.Plausible;
 
-    public AnalyticsCapabilities Capabilities => AnalyticsProviderCatalog.Default.Get(Provider).Capabilities;
-
     public Task<string> GetDisplayNameAsync(
         AnalyticsConnection connection,
         CancellationToken cancellationToken) => Task.FromResult(connection.SiteId);
@@ -84,29 +82,18 @@ public sealed class PlausibleAnalyticsClient(
         CancellationToken cancellationToken)
     {
         var plausibleDimension = ToApiDimension(dimension);
-        var fetchLimit = dimension == AnalyticsDimension.ReferrerHostname ? 100 : limit;
         var response = await QueryAsync(
             connection,
             query,
             ["pageviews", "visitors"],
             [plausibleDimension],
-            fetchLimit,
+            limit,
             string.IsNullOrWhiteSpace(search) ? null : (plausibleDimension, search.Trim()),
             cancellationToken);
-        var rows = response.Results!.Select(row => new AnalyticsBreakdownRow(
+        return response.Results!.Select(row => new AnalyticsBreakdownRow(
             Dimension(row, 0, plausibleDimension),
             Metric(row, 0, "pageviews"),
-            Metric(row, 1, "visitors")));
-        if (dimension != AnalyticsDimension.ReferrerHostname) return rows.ToArray();
-        return rows
-            .GroupBy(row => NormalizeReferrerHostname(row.Value), StringComparer.OrdinalIgnoreCase)
-            .Select(group => new AnalyticsBreakdownRow(
-                group.Key,
-                group.Sum(row => row.PageViews),
-                group.Sum(row => row.Visitors)))
-            .OrderByDescending(row => row.PageViews)
-            .Take(limit)
-            .ToArray();
+            Metric(row, 1, "visitors"))).ToArray();
     }
 
     public async Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
@@ -205,7 +192,7 @@ public sealed class PlausibleAnalyticsClient(
     internal static string ToApiDimension(AnalyticsDimension dimension) => dimension switch
     {
         AnalyticsDimension.RequestPath => "event:page",
-        AnalyticsDimension.ReferrerHostname => "visit:referrer",
+        AnalyticsDimension.Referrer => "visit:referrer",
         AnalyticsDimension.Country => "visit:country",
         AnalyticsDimension.DeviceType => "visit:device",
         AnalyticsDimension.BrowserName => "visit:browser",
@@ -250,14 +237,6 @@ public sealed class PlausibleAnalyticsClient(
         if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var timestamp))
             return timestamp.ToString("O", CultureInfo.InvariantCulture);
         throw new JsonException("Plausible returned an invalid time dimension.");
-    }
-
-    private static string NormalizeReferrerHostname(string value)
-    {
-        var candidate = value.Contains("://", StringComparison.Ordinal) ? value : $"https://{value}";
-        return Uri.TryCreate(candidate, UriKind.Absolute, out var uri) && uri.Host.Contains('.')
-            ? uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host
-            : value;
     }
 
     private sealed record PlausibleRequest(

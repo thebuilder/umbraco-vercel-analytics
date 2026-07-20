@@ -18,6 +18,9 @@ import "@umbraco-cms/backoffice/document";
 export type EditableAnalyticsConnection = AnalyticsConnectionSettingsResponse;
 export type ConnectionActionStatus = { type: "success" | "error" | "info"; message: string };
 
+const credentialName = (provider: AnalyticsConnectionSettingsResponse["provider"]): string =>
+  provider === "Plausible" ? "Stats API key" : "access token";
+
 @customElement("vercel-analytics-connection-editor")
 export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) connection!: EditableAnalyticsConnection;
@@ -161,12 +164,12 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
               <summary><span>Token override</span><small>${connection.hasAccessTokenOverride ? "Configured on the server" : connection.hasAccessToken ? "Using shared token" : "Optional"}</small></summary>
               <div class="config-content token-content">
                 <p>
-                  Optional. Set a connection-specific token only when this connection cannot use the shared ${connection.provider} token.
-                  <a href=${connection.provider === "Plausible" ? "https://plausible.io/settings/api-keys" : "https://vercel.com/account/settings/tokens"} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} access token (opens in a new tab)`}>
-                    Create a ${connection.provider} access token<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
+                  Optional. Set a connection-specific credential only when this connection cannot use the shared ${connection.provider} credential.
+                  <a href=${connection.provider === "Plausible" ? "https://plausible.io/settings/api-keys" : "https://vercel.com/account/settings/tokens"} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} ${credentialName(connection.provider)} (opens in a new tab)`}>
+                    Create a ${connection.provider} ${credentialName(connection.provider)}<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
                   </a>
                 </p>
-                <div class="token-key"><code>WebAnalytics__ConnectionAccessTokens__${connection.key}</code><uui-button compact look="secondary" label="Copy access token setting name" @click=${this.#copyTokenKey}>${this._tokenCopied ? "Copied" : "Copy"}</uui-button></div>
+                <div class="token-key"><code>WebAnalytics__ConnectionAccessTokens__${connection.key}</code><uui-button compact look="secondary" label="Copy credential setting name" @click=${this.#copyTokenKey}>${this._tokenCopied ? "Copied" : "Copy"}</uui-button></div>
               </div>
             </details>`}
 

@@ -24,8 +24,6 @@ public sealed class VercelAnalyticsClient(
 
     public AnalyticsProvider Provider => AnalyticsProvider.Vercel;
 
-    public AnalyticsCapabilities Capabilities => AnalyticsProviderCatalog.Default.Get(Provider).Capabilities;
-
     public async Task<string> GetDisplayNameAsync(
         AnalyticsConnection connection,
         CancellationToken cancellationToken)
@@ -254,7 +252,7 @@ public sealed class VercelAnalyticsClient(
             {
                 var statusCode = response.StatusCode;
                 response.Dispose();
-                throw new AnalyticsProviderApiException(statusCode);
+                throw new AnalyticsProviderApiException(statusCode, Provider);
             }
 
             return response;

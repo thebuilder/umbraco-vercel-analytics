@@ -325,7 +325,7 @@ describe("AnalyticsDashboardController", () => {
         displayName: "Plausible",
         provider: "Plausible",
         capabilities: {
-          dimensions: ["RequestPath", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
+          dimensions: ["RequestPath", "Referrer", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
           events: true,
           eventProperties: false,
           flags: false,
@@ -351,7 +351,9 @@ describe("AnalyticsDashboardController", () => {
   it("removes unsupported filters when switching providers", async () => {
     const api = dashboardApi();
     const plausibleCapabilities: AnalyticsCapabilities = {
-      dimensions: fullCapabilities.dimensions.filter((dimension) => dimension !== "Route"),
+      dimensions: fullCapabilities.dimensions
+        .filter((dimension) => dimension !== "Route" && dimension !== "ReferrerHostname")
+        .concat("Referrer"),
       events: true,
       eventProperties: false,
       flags: false,
@@ -385,7 +387,12 @@ describe("AnalyticsDashboardController", () => {
         key: "11111111-1111-1111-1111-111111111111",
         displayName: "Plausible",
         provider: "Plausible",
-        capabilities: { ...fullCapabilities, dimensions: fullCapabilities.dimensions.filter((dimension) => dimension !== "Route") },
+        capabilities: {
+          ...fullCapabilities,
+          dimensions: fullCapabilities.dimensions
+            .filter((dimension) => dimension !== "Route" && dimension !== "ReferrerHostname")
+            .concat("Referrer"),
+        },
         isDefault: true,
         isConfigured: true,
         baseUrl: "https://example.com",

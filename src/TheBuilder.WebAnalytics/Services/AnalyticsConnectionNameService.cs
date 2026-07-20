@@ -13,11 +13,10 @@ public interface IAnalyticsConnectionNameService
 
 public sealed class AnalyticsConnectionNameService(
     IAnalyticsProviderClientResolver clients,
-    AnalyticsProviderCatalog providerCatalog,
     IMemoryCache cache) : IAnalyticsConnectionNameService
 {
     internal AnalyticsConnectionNameService(IAnalyticsProviderClient client, IMemoryCache cache)
-        : this(new SingleAnalyticsProviderClientResolver(client), AnalyticsProviderCatalog.Default, cache)
+        : this(new SingleAnalyticsProviderClientResolver(client), cache)
     {
     }
 
@@ -28,7 +27,7 @@ public sealed class AnalyticsConnectionNameService(
         CancellationToken cancellationToken)
     {
         var fallback = FirstNonEmpty(
-            providerCatalog.Get(connection.Provider).GetIdentifier(connection),
+            AnalyticsProviderCatalog.Default.Get(connection.Provider).GetIdentifier(connection),
             connection.DisplayName,
             connection.Key.ToString());
         if (!connection.IsConfigured) return fallback;

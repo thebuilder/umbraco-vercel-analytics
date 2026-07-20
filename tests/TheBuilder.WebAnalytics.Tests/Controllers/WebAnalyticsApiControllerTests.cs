@@ -314,6 +314,58 @@ public sealed class WebAnalyticsApiControllerTests
     }
 
     [Fact]
+    public async Task Breakdown_rejects_a_dimension_not_supported_by_the_selected_provider()
+    {
+        var response = await CreatePlausibleBoundaryController().Breakdown(
+            AnalyticsDimension.Route,
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day);
+
+        AssertInvalidQuery(response.Result);
+    }
+
+    [Fact]
+    public async Task Flags_rejects_a_provider_without_flag_capabilities()
+    {
+        var response = await CreatePlausibleBoundaryController().Flags(
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day);
+
+        AssertInvalidQuery(response.Result);
+    }
+
+    [Fact]
+    public async Task Event_details_rejects_a_provider_without_event_property_capabilities()
+    {
+        var response = await CreatePlausibleBoundaryController().EventDetails(
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day,
+            "Signup");
+
+        AssertInvalidQuery(response.Result);
+    }
+
+    [Fact]
+    public async Task Event_property_values_rejects_a_provider_without_event_property_capabilities()
+    {
+        var response = await CreatePlausibleBoundaryController().EventPropertyValues(
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day,
+            "Signup",
+            "plan");
+
+        AssertInvalidQuery(response.Result);
+    }
+
+    [Fact]
     public async Task Event_details_rejects_event_name_filter_from_the_shared_query()
     {
         var controller = CreateBoundaryOnlyController();
@@ -348,6 +400,13 @@ public sealed class WebAnalyticsApiControllerTests
 
     private static WebAnalyticsApiController CreateBoundaryOnlyController() =>
         new(null!, null!, null!, null!, null!);
+
+    private static WebAnalyticsApiController CreatePlausibleBoundaryController()
+    {
+        var authorization = new Mock<IAnalyticsAuthorizationService>(MockBehavior.Strict);
+        authorization.Setup(service => service.HasAnalyticsSectionAccess()).Returns(true);
+        return new(authorization.Object, PlausibleRegistry(), null!, null!, null!);
+    }
 
     private static DateTimeOffset UtcDate(int year, int month, int day) =>
         new(year, month, day, 0, 0, 0, TimeSpan.Zero);

@@ -18,7 +18,7 @@ public sealed class WebAnalyticsProblemFactoryTests
     {
         var problem = Assert.IsType<WebAnalyticsProblemDefinition>(
             WebAnalyticsProblemFactory.FromException(
-                new AnalyticsProviderApiException(HttpStatusCode.Forbidden)));
+                new AnalyticsProviderApiException(HttpStatusCode.Forbidden, AnalyticsProvider.Vercel)));
 
         Assert.Equal(StatusCodes.Status502BadGateway, problem.Status);
         Assert.Equal(WebAnalyticsProblemCodes.InvalidCredentials, problem.Code);
@@ -34,7 +34,7 @@ public sealed class WebAnalyticsProblemFactoryTests
         string expectedCode)
     {
         var problem = Assert.IsType<WebAnalyticsProblemDefinition>(
-            WebAnalyticsProblemFactory.FromException(new AnalyticsProviderApiException(upstreamStatus)));
+            WebAnalyticsProblemFactory.FromException(new AnalyticsProviderApiException(upstreamStatus, AnalyticsProvider.Vercel)));
 
         Assert.Equal(expectedStatus, problem.Status);
         Assert.Equal(expectedCode, problem.Code);

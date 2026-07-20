@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Moq;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Services;
@@ -148,13 +149,15 @@ public sealed class MockAnalyticsClientTests
     }
 
     [Fact]
-    public async Task Router_serves_mock_reports_without_contacting_Vercel()
+    public async Task Resolver_serves_mock_reports_without_contacting_providers()
     {
         var handler = new RejectingHttpMessageHandler();
         var router = new AnalyticsProviderClientResolver(
-            new VercelAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate()),
-            new MockAnalyticsClient(),
-            new PlausibleAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate()));
+            [
+                new VercelAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate()),
+                new PlausibleAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate())
+            ],
+            new MockAnalyticsClient());
         using var cache = new AnalyticsReportCache();
         var service = new AnalyticsReportService(
             CreateRegistry(MockAnalyticsScenario.Complete, true),
@@ -167,6 +170,53 @@ public sealed class MockAnalyticsClientTests
         Assert.NotEmpty(summary.Points);
         Assert.True(summary.Totals.PageViews > 0);
         Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public void Resolver_rejects_duplicate_provider_clients()
+    {
+        var handler = new RejectingHttpMessageHandler();
+        var gate = new AnalyticsProviderRequestGate();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new AnalyticsProviderClientResolver(
+            [
+                new VercelAnalyticsClient(new HttpClient(handler), gate),
+                new VercelAnalyticsClient(new HttpClient(handler), gate),
+                new PlausibleAnalyticsClient(new HttpClient(handler), gate)
+            ],
+            new MockAnalyticsClient()));
+
+        Assert.Contains("Multiple analytics clients", exception.Message);
+    }
+
+    [Fact]
+    public void Resolver_rejects_missing_provider_clients()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => new AnalyticsProviderClientResolver(
+            [new VercelAnalyticsClient(new HttpClient(new RejectingHttpMessageHandler()), new AnalyticsProviderRequestGate())],
+            new MockAnalyticsClient()));
+
+        Assert.Contains("No analytics client is registered for Plausible", exception.Message);
+    }
+
+    [Fact]
+    public void Resolver_rejects_clients_that_do_not_implement_advertised_capabilities()
+    {
+        var handler = new RejectingHttpMessageHandler();
+        var plausible = new Mock<IAnalyticsProviderClient>(MockBehavior.Strict);
+        plausible.SetupGet(client => client.Provider).Returns(AnalyticsProvider.Plausible);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            _ = new AnalyticsProviderClientResolver(
+                [
+                    new VercelAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate()),
+                    plausible.Object
+                ],
+                new MockAnalyticsClient());
+        });
+
+        Assert.Contains("Plausible client and catalog disagree about events support", exception.Message);
     }
 
     private static AnalyticsQuery CreateQuery() => new(

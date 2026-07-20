@@ -66,7 +66,7 @@ export type AnalyticsConnectionsResponse = {
     connections: Array<AnalyticsConnectionSummary>;
 };
 
-export type AnalyticsDimension = 'RequestPath' | 'Route' | 'ReferrerHostname' | 'Country' | 'DeviceType' | 'BrowserName' | 'OsName' | 'UtmSource' | 'UtmMedium' | 'UtmCampaign' | 'UtmTerm' | 'UtmContent' | 'EventName';
+export type AnalyticsDimension = 'RequestPath' | 'Route' | 'ReferrerHostname' | 'Referrer' | 'Country' | 'DeviceType' | 'BrowserName' | 'OsName' | 'UtmSource' | 'UtmMedium' | 'UtmCampaign' | 'UtmTerm' | 'UtmContent' | 'EventName';
 
 export type AnalyticsDocumentRoute = {
     connection: string;

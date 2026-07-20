@@ -37,7 +37,7 @@ public sealed class PlausibleAnalyticsClientTests
         };
 
         var rows = await client.GetBreakdownAsync(
-            CreateConnection(), query, AnalyticsDimension.ReferrerHostname, 10, "goo", CancellationToken.None);
+            CreateConnection(), query, AnalyticsDimension.Referrer, 10, "goo", CancellationToken.None);
 
         Assert.Equal(new AnalyticsBreakdownRow("Google", 12, 8), Assert.Single(rows));
         Assert.Contains("visit:referrer", handler.Body);
@@ -87,17 +87,20 @@ public sealed class PlausibleAnalyticsClientTests
     }
 
     [Fact]
-    public async Task Referrer_breakdown_normalizes_and_combines_hostnames()
+    public async Task Referrer_breakdown_preserves_provider_values_and_metrics()
     {
         var handler = new RecordingHandler("""{"results":[{"dimensions":["https://www.example.com/one"],"metrics":[5,3]},{"dimensions":["example.com/two"],"metrics":[7,4]}]}""");
         var client = CreateClient(handler);
 
         var rows = await client.GetBreakdownAsync(
-            CreateConnection(), CreateQuery(), AnalyticsDimension.ReferrerHostname, 10, null, CancellationToken.None);
+            CreateConnection(), CreateQuery(), AnalyticsDimension.Referrer, 10, null, CancellationToken.None);
 
-        Assert.Equal(new AnalyticsBreakdownRow("example.com", 12, 7), Assert.Single(rows));
+        Assert.Equal([
+            new AnalyticsBreakdownRow("https://www.example.com/one", 5, 3),
+            new AnalyticsBreakdownRow("example.com/two", 7, 4)
+        ], rows);
         using var body = JsonDocument.Parse(handler.Body!);
-        Assert.Equal(100, body.RootElement.GetProperty("pagination").GetProperty("limit").GetInt32());
+        Assert.Equal(10, body.RootElement.GetProperty("pagination").GetProperty("limit").GetInt32());
     }
 
     [Fact]
@@ -152,6 +155,7 @@ public sealed class PlausibleAnalyticsClientTests
 
     [Theory]
     [InlineData(AnalyticsDimension.RequestPath, "event:page")]
+    [InlineData(AnalyticsDimension.Referrer, "visit:referrer")]
     [InlineData(AnalyticsDimension.UtmCampaign, "visit:utm_campaign")]
     [InlineData(AnalyticsDimension.UtmTerm, "visit:utm_term")]
     [InlineData(AnalyticsDimension.UtmContent, "visit:utm_content")]

@@ -167,7 +167,7 @@ Each entry under `Connections` supports:
 | Key | Default | Description |
 | --- | --- | --- |
 | `Key` | Generated GUID | Stable internal identity. The settings UI creates this automatically; provide a fixed GUID for deterministic configuration-only setup. |
-| `DisplayName` | Empty | Cached project name used until the name can be loaded from Vercel. |
+| `DisplayName` | Empty | Cached connection name used until a display name can be loaded from the provider. |
 | `Provider` | `Vercel` | Analytics provider: `Vercel` or `Plausible`. |
 | `ProjectId` | Vercel only | Vercel project ID beginning with `prj_`. |
 | `Team` | Empty | Optional team ID (`team_...`) or team slug. Leave empty for a personal project. |
@@ -208,7 +208,7 @@ The available reporting window and dimensions depend on the provider, plan, and 
 | Plausible rejects the query | Verify `SiteId` exactly matches the domain registered in Plausible. |
 | Analytics section is not visible | Add the Analytics section to the user's Umbraco user group. The automatic administrator grant runs only once. |
 | Document Analytics view is not visible | Confirm the document is published, beneath a configured document root, uses an enabled document type, and the user can read it. |
-| No data appears | Confirm Web Analytics is enabled and installed on the public site, production traffic has been recorded, and the selected date is inside Vercel's reporting window. |
+| No data appears | Confirm the selected provider is tracking the public site, production traffic has been recorded, and the selected date is inside the provider's available reporting window. |
 | Settings differ between application instances | Restart every instance after changing settings or tokens. |
 
 ## Development

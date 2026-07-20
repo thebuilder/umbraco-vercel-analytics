@@ -476,13 +476,16 @@ export class AnalyticsDashboardController {
   }
 
   #dashboardReportPlan(utmCapability = this.state.utmCapability): DashboardReportPlan {
+    const capabilities = this.#capabilities();
+    const referrerDimension = capabilities.dimensions.includes("ReferrerHostname") ? "ReferrerHostname" : "Referrer";
     const plan = dashboardReportPlan(
       Boolean(this.#documentId),
       utmCapability,
       this.state.acquisitionView,
       this.state.utmDimension,
+      referrerDimension,
     );
-    const supported = new Set(this.#capabilities().dimensions);
+    const supported = new Set(capabilities.dimensions);
     const cards = plan.cards.reduce<DashboardCard[]>((result, card) => {
       if (card.kind === "breakdown") {
         if (supported.has(card.dimension)) result.push(card);

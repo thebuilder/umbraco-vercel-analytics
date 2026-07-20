@@ -202,7 +202,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
   render() {
     const standardCards = this.cards.filter((card) => card.kind !== "tabbed-breakdown" || card.id !== "utm");
     const utmCard = this.cards.find((card): card is Extract<DashboardCard, { kind: "tabbed-breakdown" }> => card.kind === "tabbed-breakdown" && card.id === "utm");
-    const referrerCard = standardCards.find((card) => card.kind === "breakdown" && card.dimension === "ReferrerHostname");
+    const referrerCard = standardCards.find((card) => card.kind === "breakdown" && (card.dimension === "ReferrerHostname" || card.dimension === "Referrer"));
     const renderCard = (card: DashboardCard) => card === referrerCard ? this.#renderAcquisitionCard(card, utmCard) : this.#renderCard(card);
     const documentScoped = !standardCards.some((card) => card.kind === "breakdown" && card.dimension === "RequestPath");
     const cardsBeforeEvents = documentScoped ? standardCards.slice(0, 1) : standardCards;

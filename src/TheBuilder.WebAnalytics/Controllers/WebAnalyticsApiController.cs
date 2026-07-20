@@ -25,6 +25,19 @@ public sealed class WebAnalyticsApiController(
         EventSelection
     }
 
+    private enum ReportCapability
+    {
+        Core,
+        Breakdown,
+        Events,
+        EventProperties,
+        Flags
+    }
+
+    private readonly record struct ReportRequirement(
+        ReportCapability Capability,
+        AnalyticsDimension? Dimension = null);
+
     [HttpGet("connections")]
     [ProducesResponseType<AnalyticsConnectionsResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -87,7 +100,8 @@ public sealed class WebAnalyticsApiController(
         CancellationToken cancellationToken)
     {
         var scope = await AuthorizeAndBuildQueryAsync(
-            connection, from, to, interval, documentId, culture, path, filter, ReportScope.Visits, cancellationToken);
+            connection, from, to, interval, documentId, culture, path, filter, ReportScope.Visits,
+            new(ReportCapability.Core), cancellationToken);
         if (scope.Error is not null) return scope.Error;
         var report = await reportService.GetSummaryAsync(scope.Query!, cancellationToken);
         return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
@@ -117,7 +131,8 @@ public sealed class WebAnalyticsApiController(
         if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
         if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
         var scope = await AuthorizeAndBuildQueryAsync(
-            connection, from, to, interval, documentId, culture, path, filter, ReportScope.Visits, cancellationToken);
+            connection, from, to, interval, documentId, culture, path, filter, ReportScope.Visits,
+            new(ReportCapability.Breakdown, dimension), cancellationToken);
         if (scope.Error is not null) return scope.Error;
         var report = await reportService.GetBreakdownAsync(scope.Query!, dimension, limit, search, cancellationToken);
         return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
@@ -142,7 +157,8 @@ public sealed class WebAnalyticsApiController(
         if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
         if (search?.Length > 200) return ValidationProblem("Search must be 200 characters or fewer.");
         var scope = await AuthorizeAndBuildQueryAsync(
-            connection, from, to, interval, documentId, culture, path, filter, ReportScope.EventList, cancellationToken);
+            connection, from, to, interval, documentId, culture, path, filter, ReportScope.EventList,
+            new(ReportCapability.Events), cancellationToken);
         if (scope.Error is not null) return scope.Error;
         var report = await reportService.GetEventsAsync(scope.Query!, limit, search, cancellationToken);
         return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
@@ -167,7 +183,8 @@ public sealed class WebAnalyticsApiController(
         if (flagKey?.Length > 255) return ValidationProblem("Flag key must be 255 characters or fewer.");
         if (limit is < 1 or > 100) return ValidationProblem("Limit must be between 1 and 100.");
         var scope = await AuthorizeAndBuildQueryAsync(
-            connection, from, to, interval, documentId, culture, path, filter, ReportScope.Visits, cancellationToken);
+            connection, from, to, interval, documentId, culture, path, filter, ReportScope.Visits,
+            new(ReportCapability.Flags), cancellationToken);
         if (scope.Error is not null) return scope.Error;
         var report = await reportService.GetFlagsAsync(scope.Query!, flagKey, limit, cancellationToken);
         return report is null ? NotFoundProblem("The selected analytics connection does not exist.") : Ok(report);
@@ -204,7 +221,8 @@ public sealed class WebAnalyticsApiController(
         }
 
         var scope = await AuthorizeAndBuildQueryAsync(
-            connection, from, to, interval, documentId, culture, path, filter, ReportScope.EventSelection, cancellationToken);
+            connection, from, to, interval, documentId, culture, path, filter, ReportScope.EventSelection,
+            new(ReportCapability.EventProperties), cancellationToken);
         if (scope.Error is not null) return scope.Error;
         var eventDataFilter = string.IsNullOrWhiteSpace(eventProperty)
             ? null
@@ -253,7 +271,8 @@ public sealed class WebAnalyticsApiController(
         }
 
         var scope = await AuthorizeAndBuildQueryAsync(
-            connection, from, to, interval, documentId, culture, path, filter, ReportScope.EventSelection, cancellationToken);
+            connection, from, to, interval, documentId, culture, path, filter, ReportScope.EventSelection,
+            new(ReportCapability.EventProperties), cancellationToken);
         if (scope.Error is not null) return scope.Error;
         var eventDataFilter = string.IsNullOrWhiteSpace(eventProperty)
             ? null
@@ -279,6 +298,7 @@ public sealed class WebAnalyticsApiController(
         string? path,
         IReadOnlyList<string>? filterValues,
         ReportScope reportScope,
+        ReportRequirement reportRequirement,
         CancellationToken cancellationToken)
     {
         if (!Enum.IsDefined(interval))
@@ -312,7 +332,7 @@ public sealed class WebAnalyticsApiController(
             var selectedConnection = registry.Get(connection);
             if (selectedConnection is null)
                 return (null, NotFoundProblem("The selected analytics connection does not exist."));
-            var capabilityError = ValidateFilterCapabilities(filters, selectedConnection.Capabilities);
+            var capabilityError = ValidateCapabilities(filters, reportRequirement, selectedConnection.Capabilities);
             return capabilityError is null
                 ? (new AnalyticsQuery(connection, from, to, interval, Filters: filters), null)
                 : (null, capabilityError);
@@ -329,20 +349,33 @@ public sealed class WebAnalyticsApiController(
             string.Equals(route.Path, path, StringComparison.Ordinal));
         if (selectedRoute is null)
             return (null, ValidationProblem("The selected path is not a published route for this document and connection."));
-        var documentCapabilityError = ValidateFilterCapabilities(filters, selectedRoute.Capabilities);
+        var documentCapabilityError = ValidateCapabilities(filters, reportRequirement, selectedRoute.Capabilities);
         return documentCapabilityError is null
             ? (new AnalyticsQuery(connection, from, to, interval, selectedRoute.Path, filters), null)
             : (null, documentCapabilityError);
     }
 
-    private ActionResult? ValidateFilterCapabilities(
+    private ActionResult? ValidateCapabilities(
         IReadOnlyList<AnalyticsFilter> filters,
+        ReportRequirement requirement,
         AnalyticsCapabilities capabilities)
     {
         var unsupported = filters.FirstOrDefault(filter => !capabilities.Dimensions.Contains(filter.Dimension));
-        return unsupported is null
+        if (unsupported is not null)
+            return ValidationProblem($"The selected analytics provider does not support {unsupported.Dimension} filters.");
+
+        var supported = requirement.Capability switch
+        {
+            ReportCapability.Core => true,
+            ReportCapability.Breakdown => requirement.Dimension is not null && capabilities.Dimensions.Contains(requirement.Dimension.Value),
+            ReportCapability.Events => capabilities.Events,
+            ReportCapability.EventProperties => capabilities.EventProperties,
+            ReportCapability.Flags => capabilities.Flags,
+            _ => false
+        };
+        return supported
             ? null
-            : ValidationProblem($"The selected analytics provider does not support {unsupported.Dimension} filters.");
+            : ValidationProblem($"The selected analytics provider does not support this {requirement.Capability.ToString().ToLowerInvariant()} report.");
     }
 
     private ActionResult ValidationProblem(string detail) =>
@@ -362,7 +395,7 @@ public sealed class WebAnalyticsApiController(
     private static IReadOnlyList<string> ConnectionWarnings(AnalyticsConnection connection)
     {
         var warnings = new List<string>();
-        if (!connection.IsConfigured) warnings.Add("No server-side access token is configured for this connection.");
+        if (!connection.IsConfigured) warnings.Add("No server-side credential is configured for this connection.");
         return warnings;
     }
 }

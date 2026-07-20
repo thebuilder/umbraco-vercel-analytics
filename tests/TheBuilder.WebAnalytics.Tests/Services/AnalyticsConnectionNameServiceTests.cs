@@ -31,7 +31,7 @@ public sealed class AnalyticsConnectionNameServiceTests
         var client = new Mock<IAnalyticsProviderClient>(MockBehavior.Strict);
         var connection = CreateConnection();
         client.Setup(item => item.GetDisplayNameAsync(connection, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new AnalyticsProviderApiException(System.Net.HttpStatusCode.Forbidden));
+            .ThrowsAsync(new AnalyticsProviderApiException(System.Net.HttpStatusCode.Forbidden, AnalyticsProvider.Vercel));
         var service = new AnalyticsConnectionNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
 
         var result = await service.GetDisplayNameAsync(connection, CancellationToken.None);

@@ -47,8 +47,6 @@ public sealed class MockAnalyticsClient :
 
     public AnalyticsProvider Provider => AnalyticsProvider.Vercel;
 
-    public AnalyticsCapabilities Capabilities => AnalyticsProviderCatalog.Default.Get(Provider).Capabilities;
-
     public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

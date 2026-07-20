@@ -17,7 +17,6 @@ public sealed class WebAnalyticsSettingsApiController(
     WebAnalyticsSettingsStore settingsStore,
     AnalyticsConnectionRegistry registry,
     IOptions<WebAnalyticsOptions> serverOptions,
-    AnalyticsProviderCatalog providerCatalog,
     IAnalyticsProviderClientResolver providerClients,
     IAnalyticsConnectionNameService projectNames) : WebAnalyticsApiControllerBase
 {
@@ -33,7 +32,6 @@ public sealed class WebAnalyticsSettingsApiController(
             settingsStore,
             registry,
             serverOptions,
-            AnalyticsProviderCatalog.Default,
             new SingleAnalyticsProviderClientResolver(providerClient),
             projectNames)
     {
@@ -99,7 +97,7 @@ public sealed class WebAnalyticsSettingsApiController(
         var connection = registry.Get(key);
         if (connection is null) return NotFound();
         if (!connection.IsConfigured)
-            return Ok(new AnalyticsConnectionTestResult(false, $"Add a server-side {connection.Provider} access token and identifier."));
+            return Ok(new AnalyticsConnectionTestResult(false, $"Add a server-side {connection.Provider} credential and identifier."));
 
         try
         {
@@ -112,7 +110,7 @@ public sealed class WebAnalyticsSettingsApiController(
         }
         catch (AnalyticsProviderApiException exception)
         {
-            var message = providerCatalog.Get(exception.Provider).ConnectionTestFailure(exception.StatusCode);
+            var message = AnalyticsProviderCatalog.Default.Get(exception.Provider).ConnectionTestFailure(exception.StatusCode);
             return Ok(new AnalyticsConnectionTestResult(false, message));
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -140,7 +138,7 @@ public sealed class WebAnalyticsSettingsApiController(
             var displayName = connection.IsMock
                 ? connection.DisplayName
                 : registered is null
-                    ? providerCatalog.Get(connection.Provider).GetIdentifier(connection)
+                    ? AnalyticsProviderCatalog.Default.Get(connection.Provider).GetIdentifier(connection)
                     : await projectNames.GetDisplayNameAsync(registered, cancellationToken);
             return new AnalyticsConnectionSettingsResponse(
                 connection.Key,
@@ -159,7 +157,7 @@ public sealed class WebAnalyticsSettingsApiController(
         var responseConnections = await Task.WhenAll(responseTasks);
         return new AnalyticsSettingsResponse(
             settings.Enabled,
-            providerCatalog.Definitions
+            AnalyticsProviderCatalog.Default.Definitions
                 .Select(definition => new AnalyticsProviderTokenStatus(
                     definition.Provider,
                     !string.IsNullOrWhiteSpace(definition.GetAccessToken(serverConfiguration))))

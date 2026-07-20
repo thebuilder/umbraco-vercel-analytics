@@ -27,8 +27,8 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
     return html`
       ${this.loading ? html`<span class="visually-hidden" role="status">Loading events</span>` : ""}
       <table aria-busy=${this.loading ? "true" : "false"}>
-        <caption>Custom events</caption>
-        <thead><tr><th scope="col">Events</th><th scope="col">Visitors</th><th scope="col">Total events</th></tr></thead>
+        <caption>Events and goals</caption>
+        <thead><tr><th scope="col">Events and goals</th><th scope="col">Visitors</th><th scope="col">Total</th></tr></thead>
         <tbody>${this.loading
           ? Array.from({ length: this.skeletonRows }, () => html`
               <tr><th scope="row"><span class="skeleton-line"></span></th><td><span class="skeleton-number"></span></td><td><span class="skeleton-number"></span></td></tr>
@@ -68,7 +68,7 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
         <div class="empty">
           <span class="empty-icon"><uui-icon name="icon-lightning" aria-hidden="true"></uui-icon></span>
           <strong>No events</strong>
-          <p>Track custom events to understand which actions visitors take.</p>
+          <p>Configure events or goals to understand which actions visitors take.</p>
         </div>
       ` : ""}
     `;

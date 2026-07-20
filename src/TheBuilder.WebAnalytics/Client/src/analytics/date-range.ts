@@ -244,6 +244,10 @@ export function isAnalyticsPeriodInProgress(
   interval: AnalyticsInterval,
   now = new Date(),
 ): boolean {
+  // Plausible returns date-only and offset-less labels in the site's reporting
+  // timezone. Without that timezone, inferring whether the bucket is complete
+  // would be guesswork, so only absolute timestamps participate here.
+  if (/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?$/.test(timestamp)) return false;
   const start = analyticsDisplayTimestamp(timestamp, "UTC").date;
   if (Number.isNaN(start.valueOf())) return false;
   const end = new Date(start);

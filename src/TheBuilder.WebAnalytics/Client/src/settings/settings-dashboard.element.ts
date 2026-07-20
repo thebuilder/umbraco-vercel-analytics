@@ -25,6 +25,9 @@ type NewConnection =
   | { kind: "provider"; provider: AnalyticsProvider; hasAccessToken: boolean }
   | { kind: "mock"; scenario: MockScenarioDefinition };
 
+const credentialName = (provider: AnalyticsProvider): string =>
+  provider === "Plausible" ? "Stats API key" : "access token";
+
 @customElement("vercel-analytics-settings-dashboard")
 export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitElement) {
   @state() private _settings?: AnalyticsSettingsResponse;
@@ -268,17 +271,17 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
             ${this._settings.providerTokens.map((token) => html`
               <section class="shared-token" aria-labelledby=${`shared-token-${token.provider}`}>
                 <div class="shared-token-summary">
-                  <strong id=${`shared-token-${token.provider}`}>${token.provider} access token</strong>
+                  <strong id=${`shared-token-${token.provider}`}>${token.provider} ${credentialName(token.provider)}</strong>
                   ${token.hasAccessToken
                     ? html`<span class="shared-token-status configured"><uui-icon name="icon-check" aria-hidden="true"></uui-icon>Configured</span>`
                     : html`<uui-tag class="shared-token-status" color="warning">Not configured</uui-tag>`}
                 </div>
                 ${token.hasAccessToken ? "" : html`
                   <div class="shared-token-setup">
-                    <p class="shared-token-help">Set this server environment variable to a ${token.provider} access token.</p>
+                    <p class="shared-token-help">Set this server environment variable to a ${token.provider} ${credentialName(token.provider)}.</p>
                     <div class="shared-token-key">
                       <code>WebAnalytics__Providers__${token.provider}__AccessToken</code>
-                      <uui-button compact look="secondary" label=${`Copy ${token.provider} access token setting name`} @click=${() => this.#copyTokenKey(token.provider)}>${this._copiedTokenProvider === token.provider ? "Copied" : "Copy"}</uui-button>
+                      <uui-button compact look="secondary" label=${`Copy ${token.provider} credential setting name`} @click=${() => this.#copyTokenKey(token.provider)}>${this._copiedTokenProvider === token.provider ? "Copied" : "Copy"}</uui-button>
                     </div>
                   </div>
                 `}
@@ -289,7 +292,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
 
         ${this._settings.canCreateMockConnections ? html`
           <uui-box headline="Development data" class="mock-settings">
-            <p class="mock-intro">Create deterministic local connections to verify dashboard states without calling Vercel. Mock connections are only active while the server runs in Development.</p>
+            <p class="mock-intro">Create deterministic local connections to verify dashboard states without calling an analytics provider. Mock connections are only active while the server runs in Development.</p>
             <div class="mock-scenarios">
               ${MOCK_SCENARIOS.map((scenario) => {
                 const added = this._settings?.connections.some((connection) => connection.mockScenario === scenario.id) ?? false;
@@ -335,7 +338,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
                 <uui-icon name="icon-globe" aria-hidden="true"></uui-icon>
                 <div>
                   <h3>Connect your first analytics provider</h3>
-                  <p>Choose Vercel or Plausible. The matching server-side access token above will be used automatically.</p>
+                  <p>Choose Vercel or Plausible. The matching server-side credential above will be used automatically.</p>
                 </div>
                 <div class="connection-actions"><uui-button type="button" look="primary" label="Add your first Vercel connection" @click=${() => this.#addConnection("Vercel")}>Add Vercel</uui-button><uui-button type="button" look="secondary" label="Add your first Plausible connection" @click=${() => this.#addConnection("Plausible")}>Add Plausible</uui-button></div>
               </div>

@@ -76,7 +76,7 @@ public sealed class AnalyticsReportServiceTests
 
     public static TheoryData<Func<Exception>> OptionalPreviousRangeFailures =>
     [
-        () => new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired),
+        () => new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired, AnalyticsProvider.Vercel),
         () => new HttpRequestException(),
         () => new System.Text.Json.JsonException(),
         () => new OperationCanceledException()
@@ -412,8 +412,6 @@ public sealed class AnalyticsReportServiceTests
     {
         public AnalyticsProvider Provider => AnalyticsProvider.Vercel;
 
-        public AnalyticsCapabilities Capabilities => AnalyticsProviderCatalog.Default.Get(Provider).Capabilities;
-
         public int CountCalls { get; private set; }
         public int TrendCalls { get; private set; }
         public int BreakdownCalls { get; private set; }
@@ -461,7 +459,7 @@ public sealed class AnalyticsReportServiceTests
             }
             if (FailPreviousCount && query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero))
             {
-                throw new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired);
+                throw new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired, Provider);
             }
 
             CountStarted?.TrySetResult();

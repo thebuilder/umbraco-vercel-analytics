@@ -177,5 +177,7 @@ describe("analytics date ranges", () => {
     expect(isAnalyticsPeriodInProgress("2026-07-10T00:00:00Z", "Week", now)).toBe(true);
     expect(isAnalyticsPeriodInProgress("2026-07-01T00:00:00Z", "Month", now)).toBe(true);
     expect(isAnalyticsPeriodInProgress("2026-07-15T00:00:00Z", "Day", now)).toBe(false);
+    expect(isAnalyticsPeriodInProgress("2026-07-16T10:00:00", "Hour", now)).toBe(false);
+    expect(isAnalyticsPeriodInProgress("2026-07-16", "Day", now)).toBe(false);
   });
 });

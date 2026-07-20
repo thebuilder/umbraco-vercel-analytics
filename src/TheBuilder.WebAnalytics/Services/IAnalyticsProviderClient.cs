@@ -7,8 +7,6 @@ public interface IAnalyticsProviderClient
 {
     AnalyticsProvider Provider { get; }
 
-    AnalyticsCapabilities Capabilities { get; }
-
     Task<string> GetDisplayNameAsync(
         AnalyticsConnection connection,
         CancellationToken cancellationToken);

@@ -41,6 +41,7 @@ public enum AnalyticsDimension
     RequestPath,
     Route,
     ReferrerHostname,
+    Referrer,
     Country,
     DeviceType,
     BrowserName,

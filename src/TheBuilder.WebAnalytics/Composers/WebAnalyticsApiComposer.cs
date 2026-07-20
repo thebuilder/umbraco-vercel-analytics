@@ -18,7 +18,6 @@ namespace TheBuilder.WebAnalytics.Composers
                 .ValidateOnStart();
             builder.Services.AddSingleton<IValidateOptions<WebAnalyticsOptions>, WebAnalyticsOptionsValidator>();
             builder.Services.AddSingleton<WebAnalyticsSettingsStore>();
-            builder.Services.AddSingleton(AnalyticsProviderCatalog.Default);
             builder.Services.AddSingleton<AnalyticsConnectionRegistry>();
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<AnalyticsReportCache>();
@@ -28,11 +27,13 @@ namespace TheBuilder.WebAnalytics.Composers
                 client.BaseAddress = new Uri("https://api.vercel.com/");
                 client.Timeout = TimeSpan.FromSeconds(15);
             });
+            builder.Services.AddTransient<IAnalyticsProviderClient>(services => services.GetRequiredService<VercelAnalyticsClient>());
             builder.Services.AddHttpClient<PlausibleAnalyticsClient>(client =>
             {
                 client.BaseAddress = new Uri("https://plausible.io/");
                 client.Timeout = TimeSpan.FromSeconds(15);
             });
+            builder.Services.AddTransient<IAnalyticsProviderClient>(services => services.GetRequiredService<PlausibleAnalyticsClient>());
             builder.Services.AddSingleton<MockAnalyticsClient>();
             builder.Services.AddTransient<IAnalyticsProviderClientResolver, AnalyticsProviderClientResolver>();
             builder.Services.AddTransient<AnalyticsReportService>();

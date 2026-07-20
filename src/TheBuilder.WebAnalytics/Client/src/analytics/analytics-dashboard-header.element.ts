@@ -100,8 +100,12 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
     .warnings { display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); margin-bottom: var(--uui-size-space-5); }
     .warnings:empty { display: none; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-    @container (max-width: 62rem) { .project-select { inline-size: min(100%, 28rem); max-inline-size: 100%; } }
-    @container (max-width: 32rem) {
+    @media (max-width: 62rem) {
+      header { align-items: flex-start; }
+      .controls { flex: 1 1 100%; justify-content: space-between; margin-inline-start: 0; }
+      .project-select { flex: 1 1 15rem; inline-size: auto; max-inline-size: 28rem; }
+    }
+    @media (max-width: 32rem) {
       header { align-items: stretch; }
       .site-context { flex: 1 1 100%; }
       .controls { align-items: stretch; inline-size: 100%; margin-inline-start: 0; }

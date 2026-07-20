@@ -149,12 +149,12 @@ export class VercelAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
     .summary-error-copy { flex: 1 1 22rem; }
     .summary-error-copy p { color: var(--uui-color-text-alt); margin: var(--uui-size-space-1) 0 0; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-    @container (max-width: 48rem) {
+    @media (max-width: 48rem) {
       .metric-tab { --metric-font-size: clamp(1.5rem, 4cqi, 2rem); box-sizing: border-box; flex: 0 0 65cqi; min-block-size: 6.5rem; min-inline-size: 14rem; padding: var(--uui-size-space-4); }
       .metric-value { gap: var(--uui-size-space-2); }
       .comparison { font-size: 0.875rem; padding: var(--uui-size-space-1) var(--uui-size-space-2); }
     }
-    @container (max-width: 40rem) {
+    @media (max-width: 40rem) {
       .metric-tab { --metric-font-size: clamp(1.25rem, 5cqi, 1.75rem); min-block-size: 5.5rem; padding: var(--uui-size-space-3); }
       .eyebrow { font-size: 0.875rem; }
       .comparison { font-size: 0.75rem; }

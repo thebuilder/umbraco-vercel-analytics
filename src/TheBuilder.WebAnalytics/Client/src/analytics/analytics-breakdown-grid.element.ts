@@ -237,12 +237,12 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     .utm-tabs button[aria-selected="true"] { background: var(--uui-color-surface-alt); color: var(--uui-color-text); font-weight: 600; }
     .utm-tabs button:hover { background: color-mix(in srgb, var(--uui-color-selected) 8%, transparent); color: var(--uui-color-text); }
     .utm-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    @container (max-width: 62rem) {
+    @media (max-width: 62rem) {
       .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .breakdown-card, .wide { grid-column: auto; }
       .document-flags-card { inline-size: 100%; }
     }
-    @container (max-width: 56rem) {
+    @media (max-width: 56rem) {
       .grid { grid-template-columns: 1fr; }
       .document-flags-card { grid-column: 1 / -1; }
     }

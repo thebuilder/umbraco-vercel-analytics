@@ -81,6 +81,8 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
     th, td { box-sizing: border-box; padding: var(--uui-size-space-3) var(--uui-size-space-5); text-align: left; }
     thead th { border-bottom: 1px solid var(--uui-color-border); font-weight: 700; }
     thead th:not(:first-child), td { text-align: right; width: 8rem; }
+    tbody tr { height: 2.5rem; }
+    tbody th, tbody td { padding-block: 0; }
     tbody th { font-weight: 500; min-width: 12rem; position: relative; }
     td { font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
     tbody tr:hover, tbody tr:focus-within { position: relative; z-index: 2; }

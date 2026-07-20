@@ -98,8 +98,8 @@ public sealed class VercelAnalyticsReportService(
         var normalizedEventName = eventName.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
-            : $":{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Property))}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Value))}";
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-details:{normalizedEventName}{eventDataCacheKey}:{Normalize(query)}";
+            : $":{EncodeCachePart(eventDataFilter.Property)}:{EncodeCachePart(eventDataFilter.Value)}";
+        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-details:{EncodeCachePart(normalizedEventName)}{eventDataCacheKey}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
             var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
@@ -130,10 +130,10 @@ public sealed class VercelAnalyticsReportService(
         var normalizedSearch = search?.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
-            : $":{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Property))}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Value))}";
-        var eventNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedEventName));
-        var propertyNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedPropertyName));
-        var searchCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedSearch ?? string.Empty));
+            : $":{EncodeCachePart(eventDataFilter.Property)}:{EncodeCachePart(eventDataFilter.Value)}";
+        var eventNameCacheKey = EncodeCachePart(normalizedEventName);
+        var propertyNameCacheKey = EncodeCachePart(normalizedPropertyName);
+        var searchCacheKey = EncodeCachePart(normalizedSearch ?? string.Empty);
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-property-values:{eventNameCacheKey}:{propertyNameCacheKey}:{limit}:{searchCacheKey}{eventDataCacheKey}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
@@ -156,6 +156,9 @@ public sealed class VercelAnalyticsReportService(
         Func<CancellationToken, Task<T>> factory,
         CancellationToken cancellationToken) =>
         cache.GetOrCreateAsync(cacheKey, cacheDuration, factory, cancellationToken);
+
+    private static string EncodeCachePart(string value) =>
+        Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value));
 
     private static string Normalize(AnalyticsQuery query)
     {

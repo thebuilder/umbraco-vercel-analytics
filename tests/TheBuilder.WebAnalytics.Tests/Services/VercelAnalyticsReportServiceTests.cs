@@ -257,6 +257,23 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
+    public async Task Event_details_cache_distinguishes_event_names_from_filter_segments()
+    {
+        var client = new CountingClient();
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var filter = new AnalyticsEventDataFilter("plan", "Pro");
+
+        await service.GetEventDetailsAsync(CreateQuery(), "Signup:cGxhbg==:UHJv", null, CancellationToken.None);
+        await service.GetEventDetailsAsync(CreateQuery(), "Signup", filter, CancellationToken.None);
+
+        Assert.Equal(2, client.EventCountCalls);
+        Assert.Equal(
+            [("Signup:cGxhbg==:UHJv", (AnalyticsEventDataFilter?)null), ("Signup", filter)],
+            client.EventDetailCalls);
+    }
+
+    [Fact]
     public async Task Event_property_search_is_server_backed_and_cached_by_search_term()
     {
         var client = new CountingClient();
@@ -381,6 +398,7 @@ public sealed class VercelAnalyticsReportServiceTests
         public Exception? PreviousCountException { get; init; }
         public Action? BeforePreviousCountFailure { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
+        public List<(string EventName, AnalyticsEventDataFilter? Filter)> EventDetailCalls { get; } = [];
 
         public Task<string> GetProjectNameAsync(VercelAnalyticsConnection connection, CancellationToken cancellationToken) =>
             Task.FromResult(connection.DisplayName);
@@ -442,6 +460,7 @@ public sealed class VercelAnalyticsReportServiceTests
             cancellationToken.ThrowIfCancellationRequested();
             EventCountCalls++;
             LastEventDataFilter = eventDataFilter;
+            EventDetailCalls.Add((eventName, eventDataFilter));
             return Task.FromResult(new AnalyticsEventTotals(30, 12));
         }
 

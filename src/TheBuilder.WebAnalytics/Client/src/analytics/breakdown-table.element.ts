@@ -9,7 +9,6 @@ import {
   breakdownPercentage,
   isPercentageDimension,
   referrerExternalHref,
-  referrerFaviconUrl,
   visibleBreakdownRows,
   type TrafficMetric,
 } from "./breakdown-rows.js";
@@ -64,7 +63,6 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
               ? analyticsRowHref(this.baseUrl, row.value)
               : undefined;
           const countryCode = this.dimension === "Country" ? normalizeCountryCode(row.value) : undefined;
-          const faviconUrl = this.dimension === "ReferrerHostname" ? referrerFaviconUrl(row.value) : undefined;
           const displayValue = countryCode
             ? countryDisplayName(countryCode, navigator.languages)
             : breakdownDisplayValue(row.value, this.dimension);
@@ -84,7 +82,6 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
               <span class="bar" style=${`--bar-width:${barRatio * 100}%;--bar-minimum:${metricValue > 0 ? "4px" : "0px"}`}></span>
               <span class="row-value">
                 ${countryCode ? html`<img class="country-flag" src=${countryFlagUrl(countryCode)} alt="" width="20" height="15" loading="lazy" referrerpolicy="no-referrer" @error=${(event: Event) => ((event.currentTarget as HTMLImageElement).style.visibility = "hidden")}>` : ""}
-                ${faviconUrl ? html`<img class="referrer-favicon" src=${faviconUrl} alt="" width="20" height="20" loading="lazy" referrerpolicy="no-referrer" @error=${(event: Event) => ((event.currentTarget as HTMLImageElement).style.visibility = "hidden")}>` : ""}
                 <span class="row-label" title=${displayValue}>${href
                   ? html`<a href=${href} target="_blank" rel="noopener noreferrer">${displayValue}<span class="visually-hidden"> (opens in a new tab)</span></a>`
                   : displayValue}</span>
@@ -166,7 +163,6 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     .row-label a { color: inherit; text-decoration: none; }
     .row-label a:hover, .row-label a:focus-visible { text-decoration: underline; text-underline-offset: 0.12em; }
     .country-flag { border-radius: 2px; flex: 0 0 auto; object-fit: cover; }
-    .referrer-favicon { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: contain; }
     .percentage-value { display: inline-block; font-weight: 700; outline: none; position: relative; }
     .percentage-value:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
     .percentage-tooltip {

@@ -179,7 +179,9 @@ export function formatAnalyticsDate(
   locale?: string,
   timeZone = browserTimeZone(),
 ): string {
-  const date = new Date(timestamp);
+  const parsed = analyticsDisplayTimestamp(timestamp, timeZone);
+  const { date } = parsed;
+  timeZone = parsed.timeZone;
   if (interval === "Month") {
     const month = new Intl.DateTimeFormat(locale, { month: "short", timeZone }).format(date);
     const year = new Intl.DateTimeFormat("en", { year: "2-digit", timeZone }).format(date);
@@ -198,7 +200,9 @@ export function formatAnalyticsTooltipDate(
   locale?: string,
   timeZone = browserTimeZone(),
 ): string {
-  const date = new Date(timestamp);
+  const parsed = analyticsDisplayTimestamp(timestamp, timeZone);
+  const { date } = parsed;
+  timeZone = parsed.timeZone;
   if (interval === "Hour") {
     return new Intl.DateTimeFormat(locale, {
       month: "short", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit", timeZone,
@@ -240,7 +244,7 @@ export function isAnalyticsPeriodInProgress(
   interval: AnalyticsInterval,
   now = new Date(),
 ): boolean {
-  const start = new Date(timestamp);
+  const start = analyticsDisplayTimestamp(timestamp, "UTC").date;
   if (Number.isNaN(start.valueOf())) return false;
   const end = new Date(start);
   if (interval === "Month") end.setUTCMonth(end.getUTCMonth() + 1);
@@ -248,6 +252,16 @@ export function isAnalyticsPeriodInProgress(
   else if (interval === "Day") end.setUTCDate(end.getUTCDate() + 1);
   else end.setUTCHours(end.getUTCHours() + 1);
   return start <= now && now < end;
+}
+
+function analyticsDisplayTimestamp(timestamp: string, timeZone: string): { date: Date; timeZone: string } {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+    return { date: new Date(`${timestamp}T00:00:00Z`), timeZone: "UTC" };
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(timestamp)) {
+    return { date: new Date(`${timestamp}Z`), timeZone: "UTC" };
+  }
+  return { date: new Date(timestamp), timeZone };
 }
 
 function validIso(value: string): string | undefined {

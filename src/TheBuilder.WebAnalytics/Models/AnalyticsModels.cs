@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using TheBuilder.WebAnalytics.Configuration;
 
@@ -90,7 +91,13 @@ public sealed record AnalyticsEventDataFilter(string Property, string Value);
 
 public sealed record AnalyticsTotals(long PageViews, long Visitors);
 
-public sealed record AnalyticsPoint(DateTimeOffset Timestamp, long PageViews, long Visitors);
+public sealed record AnalyticsPoint(string Timestamp, long PageViews, long Visitors)
+{
+    public AnalyticsPoint(DateTimeOffset timestamp, long pageViews, long visitors)
+        : this(timestamp.ToString("O", CultureInfo.InvariantCulture), pageViews, visitors)
+    {
+    }
+}
 
 public sealed record AnalyticsSummary(
     AnalyticsTotals Totals,

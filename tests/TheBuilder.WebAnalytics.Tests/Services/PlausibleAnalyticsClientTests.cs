@@ -41,7 +41,7 @@ public sealed class PlausibleAnalyticsClientTests
 
         Assert.Equal(new AnalyticsBreakdownRow("Google", 12, 8), Assert.Single(rows));
         Assert.Contains("visit:referrer", handler.Body);
-        Assert.Contains("visit:country_name", handler.Body);
+        Assert.Contains("visit:country", handler.Body);
         Assert.Contains("event:page", handler.Body);
         Assert.Contains("contains", handler.Body);
     }
@@ -57,6 +57,75 @@ public sealed class PlausibleAnalyticsClientTests
         Assert.Equal(new AnalyticsEventRow("Signup", 9, 7), Assert.Single(rows));
         Assert.Contains("event:goal", handler.Body);
         Assert.Contains("events", handler.Body);
+    }
+
+    [Fact]
+    public async Task Trend_preserves_reporting_timezone_labels_and_fills_empty_buckets()
+    {
+        var handler = new RecordingHandler("""{"results":[{"dimensions":["2026-07-02"],"metrics":[12,8]}],"meta":{"time_labels":["2026-07-01","2026-07-02","2026-07-03"]}}""");
+        var client = CreateClient(handler);
+
+        var points = await client.GetTrendAsync(CreateConnection(), CreateQuery(), CancellationToken.None);
+
+        Assert.Equal(["2026-07-01", "2026-07-02", "2026-07-03"], points.Select(point => point.Timestamp));
+        Assert.Equal([0L, 12L, 0L], points.Select(point => point.PageViews));
+        using var body = JsonDocument.Parse(handler.Body!);
+        Assert.True(body.RootElement.GetProperty("include").GetProperty("time_labels").GetBoolean());
+        Assert.Equal("time:day", body.RootElement.GetProperty("dimensions")[0].GetString());
+    }
+
+    [Fact]
+    public async Task Hourly_trend_keeps_provider_local_wall_clock_time()
+    {
+        var handler = new RecordingHandler("""{"results":[{"dimensions":["2026-07-01 23:00:00"],"metrics":[4,3]}],"meta":{"time_labels":["2026-07-01 23:00:00"]}}""");
+        var client = CreateClient(handler);
+        var query = CreateQuery() with { Interval = AnalyticsInterval.Hour };
+
+        var point = Assert.Single(await client.GetTrendAsync(CreateConnection(), query, CancellationToken.None));
+
+        Assert.Equal("2026-07-01T23:00:00", point.Timestamp);
+    }
+
+    [Fact]
+    public async Task Referrer_breakdown_normalizes_and_combines_hostnames()
+    {
+        var handler = new RecordingHandler("""{"results":[{"dimensions":["https://www.example.com/one"],"metrics":[5,3]},{"dimensions":["example.com/two"],"metrics":[7,4]}]}""");
+        var client = CreateClient(handler);
+
+        var rows = await client.GetBreakdownAsync(
+            CreateConnection(), CreateQuery(), AnalyticsDimension.ReferrerHostname, 10, null, CancellationToken.None);
+
+        Assert.Equal(new AnalyticsBreakdownRow("example.com", 12, 7), Assert.Single(rows));
+        using var body = JsonDocument.Parse(handler.Body!);
+        Assert.Equal(100, body.RootElement.GetProperty("pagination").GetProperty("limit").GetInt32());
+    }
+
+    [Fact]
+    public async Task Empty_aggregate_returns_zero_totals()
+    {
+        var client = CreateClient(new RecordingHandler("""{"results":[]}"""));
+
+        var totals = await client.CountAsync(CreateConnection(), CreateQuery(), CancellationToken.None);
+
+        Assert.Equal(new AnalyticsTotals(0, 0), totals);
+    }
+
+    [Fact]
+    public async Task Multiple_aggregate_rows_are_rejected()
+    {
+        var client = CreateClient(new RecordingHandler("""{"results":[{"dimensions":[],"metrics":[1,1]},{"dimensions":[],"metrics":[2,2]}]}"""));
+
+        await Assert.ThrowsAsync<JsonException>(() =>
+            client.CountAsync(CreateConnection(), CreateQuery(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Rows_with_an_unexpected_shape_are_rejected()
+    {
+        var client = CreateClient(new RecordingHandler("""{"results":[{"dimensions":["DK"],"metrics":[1]}]}"""));
+
+        await Assert.ThrowsAsync<JsonException>(() =>
+            client.GetBreakdownAsync(CreateConnection(), CreateQuery(), AnalyticsDimension.Country, 10, null, CancellationToken.None));
     }
 
     [Fact]
@@ -84,9 +153,29 @@ public sealed class PlausibleAnalyticsClientTests
     [Theory]
     [InlineData(AnalyticsDimension.RequestPath, "event:page")]
     [InlineData(AnalyticsDimension.UtmCampaign, "visit:utm_campaign")]
+    [InlineData(AnalyticsDimension.UtmTerm, "visit:utm_term")]
+    [InlineData(AnalyticsDimension.UtmContent, "visit:utm_content")]
+    [InlineData(AnalyticsDimension.Country, "visit:country")]
     [InlineData(AnalyticsDimension.BrowserName, "visit:browser")]
     public void Dimensions_are_mapped_to_plausible(AnalyticsDimension dimension, string expected) =>
         Assert.Equal(expected, PlausibleAnalyticsClient.ToApiDimension(dimension));
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.PaymentRequired)]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    public async Task Error_statuses_preserve_provider_identity(HttpStatusCode statusCode)
+    {
+        var client = CreateClient(new RecordingHandler("{}", statusCode));
+
+        var exception = await Assert.ThrowsAsync<AnalyticsProviderApiException>(() =>
+            client.CountAsync(CreateConnection(), CreateQuery(), CancellationToken.None));
+
+        Assert.Equal(AnalyticsProvider.Plausible, exception.Provider);
+        Assert.Equal(statusCode, exception.StatusCode);
+    }
 
     private static PlausibleAnalyticsClient CreateClient(HttpMessageHandler handler) =>
         new(new HttpClient(handler) { BaseAddress = new Uri("https://plausible.io/") }, new AnalyticsProviderRequestGate());

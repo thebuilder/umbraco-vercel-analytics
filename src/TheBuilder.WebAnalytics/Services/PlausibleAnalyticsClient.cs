@@ -50,11 +50,29 @@ public sealed class PlausibleAnalyticsClient(
             AnalyticsInterval.Month => "time:month",
             _ => throw new ArgumentOutOfRangeException(nameof(query))
         };
-        var response = await QueryAsync(connection, query, ["pageviews", "visitors"], [dimension], null, null, cancellationToken);
-        return response.Results!.Select(row => new AnalyticsPoint(
-            ParseTimestamp(Dimension(row, 0, dimension)),
-            Metric(row, 0, "pageviews"),
-            Metric(row, 1, "visitors"))).ToArray();
+        var response = await QueryAsync(
+            connection,
+            query,
+            ["pageviews", "visitors"],
+            [dimension],
+            null,
+            null,
+            cancellationToken,
+            includeTimeLabels: true);
+        var labels = response.Meta?.TimeLabels
+            ?? throw new JsonException("Plausible response did not contain requested time labels.");
+        if (labels.Any(string.IsNullOrWhiteSpace) || labels.Distinct(StringComparer.Ordinal).Count() != labels.Count)
+            throw new JsonException("Plausible returned invalid or duplicate time labels.");
+        if (response.Results!
+            .GroupBy(row => Dimension(row, 0, dimension), StringComparer.Ordinal)
+            .Any(group => group.Count() > 1))
+            throw new JsonException("Plausible returned duplicate time buckets.");
+        var rows = response.Results!.ToDictionary(row => Dimension(row, 0, dimension), StringComparer.Ordinal);
+        if (rows.Keys.Except(labels, StringComparer.Ordinal).Any())
+            throw new JsonException("Plausible returned a time bucket outside the requested labels.");
+        return labels.Select(label => rows.TryGetValue(label, out var row)
+            ? new AnalyticsPoint(NormalizeTimeLabel(label), Metric(row, 0, "pageviews"), Metric(row, 1, "visitors"))
+            : new AnalyticsPoint(NormalizeTimeLabel(label), 0, 0)).ToArray();
     }
 
     public async Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
@@ -66,18 +84,29 @@ public sealed class PlausibleAnalyticsClient(
         CancellationToken cancellationToken)
     {
         var plausibleDimension = ToApiDimension(dimension);
+        var fetchLimit = dimension == AnalyticsDimension.ReferrerHostname ? 100 : limit;
         var response = await QueryAsync(
             connection,
             query,
             ["pageviews", "visitors"],
             [plausibleDimension],
-            limit,
+            fetchLimit,
             string.IsNullOrWhiteSpace(search) ? null : (plausibleDimension, search.Trim()),
             cancellationToken);
-        return response.Results!.Select(row => new AnalyticsBreakdownRow(
+        var rows = response.Results!.Select(row => new AnalyticsBreakdownRow(
             Dimension(row, 0, plausibleDimension),
             Metric(row, 0, "pageviews"),
-            Metric(row, 1, "visitors"))).ToArray();
+            Metric(row, 1, "visitors")));
+        if (dimension != AnalyticsDimension.ReferrerHostname) return rows.ToArray();
+        return rows
+            .GroupBy(row => NormalizeReferrerHostname(row.Value), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new AnalyticsBreakdownRow(
+                group.Key,
+                group.Sum(row => row.PageViews),
+                group.Sum(row => row.Visitors)))
+            .OrderByDescending(row => row.PageViews)
+            .Take(limit)
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
@@ -110,7 +139,8 @@ public sealed class PlausibleAnalyticsClient(
         int? limit,
         (string Dimension, string Value)? search,
         CancellationToken cancellationToken,
-        string? eventName = null)
+        string? eventName = null,
+        bool includeTimeLabels = false)
     {
         var filters = BuildFilters(query, eventName);
         if (search is { } searchFilter)
@@ -127,7 +157,8 @@ public sealed class PlausibleAnalyticsClient(
             ],
             dimensions,
             filters,
-            limit is null ? null : new PlausiblePagination(Math.Min(limit.Value, 100), 0));
+            limit is null ? null : new PlausiblePagination(Math.Min(limit.Value, 100), 0),
+            includeTimeLabels ? new PlausibleInclude(TimeLabels: true) : null);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, QueryPath)
         {
@@ -145,9 +176,12 @@ public sealed class PlausibleAnalyticsClient(
         }
 
         var payload = await response.Content.ReadFromJsonAsync<PlausibleResponse>(cancellationToken);
-        return payload is { Results: not null }
-            ? payload
-            : throw new JsonException("Plausible response did not contain results.");
+        if (payload is not { Results: not null })
+            throw new JsonException("Plausible response did not contain results.");
+        if (payload.Results.Any(row =>
+            row.Dimensions?.Count != dimensions.Length || row.Metrics?.Count != metrics.Length))
+            throw new JsonException("Plausible response row did not match the requested shape.");
+        return payload;
     }
 
     private static List<object[]> BuildFilters(AnalyticsQuery query, string? eventName)
@@ -170,15 +204,17 @@ public sealed class PlausibleAnalyticsClient(
 
     internal static string ToApiDimension(AnalyticsDimension dimension) => dimension switch
     {
-        AnalyticsDimension.RequestPath or AnalyticsDimension.Route => "event:page",
+        AnalyticsDimension.RequestPath => "event:page",
         AnalyticsDimension.ReferrerHostname => "visit:referrer",
-        AnalyticsDimension.Country => "visit:country_name",
+        AnalyticsDimension.Country => "visit:country",
         AnalyticsDimension.DeviceType => "visit:device",
         AnalyticsDimension.BrowserName => "visit:browser",
         AnalyticsDimension.OsName => "visit:os",
         AnalyticsDimension.UtmSource => "visit:utm_source",
         AnalyticsDimension.UtmMedium => "visit:utm_medium",
         AnalyticsDimension.UtmCampaign => "visit:utm_campaign",
+        AnalyticsDimension.UtmTerm => "visit:utm_term",
+        AnalyticsDimension.UtmContent => "visit:utm_content",
         AnalyticsDimension.EventName => "event:goal",
         _ => throw new ArgumentOutOfRangeException(nameof(dimension), dimension, "Plausible does not support this dimension.")
     };
@@ -186,7 +222,8 @@ public sealed class PlausibleAnalyticsClient(
     private static PlausibleRow SingleRow(PlausibleResponse response) => response.Results!.Count switch
     {
         0 => new PlausibleRow([], [JsonSerializer.SerializeToElement(0), JsonSerializer.SerializeToElement(0)]),
-        _ => response.Results![0]
+        1 => response.Results![0],
+        _ => throw new JsonException("Plausible aggregate response contained multiple rows.")
     };
 
     private static long Metric(PlausibleRow row, int index, string name) =>
@@ -199,10 +236,29 @@ public sealed class PlausibleAnalyticsClient(
             ? row.Dimensions[index]
             : throw new JsonException($"Plausible dimension '{name}' was missing or invalid.");
 
-    private static DateTimeOffset ParseTimestamp(string value) =>
-        DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var timestamp)
-            ? timestamp
-            : throw new JsonException("Plausible returned an invalid time dimension.");
+    private static string NormalizeTimeLabel(string value)
+    {
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        if (DateTime.TryParseExact(
+            value,
+            ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss"],
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var localTime))
+            return localTime.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
+        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var timestamp))
+            return timestamp.ToString("O", CultureInfo.InvariantCulture);
+        throw new JsonException("Plausible returned an invalid time dimension.");
+    }
+
+    private static string NormalizeReferrerHostname(string value)
+    {
+        var candidate = value.Contains("://", StringComparison.Ordinal) ? value : $"https://{value}";
+        return Uri.TryCreate(candidate, UriKind.Absolute, out var uri) && uri.Host.Contains('.')
+            ? uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host
+            : value;
+    }
 
     private sealed record PlausibleRequest(
         [property: JsonPropertyName("site_id")] string SiteId,
@@ -210,14 +266,22 @@ public sealed class PlausibleAnalyticsClient(
         [property: JsonPropertyName("date_range")] string[] DateRange,
         [property: JsonPropertyName("dimensions")] string[] Dimensions,
         [property: JsonPropertyName("filters")] IReadOnlyList<object[]> Filters,
-        [property: JsonPropertyName("pagination"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PlausiblePagination? Pagination);
+        [property: JsonPropertyName("pagination"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PlausiblePagination? Pagination,
+        [property: JsonPropertyName("include"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PlausibleInclude? Include);
 
     private sealed record PlausiblePagination(
         [property: JsonPropertyName("limit")] int Limit,
         [property: JsonPropertyName("offset")] int Offset);
 
+    private sealed record PlausibleInclude(
+        [property: JsonPropertyName("time_labels")] bool TimeLabels);
+
     private sealed record PlausibleResponse(
-        [property: JsonPropertyName("results")] IReadOnlyList<PlausibleRow>? Results);
+        [property: JsonPropertyName("results")] IReadOnlyList<PlausibleRow>? Results,
+        [property: JsonPropertyName("meta")] PlausibleMeta? Meta);
+
+    private sealed record PlausibleMeta(
+        [property: JsonPropertyName("time_labels")] IReadOnlyList<string>? TimeLabels);
 
     private sealed record PlausibleRow(
         [property: JsonPropertyName("dimensions")] IReadOnlyList<string>? Dimensions,

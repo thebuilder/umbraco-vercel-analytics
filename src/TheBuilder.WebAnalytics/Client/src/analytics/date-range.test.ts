@@ -163,6 +163,12 @@ describe("analytics date ranges", () => {
     expect(formatAnalyticsTooltipDate("2026-07-01T00:00:00Z", "Month", "en-US")).toBe("July 2026");
   });
 
+  it("preserves provider-local trend bucket labels without timezone conversion", () => {
+    expect(formatAnalyticsDate("2026-07-15", "Day", "en-US", "America/Los_Angeles")).toBe("Jul 15");
+    expect(formatAnalyticsDate("2026-07-15T23:00:00", "Hour", "en-US", "Europe/Copenhagen")).toBe("11:00 PM");
+    expect(formatAnalyticsTooltipDate("2026-07-15T23:00:00", "Hour", "en-US", "America/New_York")).toContain("11:00 PM");
+  });
+
   it("identifies the current aggregate bucket as incomplete", () => {
     const now = new Date("2026-07-16T10:30:00Z");
 

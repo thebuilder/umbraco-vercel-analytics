@@ -41,6 +41,18 @@ public sealed class WebAnalyticsProblemFactoryTests
     }
 
     [Fact]
+    public void Maps_plausible_not_found_to_invalid_query()
+    {
+        var problem = Assert.IsType<WebAnalyticsProblemDefinition>(
+            WebAnalyticsProblemFactory.FromException(new AnalyticsProviderApiException(
+                HttpStatusCode.NotFound,
+                AnalyticsProvider.Plausible)));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
+        Assert.Equal(WebAnalyticsProblemCodes.InvalidQuery, problem.Code);
+    }
+
+    [Fact]
     public void Maps_transport_timeout_and_payload_failures()
     {
         Assert.Equal(

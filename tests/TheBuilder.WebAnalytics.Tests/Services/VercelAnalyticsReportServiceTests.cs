@@ -76,6 +76,130 @@ public sealed class VercelAnalyticsReportServiceTests
         Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
     }
 
+    public static TheoryData<Func<Exception>> OptionalPreviousRangeFailures =>
+    [
+        () => new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired),
+        () => new HttpRequestException(),
+        () => new System.Text.Json.JsonException(),
+        () => new OperationCanceledException()
+    ];
+
+    [Theory]
+    [MemberData(nameof(OptionalPreviousRangeFailures))]
+    public async Task Summary_remains_available_when_an_optional_previous_range_request_fails(
+        Func<Exception> createException)
+    {
+        var client = new CountingClient { PreviousCountException = createException() };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        Assert.NotNull(summary);
+        Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
+        Assert.Null(summary.PreviousTotals);
+        Assert.Single(summary.Points);
+    }
+
+    [Fact]
+    public async Task Summary_propagates_caller_cancellation_during_an_optional_previous_range_request()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var client = new CountingClient
+        {
+            PreviousCountException = new OperationCanceledException(),
+            BeforePreviousCountFailure = cancellation.Cancel
+        };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetSummaryAsync(CreateQuery(), cancellation.Token));
+    }
+
+    [Fact]
+    public async Task Cancelling_one_summary_waiter_during_an_optional_previous_range_request_preserves_the_shared_report()
+    {
+        var previousCountStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePreviousCount = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var firstCancellation = new CancellationTokenSource();
+        var client = new CountingClient
+        {
+            PreviousCountException = new OperationCanceledException(),
+            PreviousCountStarted = previousCountStarted,
+            PreviousCountRelease = releasePreviousCount
+        };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var first = service.GetSummaryAsync(CreateQuery(), firstCancellation.Token);
+        await previousCountStarted.Task;
+        var second = service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        firstCancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+
+        releasePreviousCount.SetResult();
+        var summary = await second;
+
+        Assert.NotNull(summary);
+        Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
+        Assert.Null(summary.PreviousTotals);
+        Assert.Equal(2, client.CountCalls);
+    }
+
+    [Fact]
+    public async Task Summary_propagates_malformed_current_range_data()
+    {
+        var client = new CountingClient { CurrentCountException = new System.Text.Json.JsonException() };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() =>
+            service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Summary_propagates_unexpected_previous_range_failures()
+    {
+        var client = new CountingClient { PreviousCountException = new InvalidOperationException() };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Summary_propagates_an_unexpected_previous_page_view_failure_when_count_has_an_optional_failure()
+    {
+        var client = new CountingClient
+        {
+            PreviousCountException = new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired),
+            PreviousPageViewTotalException = new InvalidOperationException()
+        };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Summary_propagates_an_unexpected_previous_count_failure_when_page_views_have_an_optional_failure()
+    {
+        var client = new CountingClient
+        {
+            PreviousCountException = new InvalidOperationException(),
+            PreviousPageViewTotalException = new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired)
+        };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
+    }
+
     [Fact]
     public async Task Summary_omits_comparison_when_the_previous_range_would_precede_date_minimum()
     {
@@ -194,6 +318,23 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
+    public async Task Event_details_cache_distinguishes_event_names_from_filter_segments()
+    {
+        var client = new CountingClient();
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var filter = new AnalyticsEventDataFilter("plan", "Pro");
+
+        await service.GetEventDetailsAsync(CreateQuery(), "Signup:cGxhbg==:UHJv", null, CancellationToken.None);
+        await service.GetEventDetailsAsync(CreateQuery(), "Signup", filter, CancellationToken.None);
+
+        Assert.Equal(2, client.EventCountCalls);
+        Assert.Equal(
+            [("Signup:cGxhbg==:UHJv", (AnalyticsEventDataFilter?)null), ("Signup", filter)],
+            client.EventDetailCalls);
+    }
+
+    [Fact]
     public async Task Event_property_search_is_server_backed_and_cached_by_search_term()
     {
         var client = new CountingClient();
@@ -212,7 +353,7 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
-    public async Task Cancellation_is_forwarded_to_the_Vercel_client()
+    public async Task Already_cancelled_summary_does_not_call_the_Vercel_client()
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
@@ -222,6 +363,56 @@ public sealed class VercelAnalyticsReportServiceTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             service.GetSummaryAsync(CreateQuery(), cancellation.Token));
+
+        Assert.Equal(0, client.CountCalls);
+        Assert.Equal(0, client.PageViewTotalCalls);
+        Assert.Equal(0, client.TrendCalls);
+    }
+
+    [Fact]
+    public async Task Concurrent_identical_summaries_share_one_client_fanout()
+    {
+        var countStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCounts = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new CountingClient { CountStarted = countStarted, CountRelease = releaseCounts };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var first = service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+        await countStarted.Task;
+        var second = service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        releaseCounts.SetResult();
+        var summaries = await Task.WhenAll(first, second);
+
+        Assert.NotNull(summaries[0]);
+        Assert.Same(summaries[0], summaries[1]);
+        Assert.Equal(2, client.CountCalls);
+        Assert.Equal(2, client.PageViewTotalCalls);
+        Assert.Equal(1, client.TrendCalls);
+    }
+
+    [Fact]
+    public async Task Cancelling_one_summary_waiter_does_not_cancel_the_shared_client_fanout()
+    {
+        var countStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCounts = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new CountingClient { CountStarted = countStarted, CountRelease = releaseCounts };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        using var firstCancellation = new CancellationTokenSource();
+
+        var first = service.GetSummaryAsync(CreateQuery(), firstCancellation.Token);
+        await countStarted.Task;
+        var second = service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        firstCancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        Assert.False(client.LastCountCancellationToken.IsCancellationRequested);
+
+        releaseCounts.SetResult();
+        Assert.NotNull(await second);
+        Assert.Equal(2, client.CountCalls);
     }
 
     private static AnalyticsQuery CreateQuery() => new(
@@ -261,27 +452,64 @@ public sealed class VercelAnalyticsReportServiceTests
         public AnalyticsEventDataFilter? LastEventDataFilter { get; private set; }
         public string? LastEventPropertySearch { get; private set; }
         public bool FailPreviousCount { get; init; }
+        public TaskCompletionSource? CountStarted { get; init; }
+        public TaskCompletionSource? CountRelease { get; init; }
+        public CancellationToken LastCountCancellationToken { get; private set; }
+        public Exception? CurrentCountException { get; init; }
+        public Exception? PreviousCountException { get; init; }
+        public Exception? PreviousPageViewTotalException { get; init; }
+        public Action? BeforePreviousCountFailure { get; init; }
+        public TaskCompletionSource? PreviousCountStarted { get; init; }
+        public TaskCompletionSource? PreviousCountRelease { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
+        public List<(string EventName, AnalyticsEventDataFilter? Filter)> EventDetailCalls { get; } = [];
 
         public Task<string> GetProjectNameAsync(VercelAnalyticsConnection connection, CancellationToken cancellationToken) =>
             Task.FromResult(connection.DisplayName);
 
-        public Task<AnalyticsTotals> CountAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
+        public async Task<AnalyticsTotals> CountAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            LastCountCancellationToken = cancellationToken;
             CountCalls++;
             CountQueries.Add(query);
+            if (query.To > new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero) && CurrentCountException is not null)
+            {
+                throw CurrentCountException;
+            }
+            if (query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero) && PreviousCountException is not null)
+            {
+                BeforePreviousCountFailure?.Invoke();
+                PreviousCountStarted?.TrySetResult();
+                if (PreviousCountRelease is not null)
+                {
+                    await PreviousCountRelease.Task.WaitAsync(cancellationToken);
+                }
+
+                throw PreviousCountException;
+            }
             if (FailPreviousCount && query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero))
             {
                 throw new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired);
             }
-            return Task.FromResult(new AnalyticsTotals(20, 10));
+
+            CountStarted?.TrySetResult();
+            if (CountRelease is not null)
+            {
+                await CountRelease.Task.WaitAsync(cancellationToken);
+            }
+
+            return new AnalyticsTotals(20, 10);
         }
 
         public Task<long> GetPageViewTotalAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             PageViewTotalCalls++;
+            if (query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero) && PreviousPageViewTotalException is not null)
+            {
+                return Task.FromException<long>(PreviousPageViewTotalException);
+            }
             return Task.FromResult(20L);
         }
 
@@ -306,6 +534,7 @@ public sealed class VercelAnalyticsReportServiceTests
             cancellationToken.ThrowIfCancellationRequested();
             EventCountCalls++;
             LastEventDataFilter = eventDataFilter;
+            EventDetailCalls.Add((eventName, eventDataFilter));
             return Task.FromResult(new AnalyticsEventTotals(30, 12));
         }
 

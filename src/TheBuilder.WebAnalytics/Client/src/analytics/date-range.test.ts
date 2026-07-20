@@ -38,6 +38,48 @@ describe("analytics date ranges", () => {
     expect(normalizeCustomRange("2026-07-15", "2026-07-14", "UTC")).toBeUndefined();
   });
 
+  it("makes date-only custom ranges inclusive of the selected end day", () => {
+    const range = normalizeCustomRange("2026-07-09", "2026-07-16", "UTC");
+
+    expect(range).toMatchObject({
+      from: "2026-07-09T00:00:00.000Z",
+      to: "2026-07-17T00:00:00.000Z",
+      interval: "Day",
+      timeZone: "UTC",
+    });
+    expect(inclusiveRangeDays(range!)).toBe(8);
+  });
+
+  it("keeps date-only custom ranges valid when both selected dates are the same", () => {
+    const range = normalizeCustomRange("2026-07-16", "2026-07-16", "UTC");
+
+    expect(range).toMatchObject({
+      from: "2026-07-16T00:00:00.000Z",
+      to: "2026-07-17T00:00:00.000Z",
+      interval: "Hour",
+    });
+    expect(inclusiveRangeDays(range!)).toBe(1);
+  });
+
+  it("uses the next local midnight for custom ranges across daylight saving time", () => {
+    const range = normalizeCustomRange("2026-03-28", "2026-03-29", "Europe/Copenhagen");
+
+    expect(range).toMatchObject({
+      from: "2026-03-27T23:00:00.000Z",
+      to: "2026-03-29T22:00:00.000Z",
+      interval: "Hour",
+      timeZone: "Europe/Copenhagen",
+    });
+    expect(inclusiveRangeDays(range!)).toBe(2);
+  });
+
+  it("leaves explicit custom instants unchanged", () => {
+    expect(normalizeCustomRange("2026-07-09T00:00:00Z", "2026-07-17T00:00:00Z", "UTC")).toMatchObject({
+      from: "2026-07-09T00:00:00.000Z",
+      to: "2026-07-17T00:00:00.000Z",
+    });
+  });
+
   it("counts both ends of a reporting range", () => {
     expect(inclusiveRangeDays({ from: "2026-06-15T12:00:00Z", to: "2026-07-15T12:00:00Z" })).toBe(30);
   });
@@ -60,8 +102,16 @@ describe("analytics date ranges", () => {
   it("formats preset and custom range labels compactly", () => {
     expect(formatAnalyticsRangeLabel({ from: "2026-07-14T12:00:00Z", to: "2026-07-15T12:00:00Z", timeZone: "UTC" }, 1, "en-US")).toBe("Last 24 hours");
     expect(formatAnalyticsRangeLabel({ from: "2026-06-17T00:00:00Z", to: "2026-07-16T00:00:00Z", timeZone: "UTC" }, 30, "en-US")).toBe("Last 30 days");
-    expect(formatAnalyticsRangeLabel({ from: "2026-07-09T00:00:00Z", to: "2026-07-16T00:00:00Z", timeZone: "UTC" }, "custom", "en-US")).toBe("Jul 9 – 16");
-    expect(formatAnalyticsRangeLabel({ from: "2026-06-17T00:00:00Z", to: "2026-07-16T00:00:00Z", timeZone: "UTC" }, "custom", "en-US")).toBe("Jun 17 – Jul 16");
+    expect(formatAnalyticsRangeLabel({ from: "2026-07-09T00:00:00Z", to: "2026-07-17T00:00:00Z", timeZone: "UTC" }, "custom", "en-US")).toBe("Jul 9 – 16");
+    expect(formatAnalyticsRangeLabel({ from: "2026-06-17T00:00:00Z", to: "2026-07-17T00:00:00Z", timeZone: "UTC" }, "custom", "en-US")).toBe("Jun 17 – Jul 16");
+  });
+
+  it("does not subtract a day from timestamp-based custom range labels", () => {
+    expect(formatAnalyticsRangeLabel({
+      from: "2026-07-09T12:00:00Z",
+      to: "2026-07-17T12:00:00Z",
+      timeZone: "UTC",
+    }, "custom", "en-US")).toBe("Jul 9 – 17");
   });
 
   it("formats chart dates compactly like the Vercel dashboard", () => {

@@ -64,12 +64,6 @@ export function topBreakdownRows(
   return visibleBreakdownRows(rows).slice(0, limit);
 }
 
-export function referrerFaviconUrl(domain: string): string | undefined {
-  const value = domain.trim();
-  if (!value || value.toLocaleLowerCase() === UNKNOWN_LABEL) return undefined;
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(value)}&sz=32`;
-}
-
 export function referrerExternalHref(domain: string): string | undefined {
   const value = domain.trim();
   if (!value || value.toLocaleLowerCase() === UNKNOWN_LABEL || /\s/.test(value)) return undefined;

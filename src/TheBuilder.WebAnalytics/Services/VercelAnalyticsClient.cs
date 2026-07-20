@@ -8,7 +8,9 @@ using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Services;
 
-public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyticsClient
+public sealed class VercelAnalyticsClient(
+    HttpClient httpClient,
+    VercelAnalyticsRequestGate requestGate) : IVercelAnalyticsClient
 {
     private const int EventPropertyLimit = 20;
     private const string CountPath = "v1/query/web-analytics/visits/count";
@@ -44,7 +46,9 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         var envelope = await response.Content.ReadFromJsonAsync<CountEnvelope>(cancellationToken);
         return envelope?.Data is null
             ? throw new JsonException("Vercel Analytics count response did not contain data.")
-            : new AnalyticsTotals(envelope.Data.PageViews, envelope.Data.Visitors);
+            : new AnalyticsTotals(
+                GetRequiredInt64(envelope.Data.PageViews, "pageviews"),
+                GetRequiredInt64(envelope.Data.Visitors, "visitors"));
     }
 
     public async Task<long> GetPageViewTotalAsync(
@@ -59,7 +63,7 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         var envelope = await response.Content.ReadFromJsonAsync<AggregateEnvelope>(cancellationToken);
         // `Others` is intentionally included here: it is Vercel's remainder bucket and
         // makes this partition reconcile with the exact page-view total for the range.
-        return envelope?.Data.Sum(item => GetInt64(item, "pageviews"))
+        return envelope?.Data.Sum(item => GetRequiredInt64(item, "pageviews"))
             ?? throw new JsonException("Vercel Analytics aggregate response did not contain data.");
     }
 
@@ -113,7 +117,9 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         var envelope = await response.Content.ReadFromJsonAsync<EventCountEnvelope>(cancellationToken);
         return envelope?.Data is null
             ? throw new JsonException("Vercel Analytics event count response did not contain data.")
-            : new AnalyticsEventTotals(envelope.Data.Count, envelope.Data.Visitors);
+            : new AnalyticsEventTotals(
+                GetRequiredInt64(envelope.Data.Count, "count"),
+                GetRequiredInt64(envelope.Data.Visitors, "visitors"));
     }
 
     public async Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
@@ -221,15 +227,19 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", connection.AccessToken);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        return await requestGate.RunAsync(async () =>
         {
-            var statusCode = response.StatusCode;
-            response.Dispose();
-            throw new VercelAnalyticsApiException(statusCode);
-        }
+            // ResponseContentRead keeps the lease until the upstream response body is buffered.
+            var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var statusCode = response.StatusCode;
+                response.Dispose();
+                throw new VercelAnalyticsApiException(statusCode);
+            }
 
-        return response;
+            return response;
+        });
     }
 
     private static Dictionary<string, string?> BuildVisitParameters(
@@ -329,18 +339,18 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
 
     private static AnalyticsPoint ParsePoint(JsonElement element) => new(
         element.GetProperty("timestamp").GetDateTimeOffset(),
-        GetInt64(element, "pageviews"),
-        GetInt64(element, "visitors"));
+        GetRequiredInt64(element, "pageviews"),
+        GetRequiredInt64(element, "visitors"));
 
     private static AnalyticsBreakdownRow ParseBreakdown(JsonElement element, string dimension) => new(
         element.TryGetProperty(dimension, out var value) ? value.ToString() : "Unknown",
-        GetInt64(element, "pageviews"),
-        GetInt64(element, "visitors"));
+        GetRequiredInt64(element, "pageviews"),
+        GetRequiredInt64(element, "visitors"));
 
     private static AnalyticsEventRow ParseEvent(JsonElement element) => new(
         element.TryGetProperty("eventName", out var eventName) ? eventName.ToString() : "Unknown",
-        GetInt64(element, "count"),
-        GetInt64(element, "visitors"));
+        GetRequiredInt64(element, "count"),
+        GetRequiredInt64(element, "visitors"));
 
     private static AnalyticsFlagRow ParseFlag(JsonElement element, string dimension, string? flagKey)
     {
@@ -354,8 +364,8 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
                     : default;
         return new AnalyticsFlagRow(
             value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ? "Unknown" : value.ToString(),
-            GetInt64(element, "pageviews"),
-            GetInt64(element, "visitors"));
+            GetRequiredInt64(element, "pageviews"),
+            GetRequiredInt64(element, "visitors"));
     }
 
     private static AnalyticsEventPropertyValue ParseEventPropertyValue(JsonElement element, string propertyName)
@@ -369,22 +379,34 @@ public sealed class VercelAnalyticsClient(HttpClient httpClient) : IVercelAnalyt
                     : default;
         return new AnalyticsEventPropertyValue(
             value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ? "Unknown" : value.ToString(),
-            GetInt64(element, "count"),
-            GetInt64(element, "visitors"));
+            GetRequiredInt64(element, "count"),
+            GetRequiredInt64(element, "visitors"));
     }
 
-    private static long GetInt64(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.TryGetInt64(out var result) ? result : 0;
+    private static long GetRequiredInt64(JsonElement element, string name)
+    {
+        if (element.TryGetProperty(name, out var value) &&
+            value.ValueKind == JsonValueKind.Number &&
+            value.TryGetInt64(out var result))
+        {
+            return result;
+        }
+
+        throw new JsonException($"Vercel Analytics response contained an invalid '{name}' metric.");
+    }
+
+    private static long GetRequiredInt64(long? value, string name) =>
+        value ?? throw new JsonException($"Vercel Analytics response did not contain a '{name}' metric.");
 
     private sealed record CountEnvelope(CountData Data);
 
     private sealed record CountData(
-        [property: System.Text.Json.Serialization.JsonPropertyName("pageviews")] long PageViews,
-        [property: System.Text.Json.Serialization.JsonPropertyName("visitors")] long Visitors);
+        [property: System.Text.Json.Serialization.JsonPropertyName("pageviews")] long? PageViews,
+        [property: System.Text.Json.Serialization.JsonPropertyName("visitors")] long? Visitors);
 
     private sealed record EventCountEnvelope(EventCountData Data);
 
-    private sealed record EventCountData(long Count, long Visitors);
+    private sealed record EventCountData(long? Count, long? Visitors);
 
     private sealed record AggregateEnvelope(JsonElement[] Data);
 

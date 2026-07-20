@@ -55,10 +55,11 @@ export function normalizeCustomRange(
   timeZone = browserTimeZone(),
 ): AnalyticsDateRange | undefined {
   const fromInstant = dateOnlyPattern.test(from) ? zonedMidnightToIso(from, timeZone) : validIso(from);
-  const toInstant = dateOnlyPattern.test(to) ? zonedMidnightToIso(to, timeZone) : validIso(to);
+  const nextToDate = dateOnlyPattern.test(to) ? shiftCalendarDate(to, 1) : undefined;
+  const toInstant = dateOnlyPattern.test(to) ? nextToDate && zonedMidnightToIso(nextToDate, timeZone) : validIso(to);
   if (!fromInstant || !toInstant || Date.parse(fromInstant) >= Date.parse(toInstant)) return undefined;
 
-  const days = Math.max(1, Math.ceil((Date.parse(toInstant) - Date.parse(fromInstant)) / DAY_MS));
+  const days = inclusiveRangeDays({ from: fromInstant, to: toInstant });
   return { from: fromInstant, to: toInstant, interval: intervalForRange(days), timeZone };
 }
 
@@ -106,6 +107,21 @@ export function shiftCalendarMonth(month: string, offset: number): string {
   return toUtcDateOnly(date);
 }
 
+export function shiftCalendarDate(dateOnly: string, offset: number): string | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly);
+  if (!match) return undefined;
+
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (
+    date.getUTCFullYear() !== Number(match[1])
+    || date.getUTCMonth() !== Number(match[2]) - 1
+    || date.getUTCDate() !== Number(match[3])
+  ) return undefined;
+
+  date.setUTCDate(date.getUTCDate() + offset);
+  return toUtcDateOnly(date);
+}
+
 export function formatAnalyticsRangeLabel(
   range: Pick<AnalyticsDateRange, "from" | "to" | "timeZone">,
   preset: DatePreset,
@@ -118,7 +134,15 @@ export function formatAnalyticsRangeLabel(
   if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf())) return "Custom range";
 
   const fromDate = analyticsDateOnly(range.from, range.timeZone);
-  const toDate = analyticsDateOnly(range.to, range.timeZone);
+  const exclusiveCalendarEnd = isZonedMidnight(range.from, range.timeZone)
+    && isZonedMidnight(range.to, range.timeZone);
+  const toDate = exclusiveCalendarEnd
+    ? shiftCalendarDate(analyticsDateOnly(range.to, range.timeZone), -1)
+    : analyticsDateOnly(range.to, range.timeZone);
+  if (!toDate) return "Custom range";
+  const toDisplayDate = exclusiveCalendarEnd
+    ? new Date(zonedMidnightToIso(toDate, range.timeZone) ?? range.to)
+    : to;
   const sameYear = fromDate.slice(0, 4) === toDate.slice(0, 4);
   const sameMonth = sameYear && fromDate.slice(0, 7) === toDate.slice(0, 7);
   const monthDay = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: range.timeZone });
@@ -127,8 +151,8 @@ export function formatAnalyticsRangeLabel(
     const month = new Intl.DateTimeFormat(locale, { month: "short", timeZone: range.timeZone }).format(from);
     return `${month} ${Number(fromDate.slice(8))} – ${Number(toDate.slice(8))}`;
   }
-  if (sameYear) return `${monthDay.format(from)} – ${monthDay.format(to)}`;
-  return `${monthDayYear.format(from)} – ${monthDayYear.format(to)}`;
+  if (sameYear) return `${monthDay.format(from)} – ${monthDay.format(toDisplayDate)}`;
+  return `${monthDayYear.format(from)} – ${monthDayYear.format(toDisplayDate)}`;
 }
 
 export function formatAnalyticsDate(
@@ -185,6 +209,12 @@ export function isAnalyticsPeriodInProgress(
 function validIso(value: string): string | undefined {
   const date = new Date(value);
   return value && !Number.isNaN(date.valueOf()) ? date.toISOString() : undefined;
+}
+
+function isZonedMidnight(timestamp: string, timeZone: string): boolean {
+  const dateOnly = analyticsDateOnly(timestamp, timeZone);
+  const midnight = dateOnly ? zonedMidnightToIso(dateOnly, timeZone) : undefined;
+  return midnight !== undefined && Date.parse(midnight) === Date.parse(timestamp);
 }
 
 function zonedMidnightToIso(dateOnly: string, timeZone: string): string | undefined {

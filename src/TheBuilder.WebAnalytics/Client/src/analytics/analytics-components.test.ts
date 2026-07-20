@@ -163,10 +163,13 @@ describe("analytics presentation components", () => {
     expect(table?.total).toBe(11_339);
   });
 
-  it("renders referrers as secure external links with an emphasized metric", async () => {
+  it("renders referrers as secure external links without loading favicons", async () => {
     const element = document.createElement("vercel-analytics-breakdown-table") as VercelAnalyticsBreakdownTableElement;
     element.dimension = "ReferrerHostname";
-    element.rows = [{ value: "google.com", visitors: 22_304, pageViews: 30_000 }];
+    element.rows = [
+      { value: "google.com", visitors: 22_304, pageViews: 30_000 },
+      { value: "Unknown", visitors: 1, pageViews: 1 },
+    ];
     document.body.append(element);
     await element.updateComplete;
 
@@ -174,6 +177,8 @@ describe("analytics presentation components", () => {
     expect(link?.href).toBe("https://google.com/");
     expect(link?.target).toBe("_blank");
     expect(link?.rel).toBe("noopener noreferrer");
+    expect(element.shadowRoot?.querySelectorAll("img")).toHaveLength(0);
+    expect([...element.shadowRoot?.querySelectorAll(".row-label") ?? []].map((label) => label.textContent?.trim())).toEqual(["google.com (opens in a new tab)", "Unknown"]);
     expect(element.shadowRoot?.querySelector(".metric-number")?.textContent).toBe("22,304");
   });
 

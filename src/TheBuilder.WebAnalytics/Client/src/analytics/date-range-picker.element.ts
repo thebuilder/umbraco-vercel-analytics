@@ -15,6 +15,7 @@ import {
   dateRangeForPreset,
   formatAnalyticsRangeLabel,
   normalizeCustomRange,
+  shiftCalendarDate,
   shiftCalendarMonth,
   type AnalyticsCalendarDay,
   type AnalyticsDateRange,
@@ -42,7 +43,7 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
   @property({ attribute: false }) preset: DatePreset = 30;
 
   @state() private _draftFrom = analyticsDateOnly(this.range.from, this.range.timeZone);
-  @state() private _draftTo = analyticsDateOnly(this.range.to, this.range.timeZone);
+  @state() private _draftTo = this.#draftToForRange();
   @state() private _viewMonth = this._draftTo;
   @state() private _selectingEnd = false;
 
@@ -66,9 +67,14 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
 
   #resetDraft(): void {
     this._draftFrom = analyticsDateOnly(this.range.from, this.range.timeZone);
-    this._draftTo = analyticsDateOnly(this.range.to, this.range.timeZone);
+    this._draftTo = this.#draftToForRange();
     this._viewMonth = this._draftTo;
     this._selectingEnd = false;
+  }
+
+  #draftToForRange(): string {
+    const to = analyticsDateOnly(this.range.to, this.range.timeZone);
+    return this.preset === "custom" ? shiftCalendarDate(to, -1) ?? "" : to;
   }
 
   #onToggle(event: Event): void {

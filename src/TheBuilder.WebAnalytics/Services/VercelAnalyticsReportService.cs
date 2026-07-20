@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Runtime.ExceptionServices;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
 
@@ -16,17 +18,17 @@ public sealed class VercelAnalyticsReportService(
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:summary:{Normalize(query)}";
-        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var count = client.CountAsync(connection, query, cancellationToken);
-            var pageViews = client.GetPageViewTotalAsync(connection, query, cancellationToken);
-            var previousTotals = TryGetPreviousTotalsAsync(connection, query, cancellationToken);
-            var trend = client.GetTrendAsync(connection, query, cancellationToken);
+            var count = client.CountAsync(connection, query, operationCancellationToken);
+            var pageViews = client.GetPageViewTotalAsync(connection, query, operationCancellationToken);
+            var previousTotals = TryGetPreviousTotalsAsync(connection, query, operationCancellationToken);
+            var trend = client.GetTrendAsync(connection, query, operationCancellationToken);
             await Task.WhenAll(count, pageViews, previousTotals, trend);
             var points = await trend;
             var totals = new AnalyticsTotals(await pageViews, (await count).Visitors);
             return new AnalyticsSummary(totals, await previousTotals, points);
-        });
+        }, cancellationToken);
     }
 
     public async Task<AnalyticsBreakdown?> GetBreakdownAsync(
@@ -41,11 +43,11 @@ public sealed class VercelAnalyticsReportService(
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedSearch = search?.Trim();
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:breakdown:{dimension}:{limit}:{normalizedSearch}:{Normalize(query)}";
-        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, normalizedSearch, cancellationToken);
+            var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, normalizedSearch, operationCancellationToken);
             return new AnalyticsBreakdown(dimension, rows);
-        });
+        }, cancellationToken);
     }
 
     public async Task<AnalyticsEventsReport?> GetEventsAsync(
@@ -59,11 +61,11 @@ public sealed class VercelAnalyticsReportService(
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedSearch = search?.Trim();
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:events:{limit}:{normalizedSearch}:{Normalize(query)}";
-        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var rows = await client.GetEventsAsync(connection, query, limit, normalizedSearch, cancellationToken);
+            var rows = await client.GetEventsAsync(connection, query, limit, normalizedSearch, operationCancellationToken);
             return new AnalyticsEventsReport(rows);
-        });
+        }, cancellationToken);
     }
 
     public async Task<AnalyticsFlagsReport?> GetFlagsAsync(
@@ -76,13 +78,13 @@ public sealed class VercelAnalyticsReportService(
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedFlagKey = string.IsNullOrWhiteSpace(flagKey) ? null : flagKey.Trim();
-        var flagKeyCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedFlagKey ?? string.Empty));
+        var flagKeyCacheKey = EncodeCachePart(normalizedFlagKey ?? string.Empty);
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:flags:{flagKeyCacheKey}:{limit}:{Normalize(query)}";
-        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var rows = await client.GetFlagsAsync(connection, query, normalizedFlagKey, limit, cancellationToken);
+            var rows = await client.GetFlagsAsync(connection, query, normalizedFlagKey, limit, operationCancellationToken);
             return new AnalyticsFlagsReport(normalizedFlagKey, rows);
-        });
+        }, cancellationToken);
     }
 
     public async Task<AnalyticsEventDetails?> GetEventDetailsAsync(
@@ -97,19 +99,19 @@ public sealed class VercelAnalyticsReportService(
         var normalizedEventName = eventName.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
-            : $":{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Property))}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Value))}";
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-details:{normalizedEventName}{eventDataCacheKey}:{Normalize(query)}";
-        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
+            : $":{EncodeCachePart(eventDataFilter.Property)}:{EncodeCachePart(eventDataFilter.Value)}";
+        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-details:{EncodeCachePart(normalizedEventName)}{eventDataCacheKey}:{Normalize(query)}";
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, cancellationToken);
-            var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, cancellationToken);
+            var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
+            var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
             await Task.WhenAll(totals, propertyNamesTask);
             var propertyNames = await propertyNamesTask;
             var properties = propertyNames
                 .Select(propertyName => new AnalyticsEventProperty(propertyName, []))
                 .ToArray();
             return new AnalyticsEventDetails(normalizedEventName, await totals, properties);
-        });
+        }, cancellationToken);
     }
 
     public async Task<AnalyticsEventProperty?> GetEventPropertyValuesAsync(
@@ -129,12 +131,12 @@ public sealed class VercelAnalyticsReportService(
         var normalizedSearch = search?.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
-            : $":{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Property))}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(eventDataFilter.Value))}";
-        var eventNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedEventName));
-        var propertyNameCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedPropertyName));
-        var searchCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedSearch ?? string.Empty));
+            : $":{EncodeCachePart(eventDataFilter.Property)}:{EncodeCachePart(eventDataFilter.Value)}";
+        var eventNameCacheKey = EncodeCachePart(normalizedEventName);
+        var propertyNameCacheKey = EncodeCachePart(normalizedPropertyName);
+        var searchCacheKey = EncodeCachePart(normalizedSearch ?? string.Empty);
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-property-values:{eventNameCacheKey}:{propertyNameCacheKey}:{limit}:{searchCacheKey}{eventDataCacheKey}:{Normalize(query)}";
-        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async () =>
+        return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
             var values = await client.GetEventPropertyValuesAsync(
                 connection,
@@ -144,22 +146,26 @@ public sealed class VercelAnalyticsReportService(
                 limit,
                 normalizedSearch,
                 eventDataFilter,
-                cancellationToken);
+                operationCancellationToken);
             return new AnalyticsEventProperty(normalizedPropertyName, values);
-        });
+        }, cancellationToken);
     }
 
     private Task<T> GetOrCreateAsync<T>(
         string cacheKey,
         TimeSpan cacheDuration,
-        Func<Task<T>> factory) =>
-        cache.GetOrCreateAsync(cacheKey, cacheDuration, factory);
+        Func<CancellationToken, Task<T>> factory,
+        CancellationToken cancellationToken) =>
+        cache.GetOrCreateAsync(cacheKey, cacheDuration, factory, cancellationToken);
+
+    private static string EncodeCachePart(string value) =>
+        Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value));
 
     private static string Normalize(AnalyticsQuery query)
     {
         var filters = string.Join(",", (query.Filters ?? [])
             .OrderBy(filter => filter.Dimension)
-            .Select(filter => $"{filter.Dimension}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(filter.Value))}"));
+            .Select(filter => $"{filter.Dimension}:{EncodeCachePart(filter.Value)}"));
         return $"{query.Connection:N}:{query.From.UtcTicks}:{query.To.UtcTicks}:{query.Interval}:{query.RequestPath}:{filters}";
     }
 
@@ -177,16 +183,31 @@ public sealed class VercelAnalyticsReportService(
             To = query.From
         };
 
+        Task? comparison = null;
+
         try
         {
             var count = client.CountAsync(connection, previousQuery, cancellationToken);
             var pageViews = client.GetPageViewTotalAsync(connection, previousQuery, cancellationToken);
-            await Task.WhenAll(count, pageViews);
+            comparison = Task.WhenAll(count, pageViews);
+            await comparison;
             return new AnalyticsTotals(await pageViews, (await count).Visitors);
         }
-        catch (VercelAnalyticsApiException)
+        catch (Exception failure)
         {
-            return null;
+            IEnumerable<Exception> failures = comparison?.Exception?.Flatten().InnerExceptions ?? [failure];
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                var unexpected = failures.FirstOrDefault(failure => !IsOptionalComparisonFailure(failure));
+                if (unexpected is null) return null;
+
+                ExceptionDispatchInfo.Capture(unexpected).Throw();
+            }
+
+            throw;
         }
     }
+
+    private static bool IsOptionalComparisonFailure(Exception failure) =>
+        failure is VercelAnalyticsApiException or HttpRequestException or JsonException or OperationCanceledException;
 }

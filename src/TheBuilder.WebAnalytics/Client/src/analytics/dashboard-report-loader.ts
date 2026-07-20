@@ -9,6 +9,7 @@ export type DashboardReportQuery = NonNullable<SummaryOptions["query"]>;
 type LoadedReport<T> = { status: "success"; data: T } | { status: "error"; error: string };
 type SdkResult<T> = { data?: T; error?: unknown; response: Response };
 type ReportApi = Pick<DashboardApi, "summary" | "events" | "flags" | "breakdown">;
+const maximumConcurrentDashboardReports = 4;
 export type DashboardReportUpdate =
   | ({ panel: "summary" } & LoadedReport<AnalyticsSummary>)
   | ({ panel: "events" } & LoadedReport<AnalyticsEventsReport>)
@@ -29,30 +30,44 @@ export async function loadDashboardReports(
   const utmStatuses: number[] = [];
   const publish = (update: DashboardReportUpdate) => { if (!signal.aborted) onUpdate(update); };
 
-  const summary = settleRequest(api.summary({ query: visitQuery, signal })).then((result) => {
-    const report = toLoadedReport<AnalyticsSummary>(result);
-    if (report.status === "success") baselineSucceeded = true;
-    publish({ panel: "summary", ...report });
-  });
-  const events = settleRequest(api.events({ query: { ...eventQuery, limit: 20 }, signal })).then((result) => {
-    publish({ panel: "events", ...toLoadedReport<AnalyticsEventsReport>(result) });
-  });
-  const flags = settleRequest(api.flags({ query: { ...visitQuery, limit: 10 }, signal })).then((result) => {
-    publish({ panel: "flags", ...toLoadedReport<AnalyticsFlagsReport>(result) });
-  });
-  const breakdowns = dimensions.map((dimension) => settleRequest(api.breakdown({
-    path: { dimension }, query: { ...visitQuery, limit: 11 }, signal,
-  })).then((result) => {
-    const report = toLoadedReport<AnalyticsBreakdown>(result);
-    if (isUtmDimension(dimension)) {
-      if (report.status === "success") utmSucceeded = true;
-      else if (result.status === "success" && result.value.error) utmStatuses.push(result.value.response.status);
-    } else if (report.status === "success") baselineSucceeded = true;
-    publish({ panel: "breakdown", dimension, ...report });
-  }));
+  const reports = [
+    () => settleRequest(api.summary({ query: visitQuery, signal })).then((result) => {
+      const report = toLoadedReport<AnalyticsSummary>(result);
+      if (report.status === "success") baselineSucceeded = true;
+      publish({ panel: "summary", ...report });
+    }),
+    () => settleRequest(api.events({ query: { ...eventQuery, limit: 20 }, signal })).then((result) => {
+      publish({ panel: "events", ...toLoadedReport<AnalyticsEventsReport>(result) });
+    }),
+    () => settleRequest(api.flags({ query: { ...visitQuery, limit: 10 }, signal })).then((result) => {
+      publish({ panel: "flags", ...toLoadedReport<AnalyticsFlagsReport>(result) });
+    }),
+    ...dimensions.map((dimension) => () => settleRequest(api.breakdown({
+      path: { dimension }, query: { ...visitQuery, limit: 11 }, signal,
+    })).then((result) => {
+      const report = toLoadedReport<AnalyticsBreakdown>(result);
+      if (isUtmDimension(dimension)) {
+        if (report.status === "success") utmSucceeded = true;
+        else if (result.status === "success" && result.value.error) utmStatuses.push(result.value.response.status);
+      } else if (report.status === "success") baselineSucceeded = true;
+      publish({ panel: "breakdown", dimension, ...report });
+    })),
+  ];
 
-  await Promise.all([summary, events, flags, ...breakdowns]);
+  await runWithConcurrency(reports, maximumConcurrentDashboardReports);
   return { baselineSucceeded, utmSucceeded, utmStatuses };
+}
+
+async function runWithConcurrency(tasks: ReadonlyArray<() => Promise<void>>, maximumConcurrentTasks: number): Promise<void> {
+  let nextTask = 0;
+  const worker = async () => {
+    while (nextTask < tasks.length) {
+      const task = tasks[nextTask++];
+      await task();
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(maximumConcurrentTasks, tasks.length) }, worker));
 }
 
 function toLoadedReport<T>(result: SettledRequestResult<SdkResult<T>>): LoadedReport<T> {

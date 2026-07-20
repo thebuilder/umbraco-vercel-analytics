@@ -41,6 +41,33 @@ describe("loadDashboardReports", () => {
     expect(updates.some((update) => update.panel === "breakdown" && update.dimension === "UtmSource")).toBe(true);
   });
 
+  it("bounds cold-dashboard top-level requests while publishing every panel", async () => {
+    const dimensions = [
+      "RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName",
+      "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm",
+    ] as const;
+    let active = 0;
+    let maximumActive = 0;
+    const respond = () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      return new Promise<ReturnType<typeof ok>>((resolve) => queueMicrotask(() => resolve(ok({})))).finally(() => {
+        active -= 1;
+      });
+    };
+    sdk.summary.mockImplementation(respond);
+    sdk.events.mockImplementation(respond);
+    sdk.flags.mockImplementation(respond);
+    sdk.breakdown.mockImplementation(respond);
+    const updates: DashboardReportUpdate[] = [];
+
+    await loadDashboardReports(query, query, dimensions, new AbortController().signal, (update) => updates.push(update));
+
+    expect(maximumActive).toBe(4);
+    expect(updates).toHaveLength(dimensions.length + 3);
+    expect(new Set(updates.map((update) => update.panel === "breakdown" ? `${update.panel}:${update.dimension}` : update.panel)).size).toBe(dimensions.length + 3);
+  });
+
   it("preserves partial success and separate visit/event filters", async () => {
     sdk.summary.mockResolvedValue(ok({ totals: { visitors: 1, pageViews: 2 }, points: [] }));
     sdk.events.mockResolvedValue(ok({ rows: [] }));

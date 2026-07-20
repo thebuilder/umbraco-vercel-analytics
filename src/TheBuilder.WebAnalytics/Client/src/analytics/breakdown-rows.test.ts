@@ -7,7 +7,6 @@ import {
   breakdownPercentage,
   isPercentageDimension,
   referrerExternalHref,
-  referrerFaviconUrl,
   topBreakdownRows,
   visibleBreakdownRows,
   withoutAggregatedOthers,
@@ -63,12 +62,6 @@ describe("analytics breakdown rows", () => {
     expect(breakdownBarRatio(86, 86)).toBe(1);
     expect(breakdownBarRatio(7, 86)).toBeCloseTo(0.0814, 4);
     expect(breakdownBarRatio(0, 0)).toBe(0);
-  });
-
-  it("builds an encoded Google favicon URL for a referrer hostname", () => {
-    expect(referrerFaviconUrl("www.example.com")).toBe("https://www.google.com/s2/favicons?domain=www.example.com&sz=32");
-    expect(referrerFaviconUrl("sub domain.example")).toContain("domain=sub%20domain.example");
-    expect(referrerFaviconUrl("Unknown")).toBeUndefined();
   });
 
   it("creates secure external links for attributed referrer hostnames", () => {

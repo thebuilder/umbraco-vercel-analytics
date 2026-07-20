@@ -86,12 +86,14 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
         if (!latestPeriodInProgress || this.points.length < 2) return;
 
         const previousPoint = chart.getDatasetMeta(0).data[this.points.length - 2];
-        if (!previousPoint) return;
+        const currentPoint = chart.getDatasetMeta(0).data[this.points.length - 1];
+        if (!previousPoint || !currentPoint) return;
 
         const { ctx, chartArea } = chart;
+        const separatorX = Math.round((previousPoint.x + currentPoint.x) / 2);
         ctx.save();
         ctx.fillStyle = surfaceColor;
-        ctx.fillRect(Math.round(previousPoint.x), chartArea.top, 1, chartArea.bottom - chartArea.top);
+        ctx.fillRect(separatorX, chartArea.top, 1, chartArea.bottom - chartArea.top);
         ctx.restore();
       },
     };

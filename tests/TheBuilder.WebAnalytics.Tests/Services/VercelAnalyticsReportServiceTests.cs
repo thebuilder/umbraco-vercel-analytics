@@ -118,6 +118,37 @@ public sealed class VercelAnalyticsReportServiceTests
     }
 
     [Fact]
+    public async Task Cancelling_one_summary_waiter_during_an_optional_previous_range_request_preserves_the_shared_report()
+    {
+        var previousCountStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePreviousCount = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var firstCancellation = new CancellationTokenSource();
+        var client = new CountingClient
+        {
+            PreviousCountException = new OperationCanceledException(),
+            PreviousCountStarted = previousCountStarted,
+            PreviousCountRelease = releasePreviousCount
+        };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var first = service.GetSummaryAsync(CreateQuery(), firstCancellation.Token);
+        await previousCountStarted.Task;
+        var second = service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        firstCancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+
+        releasePreviousCount.SetResult();
+        var summary = await second;
+
+        Assert.NotNull(summary);
+        Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
+        Assert.Null(summary.PreviousTotals);
+        Assert.Equal(2, client.CountCalls);
+    }
+
+    [Fact]
     public async Task Summary_propagates_malformed_current_range_data()
     {
         var client = new CountingClient { CurrentCountException = new System.Text.Json.JsonException() };
@@ -397,6 +428,8 @@ public sealed class VercelAnalyticsReportServiceTests
         public Exception? CurrentCountException { get; init; }
         public Exception? PreviousCountException { get; init; }
         public Action? BeforePreviousCountFailure { get; init; }
+        public TaskCompletionSource? PreviousCountStarted { get; init; }
+        public TaskCompletionSource? PreviousCountRelease { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
         public List<(string EventName, AnalyticsEventDataFilter? Filter)> EventDetailCalls { get; } = [];
 
@@ -416,6 +449,12 @@ public sealed class VercelAnalyticsReportServiceTests
             if (query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero) && PreviousCountException is not null)
             {
                 BeforePreviousCountFailure?.Invoke();
+                PreviousCountStarted?.TrySetResult();
+                if (PreviousCountRelease is not null)
+                {
+                    await PreviousCountRelease.Task.WaitAsync(cancellationToken);
+                }
+
                 throw PreviousCountException;
             }
             if (FailPreviousCount && query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero))

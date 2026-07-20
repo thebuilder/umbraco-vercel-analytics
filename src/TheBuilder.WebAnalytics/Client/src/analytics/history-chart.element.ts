@@ -80,21 +80,6 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
         ctx.restore();
       },
     };
-    const currentPeriodSeparator: Plugin<"line"> = {
-      id: "vercelAnalyticsCurrentPeriodSeparator",
-      afterDatasetsDraw: (chart) => {
-        if (!latestPeriodInProgress || this.points.length < 2) return;
-
-        const previousPoint = chart.getDatasetMeta(0).data[this.points.length - 2];
-        if (!previousPoint) return;
-
-        const { ctx, chartArea } = chart;
-        ctx.save();
-        ctx.fillStyle = surfaceColor;
-        ctx.fillRect(Math.round(previousPoint.x), chartArea.top, 1, chartArea.bottom - chartArea.top);
-        ctx.restore();
-      },
-    };
     const locale = this.localize.lang() || undefined;
     this.#chart = new Chart(canvas, {
       type: "line",
@@ -168,7 +153,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
           },
         },
       },
-      plugins: [currentPeriodSeparator, hoverGuide],
+      plugins: [hoverGuide],
     });
   }
 

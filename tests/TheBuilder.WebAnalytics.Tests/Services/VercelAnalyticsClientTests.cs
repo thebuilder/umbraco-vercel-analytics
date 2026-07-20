@@ -547,28 +547,55 @@ public sealed class VercelAnalyticsClientTests
     [Fact]
     public async Task Request_gate_bounds_real_http_operations_across_client_instances()
     {
-        using var gate = new VercelAnalyticsRequestGate(maximumConcurrentRequests: 8);
-        var handler = new BlockingHandler(expectedStarts: 8);
+        using var gate = new VercelAnalyticsRequestGate(maximumConcurrentRequests: 2);
+        var handler = new BlockingHandler(expectedStarts: 2);
         var firstClient = CreateClient(handler, gate);
         var secondClient = CreateClient(handler, gate);
         var connection = CreateConnection();
         var query = new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day);
-        var admitted = Enumerable.Range(0, 8)
-            .Select(index => (index % 2 == 0 ? firstClient : secondClient).CountAsync(connection, query, CancellationToken.None))
-            .ToArray();
+        var admitted = new[]
+        {
+            firstClient.CountAsync(connection, query, CancellationToken.None),
+            secondClient.CountAsync(connection, query, CancellationToken.None)
+        };
 
         await handler.AllExpectedRequestsStarted;
 
-        var rejected = firstClient.CountAsync(connection, query, CancellationToken.None);
-        Assert.True(rejected.IsFaulted);
-        await Assert.ThrowsAsync<AnalyticsReportCapacityException>(async () => await rejected);
+        var queued = firstClient.CountAsync(connection, query, CancellationToken.None);
+        Assert.False(queued.IsCompleted);
+        Assert.Equal(2, handler.RequestCount);
 
         handler.Release();
-        await Task.WhenAll(admitted);
-        await firstClient.CountAsync(connection, query, CancellationToken.None);
+        await Task.WhenAll([.. admitted, queued]);
 
-        Assert.Equal(9, handler.RequestCount);
-        Assert.InRange(handler.MaximumActiveRequests, 1, 8);
+        Assert.Equal(3, handler.RequestCount);
+        Assert.InRange(handler.MaximumActiveRequests, 1, 2);
+    }
+
+    [Fact]
+    public async Task Request_gate_cancels_a_queued_operation_without_starting_http_work()
+    {
+        using var gate = new VercelAnalyticsRequestGate(maximumConcurrentRequests: 1);
+        var handler = new BlockingHandler(expectedStarts: 1);
+        var client = CreateClient(handler, gate);
+        var connection = CreateConnection();
+        var query = new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day);
+        var admitted = client.CountAsync(connection, query, CancellationToken.None);
+
+        await handler.AllExpectedRequestsStarted;
+
+        using var cancellation = new CancellationTokenSource();
+        var queued = client.CountAsync(connection, query, cancellation.Token);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await queued);
+        Assert.Equal(1, handler.RequestCount);
+
+        handler.Release();
+        await admitted;
+        await client.CountAsync(connection, query, CancellationToken.None);
+
+        Assert.Equal(2, handler.RequestCount);
     }
 
     [Fact]

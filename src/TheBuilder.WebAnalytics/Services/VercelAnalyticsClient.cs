@@ -239,7 +239,7 @@ public sealed class VercelAnalyticsClient(
             }
 
             return response;
-        });
+        }, cancellationToken);
     }
 
     private static Dictionary<string, string?> BuildVisitParameters(

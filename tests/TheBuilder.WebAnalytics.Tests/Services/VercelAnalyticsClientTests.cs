@@ -119,6 +119,28 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Trend_sends_the_rolling_daily_window_without_calendar_expansion()
+    {
+        var handler = new RecordingHandler("""{"data":[]}""");
+        var client = CreateClient(handler);
+        var connection = CreateConnection();
+
+        await client.GetTrendAsync(
+            connection,
+            new AnalyticsQuery(
+                connection.Key,
+                new DateTimeOffset(2026, 7, 13, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 7, 20, 16, 0, 0, TimeSpan.Zero),
+                AnalyticsInterval.Day),
+            CancellationToken.None);
+
+        var query = Uri.UnescapeDataString(handler.Request!.RequestUri!.Query);
+        Assert.Contains("since=2026-07-13T15:00:00.0000000+00:00", query);
+        Assert.Contains("until=2026-07-20T15:59:59.9990000+00:00", query);
+        Assert.Contains("by=day", query);
+    }
+
+    [Fact]
     public async Task Page_view_total_sums_all_partition_rows_including_others_and_unknown()
     {
         var handler = new RecordingHandler(

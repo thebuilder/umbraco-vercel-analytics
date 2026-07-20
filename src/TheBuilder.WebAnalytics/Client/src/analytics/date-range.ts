@@ -28,19 +28,36 @@ export function dateRangeForPreset(
 ): AnalyticsDateRange {
   const to = new Date(now);
   const from = new Date(to.valueOf() - preset * DAY_MS);
-  return {
-    from: from.toISOString(),
-    to: to.toISOString(),
-    interval: intervalForRange(preset),
-    timeZone,
-  };
+  if (preset > 1) {
+    const fromHour = startOfZonedHour(from, timeZone);
+    const toHour = startOfZonedHour(to, timeZone);
+    from.setTime(fromHour.valueOf());
+    to.setTime(toHour.valueOf() + 60 * 60 * 1000);
+  }
+  return normalizePresetRange(preset, from.toISOString(), to.toISOString(), timeZone)!;
 }
 
 export function intervalForRange(days: number): AnalyticsInterval {
-  if (days <= 7) return "Hour";
+  if (days <= 1) return "Hour";
   if (days <= 90) return "Day";
   if (days <= 365) return "Week";
   return "Month";
+}
+
+export function normalizePresetRange(
+  preset: number,
+  from: string,
+  to: string,
+  timeZone = browserTimeZone(),
+): AnalyticsDateRange | undefined {
+  if (!isValidTimeZone(timeZone)) return undefined;
+  const fromInstant = validIso(from);
+  const toInstant = validIso(to);
+  if (!fromInstant || !toInstant || Date.parse(fromInstant) >= Date.parse(toInstant)) return undefined;
+  if (preset <= 1) {
+    return { from: fromInstant, to: toInstant, interval: "Hour", timeZone };
+  }
+  return { from: fromInstant, to: toInstant, interval: intervalForRange(preset), timeZone };
 }
 
 export function inclusiveRangeDays(range: Pick<AnalyticsDateRange, "from" | "to">): number {
@@ -54,6 +71,7 @@ export function normalizeCustomRange(
   to: string,
   timeZone = browserTimeZone(),
 ): AnalyticsDateRange | undefined {
+  if (!isValidTimeZone(timeZone)) return undefined;
   const fromInstant = dateOnlyPattern.test(from) ? zonedMidnightToIso(from, timeZone) : validIso(from);
   const nextToDate = dateOnlyPattern.test(to) ? shiftCalendarDate(to, 1) : undefined;
   const toInstant = dateOnlyPattern.test(to) ? nextToDate && zonedMidnightToIso(nextToDate, timeZone) : validIso(to);
@@ -209,6 +227,30 @@ export function isAnalyticsPeriodInProgress(
 function validIso(value: string): string | undefined {
   const date = new Date(value);
   return value && !Number.isNaN(date.valueOf()) ? date.toISOString() : undefined;
+}
+
+function startOfZonedHour(date: Date, timeZone: string): Date {
+  const parts = new Intl.DateTimeFormat("en", {
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const elapsedInHour = value("minute") * 60_000
+    + value("second") * 1000
+    + date.getUTCMilliseconds();
+  return new Date(date.valueOf() - elapsedInHour);
+}
+
+function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isZonedMidnight(timestamp: string, timeZone: string): boolean {

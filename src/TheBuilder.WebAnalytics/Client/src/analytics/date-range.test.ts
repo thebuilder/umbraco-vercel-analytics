@@ -1,13 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { calendarMonthDays, dateRangeForPreset, formatAnalyticsDate, formatAnalyticsRangeLabel, formatAnalyticsTooltipDate, inclusiveRangeDays, intervalForRange, isAnalyticsPeriodInProgress, normalizeCustomRange, shiftCalendarMonth } from "./date-range.js";
+import { calendarMonthDays, dateRangeForPreset, formatAnalyticsDate, formatAnalyticsRangeLabel, formatAnalyticsTooltipDate, inclusiveRangeDays, intervalForRange, isAnalyticsPeriodInProgress, normalizeCustomRange, normalizePresetRange, shiftCalendarMonth } from "./date-range.js";
 
 describe("analytics date ranges", () => {
-  it("creates an exact rolling 30 day range", () => {
-    expect(dateRangeForPreset(30, new Date("2026-07-15T12:00:00Z"), "UTC")).toEqual({
+  it("aligns a multi-day preset to Vercel's rolling hour boundaries", () => {
+    expect(dateRangeForPreset(30, new Date("2026-07-15T12:34:56Z"), "UTC")).toEqual({
       from: "2026-06-15T12:00:00.000Z",
-      to: "2026-07-15T12:00:00.000Z",
+      to: "2026-07-15T13:00:00.000Z",
       interval: "Day",
       timeZone: "UTC",
+    });
+  });
+
+  it("creates Vercel's inclusive Jul 13 through Jul 20 daily window", () => {
+    expect(dateRangeForPreset(7, new Date("2026-07-20T15:05:47.886Z"), "Europe/Copenhagen")).toEqual({
+      from: "2026-07-13T15:00:00.000Z",
+      to: "2026-07-20T16:00:00.000Z",
+      interval: "Day",
+      timeZone: "Europe/Copenhagen",
+    });
+  });
+
+  it("aligns presets to the client hour in fractional-offset timezones", () => {
+    expect(dateRangeForPreset(7, new Date("2026-07-20T11:20:47.886Z"), "Asia/Kathmandu")).toEqual({
+      from: "2026-07-13T11:15:00.000Z",
+      to: "2026-07-20T12:15:00.000Z",
+      interval: "Day",
+      timeZone: "Asia/Kathmandu",
+    });
+  });
+
+  it("preserves Vercel's rolling instants while using daily granularity", () => {
+    expect(normalizePresetRange(
+      7,
+      "2026-07-06T13:00:00.001Z",
+      "2026-07-13T14:00:00.000Z",
+      "Europe/Copenhagen",
+    )).toEqual({
+      from: "2026-07-06T13:00:00.001Z",
+      to: "2026-07-13T14:00:00.000Z",
+      interval: "Day",
+      timeZone: "Europe/Copenhagen",
     });
   });
 
@@ -21,7 +53,9 @@ describe("analytics date ranges", () => {
   });
 
   it("selects granularity from the reporting window", () => {
-    expect(intervalForRange(7)).toBe("Hour");
+    expect(intervalForRange(1)).toBe("Hour");
+    expect(intervalForRange(2)).toBe("Day");
+    expect(intervalForRange(7)).toBe("Day");
     expect(intervalForRange(30)).toBe("Day");
     expect(intervalForRange(90)).toBe("Day");
     expect(intervalForRange(91)).toBe("Week");
@@ -67,7 +101,7 @@ describe("analytics date ranges", () => {
     expect(range).toMatchObject({
       from: "2026-03-27T23:00:00.000Z",
       to: "2026-03-29T22:00:00.000Z",
-      interval: "Hour",
+      interval: "Day",
       timeZone: "Europe/Copenhagen",
     });
     expect(inclusiveRangeDays(range!)).toBe(2);

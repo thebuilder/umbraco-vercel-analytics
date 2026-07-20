@@ -52,6 +52,28 @@ describe("analytics dashboard URL state", () => {
     });
   });
 
+  it("preserves a rolling seven day URL while restoring daily granularity", () => {
+    const state = parseDashboardUrlState(new URLSearchParams(
+      "range=7&from=2026-07-06T13%3A00%3A00.001Z&to=2026-07-13T14%3A00%3A00.000Z&tz=Europe%2FCopenhagen",
+    ));
+
+    expect(state.range).toEqual({
+      from: "2026-07-06T13:00:00.001Z",
+      to: "2026-07-13T14:00:00.000Z",
+      interval: "Day",
+      timeZone: "Europe/Copenhagen",
+    });
+  });
+
+  it("ignores a preset range with an invalid timezone", () => {
+    const state = parseDashboardUrlState(new URLSearchParams(
+      "range=7&from=2026-07-06T13%3A00%3A00Z&to=2026-07-13T14%3A00%3A00Z&tz=Not%2FA_Timezone",
+    ));
+
+    expect(state.preset).toBe(7);
+    expect(state.range).toBeUndefined();
+  });
+
   it("defaults invalid UTM tabs to source", () => {
     expect(parseDashboardUrlState(new URLSearchParams("utm=Nope")).utm).toBe("UtmSource");
   });

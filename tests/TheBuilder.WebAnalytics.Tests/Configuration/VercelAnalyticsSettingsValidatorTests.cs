@@ -99,6 +99,25 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     }
 
     [Fact]
+    public void Undefined_mock_scenarios_do_not_skip_generic_connection_validation()
+    {
+        var settings = CreateSettings();
+        settings.Connections[0].Key = Guid.Empty;
+        settings.Connections[0].ProjectId = string.Empty;
+        settings.Connections[0].MockScenario = (MockAnalyticsScenario)999;
+        settings.Connections[0].DocumentRootKeys = ["not-a-guid"];
+        settings.Connections[0].EnabledDocumentTypeKeys = ["not-a-guid"];
+
+        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+
+        Assert.Contains(failures, failure => failure.Contains("unsupported mock analytics scenario"));
+        Assert.Contains(failures, failure => failure.Contains("requires a valid key"));
+        Assert.Contains(failures, failure => failure.Contains("requires a project ID"));
+        Assert.Contains(failures, failure => failure.Contains("invalid document root key"));
+        Assert.Contains(failures, failure => failure.Contains("invalid document type key"));
+    }
+
+    [Fact]
     public void Undefined_mock_scenarios_are_rejected_in_server_options()
     {
         var settings = CreateSettings();

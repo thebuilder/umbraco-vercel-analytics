@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
 
@@ -185,6 +186,18 @@ public sealed class VercelAnalyticsReportService(
             return new AnalyticsTotals(await pageViews, (await count).Visitors);
         }
         catch (VercelAnalyticsApiException)
+        {
+            return null;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return null;
         }

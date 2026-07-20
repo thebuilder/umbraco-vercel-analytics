@@ -76,6 +76,69 @@ public sealed class VercelAnalyticsReportServiceTests
         Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
     }
 
+    public static TheoryData<Func<Exception>> OptionalPreviousRangeFailures =>
+    [
+        () => new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired),
+        () => new HttpRequestException(),
+        () => new System.Text.Json.JsonException(),
+        () => new OperationCanceledException()
+    ];
+
+    [Theory]
+    [MemberData(nameof(OptionalPreviousRangeFailures))]
+    public async Task Summary_remains_available_when_an_optional_previous_range_request_fails(
+        Func<Exception> createException)
+    {
+        var client = new CountingClient { PreviousCountException = createException() };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
+
+        Assert.NotNull(summary);
+        Assert.Equal(new AnalyticsTotals(20, 10), summary.Totals);
+        Assert.Null(summary.PreviousTotals);
+        Assert.Single(summary.Points);
+    }
+
+    [Fact]
+    public async Task Summary_propagates_caller_cancellation_during_an_optional_previous_range_request()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var client = new CountingClient
+        {
+            PreviousCountException = new OperationCanceledException(),
+            BeforePreviousCountFailure = cancellation.Cancel
+        };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetSummaryAsync(CreateQuery(), cancellation.Token));
+    }
+
+    [Fact]
+    public async Task Summary_propagates_malformed_current_range_data()
+    {
+        var client = new CountingClient { CurrentCountException = new System.Text.Json.JsonException() };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() =>
+            service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Summary_propagates_unexpected_previous_range_failures()
+    {
+        var client = new CountingClient { PreviousCountException = new InvalidOperationException() };
+        using var cache = new AnalyticsReportCache();
+        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
+    }
+
     [Fact]
     public async Task Summary_omits_comparison_when_the_previous_range_would_precede_date_minimum()
     {
@@ -261,6 +324,9 @@ public sealed class VercelAnalyticsReportServiceTests
         public AnalyticsEventDataFilter? LastEventDataFilter { get; private set; }
         public string? LastEventPropertySearch { get; private set; }
         public bool FailPreviousCount { get; init; }
+        public Exception? CurrentCountException { get; init; }
+        public Exception? PreviousCountException { get; init; }
+        public Action? BeforePreviousCountFailure { get; init; }
         public List<AnalyticsQuery> CountQueries { get; } = [];
 
         public Task<string> GetProjectNameAsync(VercelAnalyticsConnection connection, CancellationToken cancellationToken) =>
@@ -271,6 +337,15 @@ public sealed class VercelAnalyticsReportServiceTests
             cancellationToken.ThrowIfCancellationRequested();
             CountCalls++;
             CountQueries.Add(query);
+            if (query.To > new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero) && CurrentCountException is not null)
+            {
+                throw CurrentCountException;
+            }
+            if (query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero) && PreviousCountException is not null)
+            {
+                BeforePreviousCountFailure?.Invoke();
+                throw PreviousCountException;
+            }
             if (FailPreviousCount && query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero))
             {
                 throw new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired);

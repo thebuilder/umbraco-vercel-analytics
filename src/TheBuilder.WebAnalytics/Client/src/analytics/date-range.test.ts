@@ -1,13 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { calendarMonthDays, dateRangeForPreset, formatAnalyticsDate, formatAnalyticsRangeLabel, formatAnalyticsTooltipDate, inclusiveRangeDays, intervalForRange, isAnalyticsPeriodInProgress, normalizeCustomRange, shiftCalendarMonth } from "./date-range.js";
+import { calendarMonthDays, dateRangeForPreset, formatAnalyticsDate, formatAnalyticsRangeLabel, formatAnalyticsTooltipDate, inclusiveRangeDays, intervalForRange, isAnalyticsPeriodInProgress, normalizeCustomRange, normalizePresetRange, shiftCalendarMonth } from "./date-range.js";
 
 describe("analytics date ranges", () => {
-  it("creates an exact rolling 30 day range", () => {
+  it("aligns a multi-day preset to every calendar day touched by the rolling range", () => {
     expect(dateRangeForPreset(30, new Date("2026-07-15T12:00:00Z"), "UTC")).toEqual({
-      from: "2026-06-15T12:00:00.000Z",
-      to: "2026-07-15T12:00:00.000Z",
+      from: "2026-06-15T00:00:00.000Z",
+      to: "2026-07-16T00:00:00.000Z",
       interval: "Day",
       timeZone: "UTC",
+    });
+  });
+
+  it("matches Vercel's timezone-adjusted daily window for a seven day request", () => {
+    expect(normalizePresetRange(
+      7,
+      "2026-07-06T13:00:00.001Z",
+      "2026-07-13T14:00:00.000Z",
+      "Europe/Copenhagen",
+    )).toEqual({
+      from: "2026-07-05T22:00:00.000Z",
+      to: "2026-07-13T22:00:00.000Z",
+      interval: "Day",
+      timeZone: "Europe/Copenhagen",
     });
   });
 
@@ -21,7 +35,9 @@ describe("analytics date ranges", () => {
   });
 
   it("selects granularity from the reporting window", () => {
-    expect(intervalForRange(7)).toBe("Hour");
+    expect(intervalForRange(1)).toBe("Hour");
+    expect(intervalForRange(2)).toBe("Day");
+    expect(intervalForRange(7)).toBe("Day");
     expect(intervalForRange(30)).toBe("Day");
     expect(intervalForRange(90)).toBe("Day");
     expect(intervalForRange(91)).toBe("Week");
@@ -67,7 +83,7 @@ describe("analytics date ranges", () => {
     expect(range).toMatchObject({
       from: "2026-03-27T23:00:00.000Z",
       to: "2026-03-29T22:00:00.000Z",
-      interval: "Hour",
+      interval: "Day",
       timeZone: "Europe/Copenhagen",
     });
     expect(inclusiveRangeDays(range!)).toBe(2);

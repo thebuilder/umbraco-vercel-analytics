@@ -28,19 +28,41 @@ export function dateRangeForPreset(
 ): AnalyticsDateRange {
   const to = new Date(now);
   const from = new Date(to.valueOf() - preset * DAY_MS);
-  return {
-    from: from.toISOString(),
-    to: to.toISOString(),
-    interval: intervalForRange(preset),
-    timeZone,
-  };
+  return normalizePresetRange(preset, from.toISOString(), to.toISOString(), timeZone)!;
 }
 
 export function intervalForRange(days: number): AnalyticsInterval {
-  if (days <= 7) return "Hour";
+  if (days <= 1) return "Hour";
   if (days <= 90) return "Day";
   if (days <= 365) return "Week";
   return "Month";
+}
+
+export function normalizePresetRange(
+  preset: number,
+  from: string,
+  to: string,
+  timeZone = browserTimeZone(),
+): AnalyticsDateRange | undefined {
+  if (!isValidTimeZone(timeZone)) return undefined;
+  const fromInstant = validIso(from);
+  const toInstant = validIso(to);
+  if (!fromInstant || !toInstant || Date.parse(fromInstant) >= Date.parse(toInstant)) return undefined;
+  if (preset <= 1) {
+    return { from: fromInstant, to: toInstant, interval: "Hour", timeZone };
+  }
+
+  const firstDate = analyticsDateOnly(fromInstant, timeZone);
+  const rawLastDate = analyticsDateOnly(toInstant, timeZone);
+  const lastDate = isZonedMidnight(toInstant, timeZone)
+    ? shiftCalendarDate(rawLastDate, -1)
+    : rawLastDate;
+  const dayAfterLast = lastDate && shiftCalendarDate(lastDate, 1);
+  const alignedFrom = firstDate && zonedMidnightToIso(firstDate, timeZone);
+  const alignedTo = dayAfterLast && zonedMidnightToIso(dayAfterLast, timeZone);
+  if (!alignedFrom || !alignedTo || Date.parse(alignedFrom) >= Date.parse(alignedTo)) return undefined;
+
+  return { from: alignedFrom, to: alignedTo, interval: intervalForRange(preset), timeZone };
 }
 
 export function inclusiveRangeDays(range: Pick<AnalyticsDateRange, "from" | "to">): number {
@@ -54,6 +76,7 @@ export function normalizeCustomRange(
   to: string,
   timeZone = browserTimeZone(),
 ): AnalyticsDateRange | undefined {
+  if (!isValidTimeZone(timeZone)) return undefined;
   const fromInstant = dateOnlyPattern.test(from) ? zonedMidnightToIso(from, timeZone) : validIso(from);
   const nextToDate = dateOnlyPattern.test(to) ? shiftCalendarDate(to, 1) : undefined;
   const toInstant = dateOnlyPattern.test(to) ? nextToDate && zonedMidnightToIso(nextToDate, timeZone) : validIso(to);
@@ -134,11 +157,8 @@ export function formatAnalyticsRangeLabel(
   if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf())) return "Custom range";
 
   const fromDate = analyticsDateOnly(range.from, range.timeZone);
-  const exclusiveCalendarEnd = isZonedMidnight(range.from, range.timeZone)
-    && isZonedMidnight(range.to, range.timeZone);
-  const toDate = exclusiveCalendarEnd
-    ? shiftCalendarDate(analyticsDateOnly(range.to, range.timeZone), -1)
-    : analyticsDateOnly(range.to, range.timeZone);
+  const exclusiveCalendarEnd = hasExclusiveCalendarEnd(range);
+  const toDate = analyticsRangeEndDate(range);
   if (!toDate) return "Custom range";
   const toDisplayDate = exclusiveCalendarEnd
     ? new Date(zonedMidnightToIso(toDate, range.timeZone) ?? range.to)
@@ -153,6 +173,13 @@ export function formatAnalyticsRangeLabel(
   }
   if (sameYear) return `${monthDay.format(from)} – ${monthDay.format(toDisplayDate)}`;
   return `${monthDayYear.format(from)} – ${monthDayYear.format(toDisplayDate)}`;
+}
+
+export function analyticsRangeEndDate(
+  range: Pick<AnalyticsDateRange, "from" | "to" | "timeZone">,
+): string {
+  const toDate = analyticsDateOnly(range.to, range.timeZone);
+  return hasExclusiveCalendarEnd(range) ? shiftCalendarDate(toDate, -1) ?? "" : toDate;
 }
 
 export function formatAnalyticsDate(
@@ -211,10 +238,26 @@ function validIso(value: string): string | undefined {
   return value && !Number.isNaN(date.valueOf()) ? date.toISOString() : undefined;
 }
 
+function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isZonedMidnight(timestamp: string, timeZone: string): boolean {
   const dateOnly = analyticsDateOnly(timestamp, timeZone);
   const midnight = dateOnly ? zonedMidnightToIso(dateOnly, timeZone) : undefined;
   return midnight !== undefined && Date.parse(midnight) === Date.parse(timestamp);
+}
+
+function hasExclusiveCalendarEnd(
+  range: Pick<AnalyticsDateRange, "from" | "to" | "timeZone">,
+): boolean {
+  return isZonedMidnight(range.from, range.timeZone)
+    && isZonedMidnight(range.to, range.timeZone);
 }
 
 function zonedMidnightToIso(dateOnly: string, timeZone: string): string | undefined {

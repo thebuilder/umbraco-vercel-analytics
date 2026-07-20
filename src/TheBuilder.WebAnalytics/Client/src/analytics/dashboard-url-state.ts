@@ -1,5 +1,5 @@
 import type { AnalyticsDimension } from "../api/types.gen.js";
-import { normalizeCustomRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
+import { normalizeCustomRange, normalizePresetRange, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
 
 export type AnalyticsFilter = { dimension: AnalyticsDimension; value: string };
 export type DashboardMetric = "visitors" | "pageViews";
@@ -32,11 +32,12 @@ export function parseDashboardUrlState(params: URLSearchParams): DashboardUrlSta
   const preset: DatePreset | undefined = rawPreset === "custom"
     ? "custom"
     : PRESETS.has(numericPreset) ? numericPreset as Exclude<DatePreset, "custom"> : undefined;
-  const range = normalizeCustomRange(
-    params.get("from") ?? "",
-    params.get("to") ?? "",
-    params.get("tz") || undefined,
-  );
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
+  const timeZone = params.get("tz") || undefined;
+  const range = preset && preset !== "custom"
+    ? normalizePresetRange(preset, from, to, timeZone)
+    : normalizeCustomRange(from, to, timeZone);
   const filters: AnalyticsFilter[] = [];
   const seen = new Set<AnalyticsDimension>();
   for (const raw of params.getAll("filter").slice(0, 10)) {

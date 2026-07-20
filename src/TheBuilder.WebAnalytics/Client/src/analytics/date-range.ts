@@ -243,11 +243,19 @@ export function isAnalyticsPeriodInProgress(
   timestamp: string,
   interval: AnalyticsInterval,
   now = new Date(),
+  timeZone = "UTC",
 ): boolean {
-  // Plausible returns date-only and offset-less labels in the site's reporting
-  // timezone. Without that timezone, inferring whether the bucket is complete
-  // would be guesswork, so only absolute timestamps participate here.
-  if (/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?$/.test(timestamp)) return false;
+  if (/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?$/.test(timestamp)) {
+    const currentDate = analyticsDateOnly(now.toISOString(), timeZone);
+    const bucketDate = timestamp.slice(0, 10);
+    if (interval === "Month") return bucketDate.slice(0, 7) === currentDate.slice(0, 7);
+    if (interval === "Week") {
+      const nextWeek = shiftCalendarDate(bucketDate, 7);
+      return currentDate >= bucketDate && nextWeek !== undefined && currentDate < nextWeek;
+    }
+    if (interval === "Day") return bucketDate === currentDate;
+    return timestamp.slice(0, 13) === zonedHourKey(now, timeZone);
+  }
   const start = analyticsDisplayTimestamp(timestamp, "UTC").date;
   if (Number.isNaN(start.valueOf())) return false;
   const end = new Date(start);
@@ -256,6 +264,15 @@ export function isAnalyticsPeriodInProgress(
   else if (interval === "Day") end.setUTCDate(end.getUTCDate() + 1);
   else end.setUTCHours(end.getUTCHours() + 1);
   return start <= now && now < end;
+}
+
+function zonedHourKey(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
+    hourCycle: "h23", timeZone,
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}`;
 }
 
 function analyticsDisplayTimestamp(timestamp: string, timeZone: string): { date: Date; timeZone: string } {

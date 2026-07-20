@@ -57,7 +57,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
     const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
-      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
+      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval, new Date(), this.timeZone)
       : false;
     const hoverGuide: Plugin<"line"> = {
       id: "vercelAnalyticsHoverGuide",
@@ -119,8 +119,11 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
             callbacks: {
               label: (context) => `${label}  ${this.localize.number(context.parsed.y ?? 0)}`,
               title: (items) => {
-                const point = this.points[items[0]?.dataIndex ?? -1];
-                return point ? formatAnalyticsTooltipDate(point.timestamp, this.interval, locale, this.timeZone) : "";
+                const index = items[0]?.dataIndex ?? -1;
+                const point = this.points[index];
+                if (!point) return "";
+                const title = formatAnalyticsTooltipDate(point.timestamp, this.interval, locale, this.timeZone);
+                return latestPeriodInProgress && index === this.points.length - 1 ? `${title} · Ongoing` : title;
               },
             },
             cornerRadius: 3,
@@ -161,7 +164,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
     const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
-      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
+      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval, new Date(), this.timeZone)
       : false;
     const progressDescription = latestPeriodInProgress ? ". The final period is still in progress" : "";
     return html`

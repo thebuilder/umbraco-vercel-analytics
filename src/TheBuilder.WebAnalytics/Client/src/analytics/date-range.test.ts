@@ -177,7 +177,17 @@ describe("analytics date ranges", () => {
     expect(isAnalyticsPeriodInProgress("2026-07-10T00:00:00Z", "Week", now)).toBe(true);
     expect(isAnalyticsPeriodInProgress("2026-07-01T00:00:00Z", "Month", now)).toBe(true);
     expect(isAnalyticsPeriodInProgress("2026-07-15T00:00:00Z", "Day", now)).toBe(false);
-    expect(isAnalyticsPeriodInProgress("2026-07-16T10:00:00", "Hour", now)).toBe(false);
-    expect(isAnalyticsPeriodInProgress("2026-07-16", "Day", now)).toBe(false);
+    expect(isAnalyticsPeriodInProgress("2026-07-16T10:00:00", "Hour", now)).toBe(true);
+    expect(isAnalyticsPeriodInProgress("2026-07-16", "Day", now)).toBe(true);
+  });
+
+  it("identifies provider-local Plausible buckets in the reporting timezone", () => {
+    const now = new Date("2026-07-20T22:30:00Z");
+
+    expect(isAnalyticsPeriodInProgress("2026-07-21", "Day", now, "Europe/Copenhagen")).toBe(true);
+    expect(isAnalyticsPeriodInProgress("2026-07-21T00:00:00", "Hour", now, "Europe/Copenhagen")).toBe(true);
+    expect(isAnalyticsPeriodInProgress("2026-07-20", "Week", now, "Europe/Copenhagen")).toBe(true);
+    expect(isAnalyticsPeriodInProgress("2026-07-01", "Month", now, "Europe/Copenhagen")).toBe(true);
+    expect(isAnalyticsPeriodInProgress("2026-07-20", "Day", now, "Europe/Copenhagen")).toBe(false);
   });
 });

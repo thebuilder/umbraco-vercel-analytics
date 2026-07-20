@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Services;
@@ -62,6 +63,20 @@ public sealed class VercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Count_rejects_missing_visitors()
+    {
+        var client = CreateClient(new RecordingHandler("""{"data":{"pageviews":42}}"""));
+        var connection = CreateConnection();
+
+        var exception = await Assert.ThrowsAsync<JsonException>(() => client.CountAsync(
+            connection,
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            CancellationToken.None));
+
+        Assert.Contains("visitors", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Trend_parses_aggregate_points()
     {
         var handler = new RecordingHandler(
@@ -117,6 +132,23 @@ public sealed class VercelAnalyticsClientTests
         Assert.Equal(42, result);
         Assert.Contains("by=requestPath", handler.Request!.RequestUri!.Query);
         Assert.Contains("limit=100", handler.Request.RequestUri.Query);
+    }
+
+    [Theory]
+    [InlineData("""{"data":[{"requestPath":"/news","visitors":10}]}""")]
+    [InlineData("""{"data":[{"requestPath":"/news","pageviews":"10","visitors":10}]}""")]
+    [InlineData("""{"data":[{"requestPath":"/news","pageviews":{},"visitors":10}]}""")]
+    public async Task Page_view_total_rejects_missing_or_non_numeric_pageviews(string body)
+    {
+        var client = CreateClient(new RecordingHandler(body));
+        var connection = CreateConnection();
+
+        var exception = await Assert.ThrowsAsync<JsonException>(() => client.GetPageViewTotalAsync(
+            connection,
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            CancellationToken.None));
+
+        Assert.Contains("pageviews", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -333,6 +365,72 @@ public sealed class VercelAnalyticsClientTests
         Assert.Contains(
             "filter=requestPath eq '/editor''s' and eventName eq 'CTA''s click'",
             Uri.UnescapeDataString(handler.Request.RequestUri.Query));
+    }
+
+    [Fact]
+    public async Task Event_count_rejects_missing_count()
+    {
+        var client = CreateClient(new RecordingHandler("""{"data":{"visitors":31}}"""));
+        var connection = CreateConnection();
+
+        var exception = await Assert.ThrowsAsync<JsonException>(() => client.CountEventsAsync(
+            connection,
+            new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
+            "Signup",
+            null,
+            CancellationToken.None));
+
+        Assert.Contains("count", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Required_metrics_accept_zero_across_parser_paths()
+    {
+        var connection = CreateConnection();
+        var query = new AnalyticsQuery(
+            connection.Key,
+            new DateOnly(2026, 7, 1),
+            new DateOnly(2026, 7, 2),
+            AnalyticsInterval.Day);
+
+        Assert.Equal(
+            new AnalyticsTotals(0, 0),
+            await CreateClient(new RecordingHandler("""{"data":{"pageviews":0,"visitors":0}}"""))
+                .CountAsync(connection, query, CancellationToken.None));
+        Assert.Equal(
+            0,
+            await CreateClient(new RecordingHandler("""{"data":[{"requestPath":"/news","pageviews":0,"visitors":0}]}"""))
+                .GetPageViewTotalAsync(connection, query, CancellationToken.None));
+
+        var trend = await CreateClient(new RecordingHandler(
+            """{"data":[{"timestamp":"2026-07-01T00:00:00Z","pageviews":0,"visitors":0}]}"""))
+            .GetTrendAsync(connection, query, CancellationToken.None);
+        Assert.Equal((0, 0), (Assert.Single(trend).PageViews, trend[0].Visitors));
+
+        var breakdown = await CreateClient(new RecordingHandler(
+            """{"data":[{"country":"DK","pageviews":0,"visitors":0}]}"""))
+            .GetBreakdownAsync(connection, query, AnalyticsDimension.Country, 10, null, CancellationToken.None);
+        Assert.Equal((0, 0), (Assert.Single(breakdown).PageViews, breakdown[0].Visitors));
+
+        Assert.Equal(
+            new AnalyticsEventTotals(0, 0),
+            await CreateClient(new RecordingHandler("""{"data":{"count":0,"visitors":0}}"""))
+                .CountEventsAsync(connection, query, "Signup", null, CancellationToken.None));
+
+        var events = await CreateClient(new RecordingHandler(
+            """{"data":[{"eventName":"Signup","count":0,"visitors":0}]}"""))
+            .GetEventsAsync(connection, query, 10, null, CancellationToken.None);
+        Assert.Equal((0, 0), (Assert.Single(events).Count, events[0].Visitors));
+
+        var flags = await CreateClient(new RecordingHandler(
+            """{"data":[{"flags":"beta","pageviews":0,"visitors":0}]}"""))
+            .GetFlagsAsync(connection, query, null, 10, CancellationToken.None);
+        Assert.Equal((0, 0), (Assert.Single(flags).PageViews, flags[0].Visitors));
+
+        var values = await CreateClient(new RecordingHandler(
+            """{"data":[{"plan":"Free","count":0,"visitors":0}]}"""))
+            .GetEventPropertyValuesAsync(connection, query, "Signup", "plan", 10, null, null, CancellationToken.None);
+        Assert.Equal((0, 0), (Assert.Single(values).Count, values[0].Visitors));
     }
 
     [Fact]

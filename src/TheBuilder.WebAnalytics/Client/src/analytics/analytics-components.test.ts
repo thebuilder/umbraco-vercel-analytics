@@ -74,8 +74,18 @@ describe("analytics presentation components", () => {
     await element.updateComplete;
 
     const link = element.shadowRoot?.querySelector<HTMLAnchorElement>(".site-link");
+    const favicon = element.shadowRoot?.querySelector<HTMLImageElement>(".site-favicon");
     expect(link?.href).toBe("https://example.com/products/example");
     expect(link?.textContent).toContain("Open page in a new tab");
+    expect(favicon?.src).toBe("https://www.google.com/s2/favicons?domain=example.com&sz=32");
+    expect(favicon?.alt).toBe("");
+    expect(favicon?.getAttribute("referrerpolicy")).toBe("no-referrer");
+
+    favicon?.dispatchEvent(new Event("error"));
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector(".site-favicon")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".site-mark uui-icon")).not.toBeNull();
   });
 
   it("directs first-time users to Web Analytics settings", async () => {

@@ -173,7 +173,7 @@ describe("analytics presentation components", () => {
     expect(table?.total).toBe(11_339);
   });
 
-  it("renders referrers as secure external links without loading favicons", async () => {
+  it("renders referrers as secure external links with favicons for attributed hosts", async () => {
     const element = document.createElement("vercel-analytics-breakdown-table") as VercelAnalyticsBreakdownTableElement;
     element.dimension = "ReferrerHostname";
     element.rows = [
@@ -187,7 +187,10 @@ describe("analytics presentation components", () => {
     expect(link?.href).toBe("https://google.com/");
     expect(link?.target).toBe("_blank");
     expect(link?.rel).toBe("noopener noreferrer");
-    expect(element.shadowRoot?.querySelectorAll("img")).toHaveLength(0);
+    const favicons = element.shadowRoot?.querySelectorAll<HTMLImageElement>(".referrer-favicon");
+    expect(favicons).toHaveLength(1);
+    expect(favicons?.[0]?.src).toBe("https://www.google.com/s2/favicons?domain=google.com&sz=32");
+    expect(favicons?.[0]?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect([...element.shadowRoot?.querySelectorAll(".row-label") ?? []].map((label) => label.textContent?.trim())).toEqual(["google.com (opens in a new tab)", "Unknown"]);
     expect(element.shadowRoot?.querySelector(".metric-number")?.textContent).toBe("22,304");
   });

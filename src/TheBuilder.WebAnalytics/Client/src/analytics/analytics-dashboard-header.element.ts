@@ -4,6 +4,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUISelectElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsConnectionSummary, AnalyticsDocumentRoute } from "../api/types.gen.js";
 import type { AnalyticsDateRange, DatePreset } from "./date-range.js";
+import { googleFaviconUrl } from "./favicon.js";
 import "./date-range-picker.element.js";
 
 @customElement("vercel-analytics-dashboard-header")
@@ -25,10 +26,6 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
     if (this.route?.hostname) return this.route.hostname;
     if (!this.siteUrl) return undefined;
     try { return new URL(this.siteUrl).hostname; } catch { return undefined; }
-  }
-
-  #faviconUrl(hostname: string): string {
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`;
   }
 
   #onFaviconError(hostname: string): void {
@@ -67,10 +64,10 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
                 ${this.#failedFaviconHostname !== hostname ? html`
                   <img
                     class="site-favicon"
-                    src=${this.#faviconUrl(hostname)}
+                    src=${googleFaviconUrl(hostname)}
                     alt=""
-                    width="16"
-                    height="16"
+                    width="24"
+                    height="24"
                     decoding="async"
                     fetchpriority="low"
                     referrerpolicy="no-referrer"
@@ -106,8 +103,9 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
     .site-link:hover .site-link-label { text-decoration: underline; text-underline-offset: 0.18em; }
     .site-link:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 3px; }
     .site-context uui-icon, .external-indicator { color: var(--uui-color-text-alt); flex: 0 0 auto; }
-    .site-mark { align-items: center; block-size: 1rem; display: inline-flex; flex: 0 0 auto; inline-size: 1rem; justify-content: center; position: relative; }
-    .site-favicon { block-size: 1rem; inline-size: 1rem; inset: 0; object-fit: contain; position: absolute; }
+    .site-mark { align-items: center; block-size: 1.5rem; display: inline-flex; flex: 0 0 auto; inline-size: 1.5rem; justify-content: center; position: relative; }
+    .site-mark uui-icon, .site-favicon { block-size: 1.5rem; inline-size: 1.5rem; }
+    .site-favicon { inset: 0; object-fit: contain; position: absolute; }
     .external-indicator { font-size: 0.875em; }
     .controls { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-3); justify-content: flex-end; margin-inline-start: auto; min-inline-size: 0; }
     .project-select {

@@ -2,24 +2,42 @@ import { describe, expect, it } from "vitest";
 import { calendarMonthDays, dateRangeForPreset, formatAnalyticsDate, formatAnalyticsRangeLabel, formatAnalyticsTooltipDate, inclusiveRangeDays, intervalForRange, isAnalyticsPeriodInProgress, normalizeCustomRange, normalizePresetRange, shiftCalendarMonth } from "./date-range.js";
 
 describe("analytics date ranges", () => {
-  it("aligns a multi-day preset to every calendar day touched by the rolling range", () => {
-    expect(dateRangeForPreset(30, new Date("2026-07-15T12:00:00Z"), "UTC")).toEqual({
-      from: "2026-06-15T00:00:00.000Z",
-      to: "2026-07-16T00:00:00.000Z",
+  it("aligns a multi-day preset to Vercel's rolling hour boundaries", () => {
+    expect(dateRangeForPreset(30, new Date("2026-07-15T12:34:56Z"), "UTC")).toEqual({
+      from: "2026-06-15T12:00:00.000Z",
+      to: "2026-07-15T13:00:00.000Z",
       interval: "Day",
       timeZone: "UTC",
     });
   });
 
-  it("matches Vercel's timezone-adjusted daily window for a seven day request", () => {
+  it("creates Vercel's inclusive Jul 13 through Jul 20 daily window", () => {
+    expect(dateRangeForPreset(7, new Date("2026-07-20T15:05:47.886Z"), "Europe/Copenhagen")).toEqual({
+      from: "2026-07-13T15:00:00.000Z",
+      to: "2026-07-20T16:00:00.000Z",
+      interval: "Day",
+      timeZone: "Europe/Copenhagen",
+    });
+  });
+
+  it("aligns presets to the client hour in fractional-offset timezones", () => {
+    expect(dateRangeForPreset(7, new Date("2026-07-20T11:20:47.886Z"), "Asia/Kathmandu")).toEqual({
+      from: "2026-07-13T11:15:00.000Z",
+      to: "2026-07-20T12:15:00.000Z",
+      interval: "Day",
+      timeZone: "Asia/Kathmandu",
+    });
+  });
+
+  it("preserves Vercel's rolling instants while using daily granularity", () => {
     expect(normalizePresetRange(
       7,
       "2026-07-06T13:00:00.001Z",
       "2026-07-13T14:00:00.000Z",
       "Europe/Copenhagen",
     )).toEqual({
-      from: "2026-07-05T22:00:00.000Z",
-      to: "2026-07-13T22:00:00.000Z",
+      from: "2026-07-06T13:00:00.001Z",
+      to: "2026-07-13T14:00:00.000Z",
       interval: "Day",
       timeZone: "Europe/Copenhagen",
     });

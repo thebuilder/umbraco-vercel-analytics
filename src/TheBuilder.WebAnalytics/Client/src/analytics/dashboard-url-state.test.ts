@@ -52,14 +52,14 @@ describe("analytics dashboard URL state", () => {
     });
   });
 
-  it("migrates a rolling seven day URL to Vercel's timezone-adjusted daily window", () => {
+  it("preserves a rolling seven day URL while restoring daily granularity", () => {
     const state = parseDashboardUrlState(new URLSearchParams(
       "range=7&from=2026-07-06T13%3A00%3A00.001Z&to=2026-07-13T14%3A00%3A00.000Z&tz=Europe%2FCopenhagen",
     ));
 
     expect(state.range).toEqual({
-      from: "2026-07-05T22:00:00.000Z",
-      to: "2026-07-13T22:00:00.000Z",
+      from: "2026-07-06T13:00:00.001Z",
+      to: "2026-07-13T14:00:00.000Z",
       interval: "Day",
       timeZone: "Europe/Copenhagen",
     });

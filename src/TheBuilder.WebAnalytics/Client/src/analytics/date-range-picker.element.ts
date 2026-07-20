@@ -11,11 +11,11 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import {
   analyticsDateOnly,
-  analyticsRangeEndDate,
   calendarMonthDays,
   dateRangeForPreset,
   formatAnalyticsRangeLabel,
   normalizeCustomRange,
+  shiftCalendarDate,
   shiftCalendarMonth,
   type AnalyticsCalendarDay,
   type AnalyticsDateRange,
@@ -73,7 +73,8 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
   }
 
   #draftToForRange(): string {
-    return analyticsRangeEndDate(this.range);
+    const to = analyticsDateOnly(this.range.to, this.range.timeZone);
+    return this.preset === "custom" ? shiftCalendarDate(to, -1) ?? "" : to;
   }
 
   #onToggle(event: Event): void {

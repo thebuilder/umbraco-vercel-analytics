@@ -99,7 +99,13 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
         IReadOnlyList<AnalyticsBreakdownRow> rows = isUtm && scenario is not (MockAnalyticsScenario.Complete or MockAnalyticsScenario.Utm)
             ? []
             : Breakdowns.GetValueOrDefault(dimension, []);
-        return Task.FromResult<IReadOnlyList<AnalyticsBreakdownRow>>(Filter(rows, search, limit, row => row.Value));
+        var filtered = ApplyDimensionFilter(rows, query, dimension, row => row.Value);
+        var scale = QueryScale(connection, query, dimension);
+        var scaled = filtered.Select(row => new AnalyticsBreakdownRow(
+            row.Value,
+            Scale(row.PageViews, scale),
+            Scale(row.Visitors, scale)));
+        return Task.FromResult<IReadOnlyList<AnalyticsBreakdownRow>>(Filter(scaled, search, limit, row => row.Value));
     }
 
     public Task<AnalyticsEventTotals> CountEventsAsync(
@@ -112,7 +118,8 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
         cancellationToken.ThrowIfCancellationRequested();
         if (!HasEvents(connection)) return Task.FromResult(new AnalyticsEventTotals(0, 0));
         var row = Events.FirstOrDefault(item => string.Equals(item.EventName, eventName, StringComparison.OrdinalIgnoreCase));
-        var scale = eventDataFilter is null ? 1d : 0.42d;
+        var scale = QueryScale(connection, query, AnalyticsDimension.EventName)
+            * (eventDataFilter is null ? 1d : 0.42d);
         return Task.FromResult(row is null
             ? new AnalyticsEventTotals(0, 0)
             : new AnalyticsEventTotals(Scale(row.Count, scale), Scale(row.Visitors, scale)));
@@ -127,7 +134,13 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     {
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<AnalyticsEventRow> rows = HasEvents(connection) ? Events : [];
-        return Task.FromResult<IReadOnlyList<AnalyticsEventRow>>(Filter(rows, search, limit, row => row.EventName));
+        var filtered = ApplyDimensionFilter(rows, query, AnalyticsDimension.EventName, row => row.EventName);
+        var scale = QueryScale(connection, query, AnalyticsDimension.EventName);
+        var scaled = filtered.Select(row => new AnalyticsEventRow(
+            row.EventName,
+            Scale(row.Count, scale),
+            Scale(row.Visitors, scale)));
+        return Task.FromResult<IReadOnlyList<AnalyticsEventRow>>(Filter(scaled, search, limit, row => row.EventName));
     }
 
     public Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(
@@ -146,7 +159,11 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
             "personalised-homepage" => [new("default", 2410, 1530), new("industry", 1390, 870), new("returning-visitor", 960, 610)],
             _ => FlagKeys
         };
-        return Task.FromResult<IReadOnlyList<AnalyticsFlagRow>>(rows.Take(Math.Max(0, limit)).ToArray());
+        var scale = QueryScale(connection, query);
+        return Task.FromResult<IReadOnlyList<AnalyticsFlagRow>>(rows
+            .Take(Math.Max(0, limit))
+            .Select(row => new AnalyticsFlagRow(row.Value, Scale(row.PageViews, scale), Scale(row.Visitors, scale)))
+            .ToArray());
     }
 
     public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
@@ -207,14 +224,30 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
         return filtered.Take(Math.Max(0, limit)).ToArray();
     }
 
-    private static double QueryScale(VercelAnalyticsConnection connection, AnalyticsQuery query)
+    private static IEnumerable<T> ApplyDimensionFilter<T>(
+        IEnumerable<T> rows,
+        AnalyticsQuery query,
+        AnalyticsDimension dimension,
+        Func<T, string> value)
+    {
+        var selected = query.Filters?.FirstOrDefault(filter => filter.Dimension == dimension);
+        return selected is null
+            ? rows
+            : rows.Where(row => string.Equals(value(row), selected.Value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static double QueryScale(
+        VercelAnalyticsConnection connection,
+        AnalyticsQuery query,
+        AnalyticsDimension? excludedDimension = null)
     {
         var scale = string.IsNullOrWhiteSpace(query.RequestPath) ? 1d : 0.36d;
         var rangeScale = Math.Clamp((query.To - query.From).TotalDays / 30d, 0.03d, 24d);
         var growthScale = Scenario(connection) is MockAnalyticsScenario.Complete
             ? DemoGrowthScale(query.To)
             : 1d;
-        return scale * rangeScale * Math.Pow(0.62d, query.Filters?.Count ?? 0) * growthScale;
+        var filterCount = query.Filters?.Count(filter => filter.Dimension != excludedDimension) ?? 0;
+        return scale * rangeScale * Math.Pow(0.62d, filterCount) * growthScale;
     }
 
     private static double DemoGrowthScale(DateTimeOffset periodEnd)

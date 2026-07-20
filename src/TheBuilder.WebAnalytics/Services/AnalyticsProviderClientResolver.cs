@@ -40,6 +40,7 @@ public sealed class AnalyticsProviderClientResolver(
         IAnalyticsProviderClient client)
     {
         Validate(definition.Capabilities.Events, client is IAnalyticsEventsProviderClient, "events");
+        Validate(definition.Capabilities.EventDetails, client is IAnalyticsEventDetailsProviderClient, "event details");
         Validate(definition.Capabilities.EventProperties, client is IAnalyticsEventPropertiesProviderClient, "event properties");
         Validate(definition.Capabilities.Flags, client is IAnalyticsFlagsProviderClient, "flags");
 

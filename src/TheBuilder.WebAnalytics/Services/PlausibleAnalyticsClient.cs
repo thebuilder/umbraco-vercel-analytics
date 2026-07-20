@@ -10,7 +10,7 @@ namespace TheBuilder.WebAnalytics.Services;
 
 public sealed class PlausibleAnalyticsClient(
     HttpClient httpClient,
-    AnalyticsProviderRequestGate requestGate) : IAnalyticsProviderClient, IAnalyticsEventsProviderClient
+    AnalyticsProviderRequestGate requestGate) : IAnalyticsProviderClient, IAnalyticsEventsProviderClient, IAnalyticsEventDetailsProviderClient
 {
     private const string QueryPath = "api/v2/query";
 
@@ -118,6 +118,28 @@ public sealed class PlausibleAnalyticsClient(
             Dimension(row, 0, dimension),
             Metric(row, 0, "events"),
             Metric(row, 1, "visitors"))).ToArray();
+    }
+
+    public async Task<AnalyticsEventTotals> CountEventsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        AnalyticsEventDataFilter? eventDataFilter,
+        CancellationToken cancellationToken)
+    {
+        if (eventDataFilter is not null)
+            throw new ArgumentException("Plausible event property filters require configured property support.", nameof(eventDataFilter));
+        var response = await QueryAsync(
+            connection,
+            query,
+            ["events", "visitors"],
+            [],
+            null,
+            null,
+            cancellationToken,
+            eventName: eventName);
+        var row = SingleRow(response);
+        return new AnalyticsEventTotals(Metric(row, 0, "events"), Metric(row, 1, "visitors"));
     }
 
     private async Task<PlausibleResponse> QueryAsync(

@@ -18,7 +18,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
-export class TheBuilderWebAnalyticsService {
+export class WebAnalyticsService {
     public static connections<ThrowOnError extends boolean = false>(options?: Options<ConnectionsData, ThrowOnError>): RequestResult<ConnectionsResponses, ConnectionsErrors, ThrowOnError> {
         return (options?.client ?? client).get<ConnectionsResponses, ConnectionsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],

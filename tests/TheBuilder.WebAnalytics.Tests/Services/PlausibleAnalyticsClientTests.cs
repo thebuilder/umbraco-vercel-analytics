@@ -82,6 +82,23 @@ public sealed class PlausibleAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Event_details_count_the_selected_plausible_goal()
+    {
+        var handler = new RecordingHandler("""{"results":[{"dimensions":[],"metrics":[9,7]}]}""");
+        var client = CreateClient(handler);
+
+        var totals = await client.CountEventsAsync(
+            CreateConnection(), CreateQuery(), "Read article", null, CancellationToken.None);
+
+        Assert.Equal(new AnalyticsEventTotals(9, 7), totals);
+        using var body = JsonDocument.Parse(handler.Body!);
+        Assert.Equal("events", body.RootElement.GetProperty("metrics")[0].GetString());
+        Assert.Equal("is", body.RootElement.GetProperty("filters")[0][0].GetString());
+        Assert.Equal("event:goal", body.RootElement.GetProperty("filters")[0][1].GetString());
+        Assert.Equal("Read article", body.RootElement.GetProperty("filters")[0][2][0].GetString());
+    }
+
+    [Fact]
     public async Task Trend_preserves_reporting_timezone_labels_and_fills_empty_buckets()
     {
         var handler = new RecordingHandler("""{"results":[{"dimensions":["2026-07-02"],"metrics":[12,8]}],"meta":{"time_labels":["2026-07-01","2026-07-02","2026-07-03"]}}""");

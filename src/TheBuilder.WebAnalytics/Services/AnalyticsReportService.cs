@@ -106,8 +106,8 @@ public sealed class AnalyticsReportService(
     {
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
-        if (connection is null || !connection.IsConfigured || !connection.Capabilities.EventProperties) return null;
-        if (clients.Get(connection) is not IAnalyticsEventPropertiesProviderClient client) return null;
+        if (connection is null || !connection.IsConfigured || !connection.Capabilities.EventDetails) return null;
+        if (clients.Get(connection) is not IAnalyticsEventDetailsProviderClient client) return null;
         var normalizedEventName = eventName.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
@@ -116,7 +116,10 @@ public sealed class AnalyticsReportService(
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
             var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
-            var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
+            var propertyNamesTask = connection.Capabilities.EventProperties
+                && client is IAnalyticsEventPropertiesProviderClient propertiesClient
+                    ? propertiesClient.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken)
+                    : Task.FromResult<IReadOnlyList<string>>([]);
             await Task.WhenAll(totals, propertyNamesTask);
             var propertyNames = await propertyNamesTask;
             var properties = propertyNames

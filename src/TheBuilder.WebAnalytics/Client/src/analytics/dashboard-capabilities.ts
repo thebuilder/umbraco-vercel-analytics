@@ -5,6 +5,7 @@ import type { AcquisitionView } from "./dashboard-cards.js";
 export const unavailableCapabilities: AnalyticsCapabilities = {
   dimensions: [],
   events: false,
+  eventDetails: false,
   eventProperties: false,
   flags: false,
 };

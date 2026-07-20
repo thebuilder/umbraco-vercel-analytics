@@ -42,7 +42,7 @@ public interface IAnalyticsEventsProviderClient
         CancellationToken cancellationToken);
 }
 
-public interface IAnalyticsEventPropertiesProviderClient
+public interface IAnalyticsEventDetailsProviderClient
 {
     Task<AnalyticsEventTotals> CountEventsAsync(
         AnalyticsConnection connection,
@@ -50,7 +50,10 @@ public interface IAnalyticsEventPropertiesProviderClient
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
+}
 
+public interface IAnalyticsEventPropertiesProviderClient : IAnalyticsEventDetailsProviderClient
+{
     Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
         AnalyticsConnection connection,
         AnalyticsQuery query,

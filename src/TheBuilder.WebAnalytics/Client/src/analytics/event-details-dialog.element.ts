@@ -178,9 +178,13 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
         <uui-dialog-layout headline=${this.eventName}>
           <div class="dialog-content" aria-busy=${this.loading}>
             ${this.details ? html`
+              <dl class="event-totals" aria-label="Event totals">
+                <div><dt>Total events</dt><dd>${this.localize.number(this.details.totals.count)}</dd></div>
+                <div><dt>Visitors</dt><dd>${this.localize.number(this.details.totals.visitors)}</dd></div>
+              </dl>
               ${activeProperty ? html`
                 ${this.#renderProperty(activeProperty)}
-              ` : html`<div class="state-message"><umb-empty-state headline="No event properties"><p>This event has totals, but no custom data properties were recorded in the selected period.</p></umb-empty-state></div>`}
+              ` : html`<div class="state-message"><umb-empty-state headline="No property breakdowns"><p>Totals are available, but property exploration is not available for this event or provider.</p></umb-empty-state></div>`}
               ${this.loading ? html`<div class="loading-overlay" role="status">Updating event details…</div>` : ""}
               ${this.unavailable ? html`<div class="error-overlay" role="alert">${this.unavailable}</div>` : ""}
             ` : this.loading ? html`<div class="loading" role="status">Loading event details…</div>` : this.unavailable ? html`<div class="state-message"><umb-empty-state headline="Event details unavailable"><p>${this.unavailable}</p></umb-empty-state></div>` : ""}
@@ -196,6 +200,10 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
     dialog::backdrop { background: rgb(0 0 0 / 45%); }
     uui-dialog-layout { --uui-size-10: var(--uui-size-space-5); --uui-size-14: var(--uui-size-space-6); }
     .dialog-content { block-size: min(30rem, 52dvh); display: flex; flex-direction: column; min-block-size: 0; position: relative; }
+    .event-totals { border-bottom: 1px solid var(--uui-color-border); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 calc(-1 * var(--uui-size-space-5)); padding: 0 var(--uui-size-space-5) var(--uui-size-space-4); }
+    .event-totals div { display: grid; gap: var(--uui-size-space-1); }
+    .event-totals dt { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
+    .event-totals dd { font-size: var(--uui-type-h3-size); font-weight: 700; margin: 0; }
     .property-tabs { display: flex; gap: var(--uui-size-space-1); inline-size: calc(100% + var(--uui-size-space-5)); margin-inline-start: calc(-1 * var(--uui-size-space-5)); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
     .property-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
     .property-tabs button:first-child { padding-inline-start: var(--uui-size-space-5); }

@@ -30,6 +30,7 @@ public sealed class WebAnalyticsApiController(
         Core,
         Breakdown,
         Events,
+        EventDetails,
         EventProperties,
         Flags
     }
@@ -224,7 +225,7 @@ public sealed class WebAnalyticsApiController(
 
         var scope = await AuthorizeAndBuildQueryAsync(
             connection, from, to, interval, documentId, culture, path, filter, ReportScope.EventSelection,
-            new(ReportCapability.EventProperties), cancellationToken);
+            new(string.IsNullOrWhiteSpace(eventProperty) ? ReportCapability.EventDetails : ReportCapability.EventProperties), cancellationToken);
         if (scope.Error is not null) return scope.Error;
         var eventDataFilter = string.IsNullOrWhiteSpace(eventProperty)
             ? null
@@ -371,6 +372,7 @@ public sealed class WebAnalyticsApiController(
             ReportCapability.Core => true,
             ReportCapability.Breakdown => requirement.Dimension is not null && capabilities.Dimensions.Contains(requirement.Dimension.Value),
             ReportCapability.Events => capabilities.Events,
+            ReportCapability.EventDetails => capabilities.EventDetails,
             ReportCapability.EventProperties => capabilities.EventProperties,
             ReportCapability.Flags => capabilities.Flags,
             _ => false

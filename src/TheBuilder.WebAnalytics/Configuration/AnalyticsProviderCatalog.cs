@@ -47,13 +47,13 @@ public sealed class AnalyticsProviderCatalog
         [
             new(
                 AnalyticsProvider.Vercel,
-                new(VercelDimensions, Events: true, EventProperties: true, Flags: true),
+                new(VercelDimensions, Events: true, EventDetails: true, EventProperties: true, Flags: true),
                 AnalyticsConnectionIdentifier.ProjectId,
                 supportsTeam: true,
                 options => options.Providers.Vercel.AccessToken),
             new(
                 AnalyticsProvider.Plausible,
-                new(PlausibleDimensions, Events: true, EventProperties: false, Flags: false),
+                new(PlausibleDimensions, Events: true, EventDetails: true, EventProperties: false, Flags: false),
                 AnalyticsConnectionIdentifier.SiteId,
                 supportsTeam: false,
                 options => options.Providers.Plausible.AccessToken,

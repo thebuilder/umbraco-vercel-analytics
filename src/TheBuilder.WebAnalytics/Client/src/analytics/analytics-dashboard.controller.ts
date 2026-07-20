@@ -326,7 +326,7 @@ export class AnalyticsDashboardController {
     }
     const { data, error, response } = result.value;
     this.#set({ expandedBreakdown: { dimension, headline, report: error
-      ? errorState(apiErrorMessage(error, response.status), previous)
+      ? errorState(apiErrorMessage(error, response?.status ?? 0), previous)
       : successState(data?.rows ?? []) } });
   }
 
@@ -353,7 +353,7 @@ export class AnalyticsDashboardController {
     if (result.status === "error") { this.#set({ expandedEvents: errorState(reportErrorMessage(result.error), previous) }); return; }
     const { data, error, response } = result.value;
     this.#set({ expandedEvents: error
-      ? errorState(apiErrorMessage(error, response.status), previous)
+      ? errorState(apiErrorMessage(error, response?.status ?? 0), previous)
       : successState(visibleEventRows(data?.rows ?? [])) });
   }
 
@@ -372,14 +372,14 @@ export class AnalyticsDashboardController {
     if (result.status === "error") { this.#set({ selectedFlag: errorState(reportErrorMessage(result.error), previous) }); return; }
     const { data, error, response } = result.value;
     this.#set({ selectedFlag: error || !data
-      ? errorState(apiErrorMessage(error, response.status), previous)
+      ? errorState(apiErrorMessage(error, response?.status ?? 0), previous)
       : successState(data) });
   }
 
   clearSelectedFlag(): void { this.#flagRequest.cancel(); this.#set({ selectedFlag: undefined }); }
 
   async selectEvent(eventName: string): Promise<void> {
-    if (!this.#capabilities().eventProperties) return;
+    if (!this.#capabilities().eventDetails) return;
     this.closeEvents();
     await this.#loadEventDetails(eventName);
   }
@@ -553,7 +553,7 @@ export class AnalyticsDashboardController {
     }
     const { data, error, response } = result.value;
     if (error || !data) {
-      this.#set({ selectedEvent: { ...this.state.selectedEvent, details: errorState(apiErrorMessage(error, response.status), previous) } });
+      this.#set({ selectedEvent: { ...this.state.selectedEvent, details: errorState(apiErrorMessage(error, response?.status ?? 0), previous) } });
       return;
     }
     this.#set({ selectedEvent: { ...this.state.selectedEvent, details: successState(data) } });
@@ -588,7 +588,7 @@ export class AnalyticsDashboardController {
     }
     const { data, error, response } = result.value;
     this.#set({ selectedEvent: { ...current, property: error || !data
-      ? errorState(apiErrorMessage(error, response.status), previous)
+      ? errorState(apiErrorMessage(error, response?.status ?? 0), previous)
       : successState(data) } });
   }
 

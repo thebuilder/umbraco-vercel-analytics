@@ -339,14 +339,16 @@ public sealed class WebAnalyticsApiControllerTests
     }
 
     [Fact]
-    public async Task Event_details_rejects_a_provider_without_event_property_capabilities()
+    public async Task Event_details_with_property_filter_rejects_a_provider_without_event_property_capabilities()
     {
         var response = await CreatePlausibleBoundaryController().EventDetails(
             MainKey,
             UtcDate(2026, 7, 1),
             UtcDate(2026, 7, 3),
             AnalyticsInterval.Day,
-            "Signup");
+            "Signup",
+            "plan",
+            "Pro");
 
         AssertInvalidQuery(response.Result);
     }

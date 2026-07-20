@@ -8,7 +8,7 @@ import type { DashboardMetric } from "./dashboard-url-state.js";
 type SummaryOptions = NonNullable<Parameters<DashboardApi["summary"]>[0]>;
 export type DashboardReportQuery = NonNullable<SummaryOptions["query"]>;
 type LoadedReport<T> = { status: "success"; data: T } | { status: "error"; error: string };
-type SdkResult<T> = { data?: T; error?: unknown; response: Response };
+type SdkResult<T> = { data?: T; error?: unknown; response?: Response };
 type ReportApi = Pick<DashboardApi, "summary" | "events" | "flags" | "breakdown">;
 type BreakdownApi = Pick<ReportApi, "breakdown">;
 const maximumConcurrentDashboardReports = 4;
@@ -78,7 +78,7 @@ export async function loadDashboardBreakdown(
   }));
   return {
     update: { panel: "breakdown", dimension, ...toLoadedReport<AnalyticsBreakdown>(result) },
-    responseStatus: result.status === "success" ? result.value.response.status : undefined,
+    responseStatus: result.status === "success" ? result.value.response?.status : undefined,
   };
 }
 
@@ -97,7 +97,7 @@ async function runWithConcurrency(tasks: ReadonlyArray<() => Promise<void>>, max
 function toLoadedReport<T>(result: SettledRequestResult<SdkResult<T>>): LoadedReport<T> {
   if (result.status === "error") return { status: "error", error: reportErrorMessage(result.error) };
   const { data, error, response } = result.value;
-  if (error) return { status: "error", error: reportErrorMessage(withStatus(error, response.status)) };
+  if (error) return { status: "error", error: reportErrorMessage(withStatus(error, response?.status ?? 0)) };
   return data == null
     ? { status: "error", error: "Analytics returned an empty response." }
     : { status: "success", data };

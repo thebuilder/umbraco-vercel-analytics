@@ -31,6 +31,7 @@ import type { VercelAnalyticsBreakdownTableElement } from "./breakdown-table.ele
 import type { VercelAnalyticsDashboardElement } from "./analytics-dashboard.element.js";
 import type { VercelAnalyticsDashboardHeaderElement } from "./analytics-dashboard-header.element.js";
 import type { VercelAnalyticsFlagCardElement } from "./flag-card.element.js";
+import type { VercelAnalyticsEventDetailsDialogElement } from "./event-details-dialog.element.js";
 import "./analytics-summary.element.js";
 import "./analytics-breakdown-grid.element.js";
 import "./analytics-dashboard.element.js";
@@ -44,7 +45,7 @@ beforeEach(() => {
       key: "11111111-1111-1111-1111-111111111111",
       displayName: "Main",
       provider: "Vercel",
-      capabilities: { dimensions: ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"], events: true, eventProperties: true, flags: true },
+      capabilities: { dimensions: ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"], events: true, eventDetails: true, eventProperties: true, flags: true },
       isDefault: true,
       isConfigured: true,
       baseUrl: "https://example.com",
@@ -73,7 +74,7 @@ describe("analytics presentation components", () => {
     element.route = {
       connection: "11111111-1111-1111-1111-111111111111",
       provider: "Vercel",
-      capabilities: { dimensions: ["RequestPath"], events: true, eventProperties: true, flags: true },
+      capabilities: { dimensions: ["RequestPath"], events: true, eventDetails: true, eventProperties: true, flags: true },
       culture: "en-US",
       hostname: "example.com",
       path: "/products/example",
@@ -316,6 +317,26 @@ describe("analytics presentation components", () => {
     expect(element.shadowRoot?.querySelector(".empty strong")?.textContent).toBe("No events");
     expect(element.shadowRoot?.querySelector(".empty-icon uui-icon")?.getAttribute("name")).toBe("icon-lightning");
     expect(element.shadowRoot?.querySelector(".empty a")).toBeNull();
+  });
+
+  it("shows Plausible event totals when property exploration is unavailable", async () => {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const element = document.createElement("vercel-analytics-event-details-dialog") as VercelAnalyticsEventDetailsDialogElement;
+    element.eventName = "Read article";
+    element.details = {
+      eventName: "Read article",
+      totals: { count: 9, visitors: 7 },
+      properties: [],
+    };
+    document.body.append(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector(".event-totals")?.textContent).toContain("Total events9");
+    expect(element.shadowRoot?.querySelector(".event-totals")?.textContent).toContain("Visitors7");
+    expect(element.shadowRoot?.querySelector("umb-empty-state")?.getAttribute("headline")).toBe("No property breakdowns");
   });
 
   it("drills from flag keys into their values and provides setup guidance when empty", async () => {

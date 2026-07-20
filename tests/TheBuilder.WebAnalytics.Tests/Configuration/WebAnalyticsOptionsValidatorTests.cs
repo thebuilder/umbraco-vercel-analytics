@@ -145,6 +145,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
         Assert.True(connection.IsConfigured);
         Assert.False(connection.Capabilities.Flags);
         Assert.False(connection.Capabilities.EventProperties);
+        Assert.True(connection.Capabilities.EventDetails);
         Assert.True(connection.Capabilities.Events);
     }
 

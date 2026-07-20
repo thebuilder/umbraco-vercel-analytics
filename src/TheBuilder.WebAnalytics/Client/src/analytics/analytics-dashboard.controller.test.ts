@@ -7,6 +7,7 @@ import { dateRangeForPreset } from "./date-range.js";
 const fullCapabilities: AnalyticsCapabilities = {
   dimensions: ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
   events: true,
+  eventDetails: true,
   eventProperties: true,
   flags: true,
 };
@@ -315,7 +316,7 @@ describe("AnalyticsDashboardController", () => {
     expect(api.summary).not.toHaveBeenCalled();
   });
 
-  it("uses provider capabilities to skip flags and event details for Plausible", async () => {
+  it("uses provider capabilities to load Plausible event details without property exploration", async () => {
     const api = dashboardApi();
     api.connections.mockResolvedValue(ok({
       enabled: true,
@@ -327,6 +328,7 @@ describe("AnalyticsDashboardController", () => {
         capabilities: {
           dimensions: ["RequestPath", "Referrer", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
           events: true,
+          eventDetails: true,
           eventProperties: false,
           flags: false,
         },
@@ -344,7 +346,8 @@ describe("AnalyticsDashboardController", () => {
 
     expect(api.events).toHaveBeenCalled();
     expect(api.flags).not.toHaveBeenCalled();
-    expect(api.eventDetails).not.toHaveBeenCalled();
+    expect(api.eventDetails).toHaveBeenCalled();
+    expect(api.eventPropertyValues).not.toHaveBeenCalled();
     expect(controller.cards().some((card) => card.kind === "tabbed-breakdown" && card.id === "utm")).toBe(true);
   });
 
@@ -355,6 +358,7 @@ describe("AnalyticsDashboardController", () => {
         .filter((dimension) => dimension !== "Route" && dimension !== "ReferrerHostname")
         .concat("Referrer"),
       events: true,
+      eventDetails: true,
       eventProperties: false,
       flags: false,
     };

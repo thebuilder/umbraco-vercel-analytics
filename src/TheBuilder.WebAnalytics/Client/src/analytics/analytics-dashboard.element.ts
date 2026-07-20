@@ -128,7 +128,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           .utmDimension=${state.utmDimension}
           .baseUrl=${this.#controller.linkBaseUrl()}
           .supportsEvents=${capabilities?.events ?? false}
-          .supportsEventProperties=${capabilities?.eventProperties ?? false}
+          .supportsEventDetails=${capabilities?.eventDetails ?? false}
           .supportsFlags=${capabilities?.flags ?? false}
           @view-breakdown=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
           @view-events=${() => this.#controller.openEvents()}
@@ -157,14 +157,14 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           <vercel-analytics-event-dialog
             .rows=${stateData(expandedEvents) ?? []}
             .filters=${state.filters}
-            .detailsEnabled=${capabilities?.eventProperties ?? false}
+            .detailsEnabled=${capabilities?.eventDetails ?? false}
             .loading=${expandedEvents.status === "loading"}
             .unavailable=${this.#error(expandedEvents)}
             @search-events=${(event: CustomEvent<{ search: string }>) => this.#controller.openEvents(event.detail.search, true)}
             @select-event=${(event: CustomEvent<{ eventName: string }>) => this.#controller.selectEvent(event.detail.eventName)}
             @close-events=${() => this.#controller.closeEvents()}></vercel-analytics-event-dialog>
         ` : ""}
-        ${selected && capabilities?.eventProperties ? html`
+        ${selected && capabilities?.eventDetails ? html`
           <vercel-analytics-event-details-dialog
             .eventName=${selected.eventName}
             .details=${stateData(selected.details)}

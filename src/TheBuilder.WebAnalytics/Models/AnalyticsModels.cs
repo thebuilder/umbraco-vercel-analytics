@@ -64,6 +64,7 @@ public enum AnalyticsDimension
 public sealed record AnalyticsCapabilities(
     IReadOnlyList<AnalyticsDimension> Dimensions,
     bool Events,
+    bool EventDetails,
     bool EventProperties,
     bool Flags);
 

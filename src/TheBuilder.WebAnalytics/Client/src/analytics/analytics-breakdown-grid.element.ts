@@ -25,7 +25,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
   @property() utmDimension: UtmDimension = "UtmSource";
   @property() baseUrl?: string;
   @property({ type: Boolean }) supportsEvents = true;
-  @property({ type: Boolean }) supportsEventProperties = true;
+  @property({ type: Boolean }) supportsEventDetails = true;
   @property({ type: Boolean }) supportsFlags = true;
 
   #dispatch(name: string, detail?: unknown): void {
@@ -190,7 +190,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     return html`
       <uui-box class="breakdown-card wide">
         <div class=${`breakdown-card-layout${empty ? " empty-card-layout" : ""}`}>
-          <vercel-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading} .detailsEnabled=${this.supportsEventProperties}></vercel-analytics-event-table>
+          <vercel-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading} .detailsEnabled=${this.supportsEventDetails}></vercel-analytics-event-table>
           ${empty ? "" : html`<footer class="breakdown-footer">
             ${!loading && rows.length ? html`<uui-button look="secondary" label="View all events" @click=${() => this.#dispatch("view-events")}>View all</uui-button>` : ""}
           </footer>`}

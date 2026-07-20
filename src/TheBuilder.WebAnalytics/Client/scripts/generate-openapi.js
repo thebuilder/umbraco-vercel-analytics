@@ -24,6 +24,28 @@ const printGenerationError = (error, message) => {
   error('Review the generator error and the client configuration in generate-openapi.js.');
 };
 
+export const normalizeOpenApiDocument = (document) => {
+  const schemas = document?.components?.schemas;
+  for (const schemaName of ['AnalyticsConnectionSettingsResponse', 'UpdateAnalyticsConnectionRequest']) {
+    const schema = schemas?.[schemaName];
+    const mockScenario = schema?.properties?.mockScenario;
+    if (mockScenario === undefined) continue;
+
+    if (mockScenario.$ref !== undefined) {
+      schema.properties.mockScenario = {
+        allOf: [{ $ref: mockScenario.$ref }],
+        nullable: true,
+      };
+    } else {
+      mockScenario.nullable = true;
+    }
+    if (Array.isArray(schema.required)) {
+      schema.required = schema.required.filter((propertyName) => propertyName !== 'mockScenario');
+    }
+  }
+  return document;
+};
+
 export async function generateOpenApiClient({
   swaggerUrl = getSwaggerUrl(process.argv.slice(2)),
   fetchImplementation = fetch,
@@ -61,8 +83,9 @@ export async function generateOpenApiClient({
 
   log(`Calling ${chalk.yellow('hey-api')} to generate TypeScript client`);
   try {
+    const openApiDocument = normalizeOpenApiDocument(await response.json());
     await createClientImplementation({
-      input: swaggerUrl,
+      input: openApiDocument,
       output: 'src/api',
       plugins: [
         ...defaultPlugins,
@@ -70,7 +93,7 @@ export async function generateOpenApiClient({
         {
           name: '@hey-api/sdk',
           asClass: true,
-          classNameBuilder: '{{name}}Service',
+          classNameBuilder: 'WebAnalyticsService',
         },
       ],
     });

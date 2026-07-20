@@ -9,6 +9,8 @@ namespace TheBuilder.WebAnalytics.Tests.Services;
 
 public sealed class VercelAnalyticsClientTests
 {
+    private static readonly TimeSpan CoordinationTimeout = TimeSpan.FromSeconds(5);
+
     [Fact]
     public async Task Project_name_uses_project_endpoint_and_team_scope()
     {
@@ -559,17 +561,24 @@ public sealed class VercelAnalyticsClientTests
             secondClient.CountAsync(connection, query, CancellationToken.None)
         };
 
-        await handler.AllExpectedRequestsStarted;
+        try
+        {
+            await handler.AllExpectedRequestsStarted.WaitAsync(CoordinationTimeout);
 
-        var queued = firstClient.CountAsync(connection, query, CancellationToken.None);
-        Assert.False(queued.IsCompleted);
-        Assert.Equal(2, handler.RequestCount);
+            var queued = firstClient.CountAsync(connection, query, CancellationToken.None);
+            Assert.False(queued.IsCompleted);
+            Assert.Equal(2, handler.RequestCount);
 
-        handler.Release();
-        await Task.WhenAll([.. admitted, queued]);
+            handler.Release();
+            await Task.WhenAll([.. admitted, queued]).WaitAsync(CoordinationTimeout);
 
-        Assert.Equal(3, handler.RequestCount);
-        Assert.InRange(handler.MaximumActiveRequests, 1, 2);
+            Assert.Equal(3, handler.RequestCount);
+            Assert.InRange(handler.MaximumActiveRequests, 1, 2);
+        }
+        finally
+        {
+            handler.Release();
+        }
     }
 
     [Fact]
@@ -582,20 +591,27 @@ public sealed class VercelAnalyticsClientTests
         var query = new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day);
         var admitted = client.CountAsync(connection, query, CancellationToken.None);
 
-        await handler.AllExpectedRequestsStarted;
+        try
+        {
+            await handler.AllExpectedRequestsStarted.WaitAsync(CoordinationTimeout);
 
-        using var cancellation = new CancellationTokenSource();
-        var queued = client.CountAsync(connection, query, cancellation.Token);
-        cancellation.Cancel();
+            using var cancellation = new CancellationTokenSource();
+            var queued = client.CountAsync(connection, query, cancellation.Token);
+            cancellation.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await queued);
-        Assert.Equal(1, handler.RequestCount);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued.WaitAsync(CoordinationTimeout));
+            Assert.Equal(1, handler.RequestCount);
 
-        handler.Release();
-        await admitted;
-        await client.CountAsync(connection, query, CancellationToken.None);
+            handler.Release();
+            await admitted.WaitAsync(CoordinationTimeout);
+            await client.CountAsync(connection, query, CancellationToken.None).WaitAsync(CoordinationTimeout);
 
-        Assert.Equal(2, handler.RequestCount);
+            Assert.Equal(2, handler.RequestCount);
+        }
+        finally
+        {
+            handler.Release();
+        }
     }
 
     [Fact]
@@ -651,7 +667,7 @@ public sealed class VercelAnalyticsClientTests
         public int MaximumActiveRequests => _maximumActiveRequests;
         public int RequestCount => _requestCount;
 
-        public void Release() => _release.SetResult();
+        public void Release() => _release.TrySetResult();
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {

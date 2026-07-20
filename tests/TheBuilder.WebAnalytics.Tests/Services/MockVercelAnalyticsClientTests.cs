@@ -110,6 +110,44 @@ public sealed class MockVercelAnalyticsClientTests
     }
 
     [Fact]
+    public async Task Demo_filters_update_matching_and_cross_dimension_reports()
+    {
+        var client = new MockVercelAnalyticsClient();
+        var connection = CreateRegistry(MockAnalyticsScenario.Complete, true).Get(MockKey)!;
+        var baseline = CreateQuery();
+        var filtered = baseline with
+        {
+            Filters = [new AnalyticsFilter(AnalyticsDimension.Country, "DK")]
+        };
+
+        var baselineDevices = await client.GetBreakdownAsync(
+            connection, baseline, AnalyticsDimension.DeviceType, 10, null, CancellationToken.None);
+        var filteredDevices = await client.GetBreakdownAsync(
+            connection, filtered, AnalyticsDimension.DeviceType, 10, null, CancellationToken.None);
+        var filteredCountries = await client.GetBreakdownAsync(
+            connection, filtered, AnalyticsDimension.Country, 10, null, CancellationToken.None);
+
+        Assert.All(filteredDevices.Zip(baselineDevices), pair =>
+            Assert.True(pair.First.Visitors < pair.Second.Visitors));
+        Assert.Equal("DK", Assert.Single(filteredCountries).Value);
+    }
+
+    [Fact]
+    public async Task Demo_event_filter_returns_only_the_selected_event()
+    {
+        var client = new MockVercelAnalyticsClient();
+        var connection = CreateRegistry(MockAnalyticsScenario.Complete, true).Get(MockKey)!;
+        var query = CreateQuery() with
+        {
+            Filters = [new AnalyticsFilter(AnalyticsDimension.EventName, "Demo requested")]
+        };
+
+        var events = await client.GetEventsAsync(connection, query, 10, null, CancellationToken.None);
+
+        Assert.Equal("Demo requested", Assert.Single(events).EventName);
+    }
+
+    [Fact]
     public async Task Router_serves_mock_reports_without_contacting_Vercel()
     {
         var handler = new RejectingHttpMessageHandler();

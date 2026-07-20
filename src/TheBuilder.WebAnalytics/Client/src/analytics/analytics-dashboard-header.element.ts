@@ -60,7 +60,6 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
           ${hostname && linkUrl ? html`
             <a class="site-link" href=${linkUrl} target="_blank" rel="noopener noreferrer">
               <span class="site-mark">
-                <uui-icon name="icon-globe" aria-hidden="true"></uui-icon>
                 ${this.#failedFaviconHostname !== hostname ? html`
                   <img
                     class="site-favicon"
@@ -72,7 +71,7 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
                     fetchpriority="low"
                     referrerpolicy="no-referrer"
                     @error=${() => this.#onFaviconError(hostname)}>
-                ` : ""}
+                ` : html`<uui-icon name="icon-globe" aria-hidden="true"></uui-icon>`}
               </span>
               <span class="site-link-label">${hostname}</span>
               <uui-icon class="external-indicator" name="icon-out" aria-hidden="true"></uui-icon>

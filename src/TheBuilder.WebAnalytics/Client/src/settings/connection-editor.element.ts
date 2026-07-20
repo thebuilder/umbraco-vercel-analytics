@@ -13,6 +13,7 @@ import type { AnalyticsConnectionSettingsResponse } from "../api/types.gen.js";
 import type { ConnectionValidationErrors } from "./settings-model.js";
 import { parseTeamReference, teamReference } from "./settings-model.js";
 import { getMockScenario } from "./mock-scenarios.js";
+import { providerLogo } from "./provider-identity.js";
 import "@umbraco-cms/backoffice/document";
 
 export type EditableAnalyticsConnection = AnalyticsConnectionSettingsResponse;
@@ -30,6 +31,12 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
   @property({ type: Boolean }) dirty = false;
   @property({ type: Boolean }) testing = false;
   @state() private _tokenCopied = false;
+  private _copyStatusTimer?: number;
+
+  disconnectedCallback(): void {
+    window.clearTimeout(this._copyStatusTimer);
+    super.disconnectedCallback();
+  }
 
   protected firstUpdated(): void {
     if (!(this.connection.provider === "Plausible" ? this.connection.siteId : this.connection.projectId)) {
@@ -84,8 +91,9 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
 
   async #copyTokenKey(): Promise<void> {
     await navigator.clipboard.writeText(`WebAnalytics__ConnectionAccessTokens__${this.connection.key}`);
+    window.clearTimeout(this._copyStatusTimer);
     this._tokenCopied = true;
-    window.setTimeout(() => { this._tokenCopied = false; }, 2000);
+    this._copyStatusTimer = window.setTimeout(() => { this._tokenCopied = false; }, 2000);
   }
 
   #dispatch(name: "test-connection" | "remove-connection"): void {
@@ -101,6 +109,10 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
       ? "Save changes before testing this connection."
       : isMock && !this.mockConnectionsEnabled
         ? "Mock connections are only active in Development."
+        : !identifier
+          ? `Enter the ${connection.provider === "Plausible" ? "site ID" : "project ID"} before testing.`
+          : !connection.hasAccessToken
+            ? "Add a server-side credential before testing this connection."
         : "Test the saved connection.";
     const tokenStatus = isMock
       ? this.mockConnectionsEnabled ? "Development mock" : "Inactive mock"
@@ -109,23 +121,37 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
       : connection.hasAccessToken
         ? "Shared token"
         : "Token missing";
-    const tokenColor = isMock
-      ? this.mockConnectionsEnabled ? "positive" : "warning"
-      : connection.hasAccessToken ? "positive" : "warning";
+    const health = this.testing
+      ? { label: "Testing", color: undefined }
+      : this.status?.type === "success"
+        ? { label: "Connected", color: "positive" as const }
+        : this.status?.type === "error"
+          ? { label: "Needs attention", color: "danger" as const }
+          : isMock
+            ? this.mockConnectionsEnabled
+              ? { label: "Ready", color: "positive" as const }
+              : { label: "Inactive", color: "warning" as const }
+            : !identifier || !connection.hasAccessToken
+              ? { label: "Setup required", color: "warning" as const }
+              : { label: "Not tested", color: undefined };
     const testDisabled = this.testing
       || this.dirty
-      || (isMock ? !this.mockConnectionsEnabled : !identifier);
+      || (isMock ? !this.mockConnectionsEnabled : !identifier || !connection.hasAccessToken);
     return html`
       <uui-box class="connection-card">
         <details class="connection-shell">
           <summary class="connection-summary">
+            <span class="provider-mark">${isMock ? html`<uui-icon name="icon-lab" aria-hidden="true"></uui-icon>` : providerLogo(connection.provider)}</span>
             <span class="summary-copy">
               <strong>${connection.displayName || identifier || "New connection"}</strong>
               <span>${isMock ? "Mock scenario" : `${connection.provider} · ${identifier || "Identifier required"}`} · ${this.#mappingSummary()}</span>
             </span>
             <span class="summary-state">
-              <uui-tag color=${tokenColor}>${tokenStatus}</uui-tag>
-              <uui-icon name="icon-navigation-down" aria-hidden="true"></uui-icon>
+              <span class="summary-health">
+                ${health.color ? html`<uui-tag color=${health.color}>${health.label}</uui-tag>` : html`<uui-tag>${health.label}</uui-tag>`}
+                <uui-icon name="icon-navigation-down" aria-hidden="true"></uui-icon>
+              </span>
+              <small>${tokenStatus}</small>
             </span>
           </summary>
 
@@ -133,7 +159,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
             <section class="essentials" aria-labelledby=${`${connection.key}-project-heading`}>
               <div class=${`essentials-header${this.status ? " has-status" : ""}`}>
                 <div class="essentials-heading">
-                  <h3 id=${`${connection.key}-project-heading`}>${isMock ? "Mock data" : "Project"}</h3>
+                  <h3 id=${`${connection.key}-project-heading`}>${isMock ? "Mock data" : `${connection.provider} connection`}</h3>
                 </div>
                 <div class="action-status" role=${this.status?.type === "error" ? "alert" : "status"} aria-live="polite">
                   ${this.status ? html`<span class=${this.status.type}><uui-icon name=${this.status.type === "success" ? "icon-check" : this.status.type === "error" ? "icon-alert" : "icon-info"}></uui-icon>${this.status.message}</span>` : ""}
@@ -146,7 +172,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
                     .state=${this.testing ? "waiting" : undefined}
                     ?disabled=${testDisabled}
                     @click=${() => this.#dispatch("test-connection")}>Test connection</uui-button>
-                  <uui-button look="secondary" color="danger" label="Remove connection" @click=${() => this.#dispatch("remove-connection")}>Remove</uui-button>
+                  <uui-button look="secondary" color="danger" label="Delete connection" @click=${() => this.#dispatch("remove-connection")}>Delete</uui-button>
                 </div>
               </div>
               ${isMock ? html`
@@ -161,10 +187,12 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
             </section>
 
             ${isMock ? "" : html`<details class="config-section token-section">
-              <summary><span>Token override</span><small>${connection.hasAccessTokenOverride ? "Configured on the server" : connection.hasAccessToken ? "Using shared token" : "Optional"}</small></summary>
+              <summary><span>Credential override</span><small>${connection.hasAccessTokenOverride ? "Configured on the server" : connection.hasAccessToken ? "Using shared credential" : "Required without a shared credential"}</small></summary>
               <div class="config-content token-content">
                 <p>
-                  Optional. Set a connection-specific credential only when this connection cannot use the shared ${connection.provider} credential.
+                  ${connection.hasAccessToken
+                    ? `Set a connection-specific credential only when this connection cannot use the shared ${connection.provider} credential.`
+                    : `No shared ${connection.provider} credential was detected. Add a connection-specific credential before testing this connection.`}
                   <a href=${connection.provider === "Plausible" ? "https://plausible.io/settings/api-keys" : "https://vercel.com/account/settings/tokens"} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} ${credentialName(connection.provider)} (opens in a new tab)`}>
                     Create a ${connection.provider} ${credentialName(connection.provider)}<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
                   </a>
@@ -256,23 +284,30 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     details, summary { box-sizing: border-box; }
     summary { cursor: pointer; list-style: none; }
     summary::-webkit-details-marker { display: none; }
-    .connection-summary { align-items: center; appearance: none; background: transparent; border: 0; color: inherit; cursor: pointer; display: flex; font: inherit; gap: var(--uui-size-space-5); inline-size: 100%; justify-content: space-between; min-block-size: 4rem; padding: var(--uui-size-space-4) var(--uui-size-space-5); text-align: start; }
+    .connection-summary { align-items: center; appearance: none; background: transparent; border: 0; color: inherit; cursor: pointer; display: grid; font: inherit; gap: var(--uui-size-space-4); grid-template-columns: auto minmax(0, 1fr) auto; inline-size: 100%; min-block-size: 4rem; padding: var(--uui-size-space-4) var(--uui-size-space-5); text-align: start; }
     .connection-summary:hover { background: color-mix(in srgb, var(--uui-color-interactive) 3%, var(--uui-color-surface)); }
     .connection-summary:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
     .summary-copy { display: grid; gap: var(--uui-size-space-1); min-inline-size: 0; }
     .summary-copy strong { font-size: var(--uui-type-h5-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .summary-copy > span { color: var(--uui-color-text-alt); overflow-wrap: anywhere; }
-    .summary-state { align-items: center; display: flex; flex: 0 0 auto; gap: var(--uui-size-space-3); }
-    .connection-shell[open] .summary-state > uui-icon { transform: rotate(180deg); }
+    .provider-mark { align-items: center; background: var(--uui-color-surface-alt); block-size: var(--uui-size-8); color: var(--uui-color-text); display: inline-flex; inline-size: var(--uui-size-8); justify-content: center; }
+    .provider-logo { block-size: var(--uui-size-5); fill: currentColor; inline-size: var(--uui-size-5); }
+    .provider-logo.plausible { color: #5850ec; }
+    .provider-mark > uui-icon { font-size: var(--uui-size-5); }
+    .summary-state { align-items: end; display: grid; gap: var(--uui-size-space-1); justify-items: end; min-inline-size: 0; }
+    .summary-state small { color: var(--uui-color-text-alt); max-inline-size: 24ch; overflow-wrap: anywhere; text-align: end; }
+    .summary-health { align-items: center; display: flex; gap: var(--uui-size-space-3); }
+    .connection-shell[open] .summary-health > uui-icon { transform: rotate(180deg); }
     .connection-body { border-top: 1px solid var(--uui-color-border); padding: 0 var(--uui-size-space-5) var(--uui-size-space-4); }
     .essentials { padding: var(--uui-size-space-4) 0 var(--uui-size-space-5); }
-    .essentials-header { align-items: center; display: grid; gap: var(--uui-size-space-4); grid-template-areas: "heading status actions"; grid-template-columns: auto minmax(0, 1fr) auto; margin-block-end: var(--uui-size-space-4); }
+    .essentials-header { align-items: center; display: grid; gap: var(--uui-size-space-4); grid-template-areas: "heading actions"; grid-template-columns: minmax(0, 1fr) auto; margin-block-end: var(--uui-size-space-4); }
+    .essentials-header.has-status { grid-template-areas: "heading actions" "status status"; }
     .essentials-heading { grid-area: heading; min-inline-size: 0; }
     .essentials-heading h3 { font-size: var(--uui-type-h5-size); margin: 0; }
     .connection-actions { align-items: center; display: flex; flex: 0 1 auto; flex-wrap: wrap; gap: var(--uui-size-space-3); grid-area: actions; justify-content: flex-end; }
-    .action-status { grid-area: status; justify-self: end; min-inline-size: 0; }
+    .action-status { grid-area: status; justify-self: start; min-inline-size: 0; }
     .action-status:empty { display: none; }
-    .action-status span { align-items: center; display: flex; gap: var(--uui-size-space-2); max-inline-size: 48ch; overflow-wrap: anywhere; text-align: end; }
+    .action-status span { align-items: center; display: flex; gap: var(--uui-size-space-2); max-inline-size: 70ch; overflow-wrap: anywhere; text-align: start; }
     .action-status .success { color: var(--uui-color-positive-standalone); }
     .action-status .error { color: var(--uui-color-danger-standalone); }
     .action-status .info { color: var(--uui-color-text-alt); }
@@ -307,15 +342,12 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     uui-input[aria-invalid="true"] { --uui-color-border: var(--uui-color-danger); }
     @container (max-width: 48rem) {
       .two-columns { grid-template-columns: 1fr; }
-      .connection-summary { align-items: flex-start; }
-      .summary-state { flex-wrap: wrap; justify-content: flex-end; }
-      .essentials-header { grid-template-areas: "heading actions"; grid-template-columns: minmax(0, 1fr) auto; }
-      .essentials-header.has-status { grid-template-areas: "heading actions" "status status"; }
-      .action-status { justify-self: start; }
-      .action-status span { text-align: start; }
+      .connection-summary { align-items: start; }
     }
     @container (max-width: 34rem) {
-      .connection-summary { align-items: stretch; flex-direction: column; }
+      .connection-summary { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
+      .summary-state { grid-column: 2; justify-items: start; }
+      .summary-state small { text-align: start; }
       .essentials-header { align-items: stretch; grid-template-areas: "heading" "actions"; grid-template-columns: 1fr; }
       .essentials-header.has-status { grid-template-areas: "heading" "status" "actions"; }
       .summary-state { justify-content: flex-start; }

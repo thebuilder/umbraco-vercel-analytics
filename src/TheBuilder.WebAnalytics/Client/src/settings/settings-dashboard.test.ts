@@ -151,7 +151,14 @@ describe("analytics settings onboarding", () => {
     expect(dashboard.shadowRoot?.querySelector(".save-bar")).toBeNull();
     expect(dashboard.shadowRoot?.querySelector(".connection-empty-state h3")?.textContent).toBe("Connect your first analytics provider");
 
-    dashboard.shadowRoot?.querySelector<HTMLElement>(".connection-empty-state uui-button")?.click();
+    dashboard.shadowRoot?.querySelector<HTMLElement>('.connection-empty-state [label="Choose analytics provider"]')?.click();
+    await dashboard.updateComplete;
+
+    const choices = dashboard.shadowRoot?.querySelectorAll<HTMLElement>(".provider-choice");
+    expect(choices).toHaveLength(2);
+    expect(choices?.[0].querySelector(".provider-logo.vercel")).not.toBeNull();
+    expect(choices?.[1].querySelector(".provider-logo.plausible")).not.toBeNull();
+    choices?.[0].click();
     await dashboard.updateComplete;
 
     expect(dashboard.shadowRoot?.querySelector(".connection-empty-state")).toBeNull();
@@ -170,7 +177,9 @@ describe("analytics settings onboarding", () => {
       "teamReference",
     ]);
 
-    dashboard.shadowRoot?.querySelector<HTMLElement>('.section-heading [label="Add Plausible connection"]')?.click();
+    dashboard.shadowRoot?.querySelector<HTMLElement>('.section-heading [label="Add analytics connection"]')?.click();
+    await dashboard.updateComplete;
+    dashboard.shadowRoot?.querySelector<HTMLElement>('.provider-choice[aria-label="Add Plausible connection"]')?.click();
     await dashboard.updateComplete;
 
     const editors = dashboard.shadowRoot?.querySelectorAll("vercel-analytics-connection-editor");
@@ -180,17 +189,18 @@ describe("analytics settings onboarding", () => {
     expect((editors?.[1] as AnalyticsConnectionEditorElement).connection.provider).toBe("Plausible");
   });
 
-  it("shows the shared token setting before a connection is added", async () => {
+  it("shows provider readiness without exposing server configuration keys", async () => {
     const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".shared-token")).not.toBeNull());
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".provider-row")).not.toBeNull());
 
-    expect(dashboard.shadowRoot?.querySelector(".shared-token code")?.textContent).toBe("WebAnalytics__Providers__Vercel__AccessToken");
-    expect(dashboard.shadowRoot?.querySelector(".shared-token-status")?.textContent?.trim()).toBe("Not configured");
-    expect(dashboard.shadowRoot?.querySelector(".shared-token-help")?.textContent?.trim()).toBe(
-      "Set this server environment variable to a Vercel access token.",
-    );
-    expect(dashboard.shadowRoot?.querySelector(".shared-token")?.textContent).not.toContain("Used by all connections");
+    const providers = dashboard.shadowRoot?.querySelectorAll(".provider-row");
+    expect(providers).toHaveLength(2);
+    expect(providers?.[0].textContent).toContain("No shared credential");
+    expect(providers?.[0].textContent).toContain("Configure the Vercel access token in server settings");
+    expect(providers?.[1].textContent).toContain("Configure the Plausible Stats API key in server settings");
+    expect(dashboard.shadowRoot?.textContent).not.toContain("WebAnalytics__Providers__");
+    expect(dashboard.shadowRoot?.querySelector(".providers code")).toBeNull();
   });
 
   it("marks new connections as using the configured shared token", async () => {
@@ -206,17 +216,19 @@ describe("analytics settings onboarding", () => {
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connection-empty-state")).not.toBeNull());
 
-    expect(dashboard.shadowRoot?.querySelector(".shared-token-status")?.textContent?.trim()).toBe("Configured");
-    const vercelToken = dashboard.shadowRoot?.querySelectorAll(".shared-token")[0];
-    expect(vercelToken?.querySelector(".shared-token-setup")).toBeNull();
-    expect(vercelToken?.querySelector("code")).toBeNull();
-    dashboard.shadowRoot?.querySelector<HTMLElement>(".connection-empty-state uui-button")?.click();
+    const vercelProvider = dashboard.shadowRoot?.querySelectorAll(".provider-row")[0];
+    expect(vercelProvider?.textContent).toContain("Shared credential detected");
+    expect(vercelProvider?.querySelector("code")).toBeNull();
+    dashboard.shadowRoot?.querySelector<HTMLElement>('.connection-empty-state [label="Choose analytics provider"]')?.click();
+    await dashboard.updateComplete;
+    dashboard.shadowRoot?.querySelector<HTMLElement>('.provider-choice[aria-label="Add Vercel connection"]')?.click();
     await dashboard.updateComplete;
 
     const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as AnalyticsConnectionEditorElement;
     expect(editor.connection.hasAccessToken).toBe(true);
     expect(editor.connection.hasAccessTokenOverride).toBe(false);
-    expect(editor.shadowRoot?.querySelector(".summary-state uui-tag")?.textContent?.trim()).toBe("Shared token");
+    expect(editor.shadowRoot?.querySelector(".summary-state uui-tag")?.textContent?.trim()).toBe("Setup required");
+    expect(editor.shadowRoot?.querySelector(".summary-state small")?.textContent?.trim()).toBe("Shared token");
   });
 
   it("adds development mock scenarios as deterministic connections", async () => {
@@ -245,7 +257,8 @@ describe("analytics settings onboarding", () => {
       hasAccessToken: false,
       mockScenario: "Utm",
     });
-    expect(editor.shadowRoot?.querySelector(".summary-state uui-tag")?.textContent?.trim()).toBe("Development mock");
+    expect(editor.shadowRoot?.querySelector(".summary-state uui-tag")?.textContent?.trim()).toBe("Ready");
+    expect(editor.shadowRoot?.querySelector(".summary-state small")?.textContent?.trim()).toBe("Development mock");
     expect(editor.shadowRoot?.querySelector(".token-section")).toBeNull();
     expect(buttons?.[1].hasAttribute("disabled")).toBe(true);
   });

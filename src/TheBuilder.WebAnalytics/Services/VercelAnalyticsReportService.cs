@@ -77,7 +77,7 @@ public sealed class VercelAnalyticsReportService(
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
         var normalizedFlagKey = string.IsNullOrWhiteSpace(flagKey) ? null : flagKey.Trim();
-        var flagKeyCacheKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(normalizedFlagKey ?? string.Empty));
+        var flagKeyCacheKey = EncodeCachePart(normalizedFlagKey ?? string.Empty);
         var cacheKey = $"vercel-analytics:{snapshot.Revision}:flags:{flagKeyCacheKey}:{limit}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
@@ -164,7 +164,7 @@ public sealed class VercelAnalyticsReportService(
     {
         var filters = string.Join(",", (query.Filters ?? [])
             .OrderBy(filter => filter.Dimension)
-            .Select(filter => $"{filter.Dimension}:{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(filter.Value))}"));
+            .Select(filter => $"{filter.Dimension}:{EncodeCachePart(filter.Value)}"));
         return $"{query.Connection:N}:{query.From.UtcTicks}:{query.To.UtcTicks}:{query.Interval}:{query.RequestPath}:{filters}";
     }
 

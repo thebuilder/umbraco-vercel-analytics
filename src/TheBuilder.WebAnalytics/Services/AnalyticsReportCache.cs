@@ -51,7 +51,7 @@ public sealed class AnalyticsReportCache : IDisposable
                 return cached!;
             }
 
-            if (!_inflight.TryGetValue(key, out operation!) || operation.Cancellation.IsCancellationRequested)
+            if (!_inflight.TryGetValue(key, out operation!) || operation.CancellationRequested)
             {
                 operation = new InflightOperation(typeof(T));
                 operation.Task = new Lazy<Task<object?>>(() => CreateAsync(key, duration, factory, operation));
@@ -107,9 +107,10 @@ public sealed class AnalyticsReportCache : IDisposable
                 {
                     _inflight.Remove(key);
                 }
-            }
 
-            operation.Cancellation.Dispose();
+                operation.IsCompleted = true;
+                DisposeCancellationIfUnused(operation);
+            }
         }
     }
 
@@ -132,14 +133,58 @@ public sealed class AnalyticsReportCache : IDisposable
 
     private void ReleaseWaiter(InflightOperation operation)
     {
+        var cancelOperation = false;
         lock (_inflightLock)
         {
             operation.Waiters--;
-            if (operation.Waiters == 0 && !operation.Task!.Value.IsCompleted)
+            if (operation.Waiters != 0)
             {
-                operation.Cancellation.Cancel();
+                return;
+            }
+
+            if (operation.IsCompleted)
+            {
+                DisposeCancellationIfUnused(operation);
+            }
+            else if (!operation.CancellationRequested)
+            {
+                operation.CancellationRequested = true;
+                operation.CancellationInProgress = true;
+                cancelOperation = true;
             }
         }
+
+        if (!cancelOperation)
+        {
+            return;
+        }
+
+        try
+        {
+            operation.Cancellation.Cancel();
+        }
+        finally
+        {
+            lock (_inflightLock)
+            {
+                operation.CancellationInProgress = false;
+                DisposeCancellationIfUnused(operation);
+            }
+        }
+    }
+
+    private static void DisposeCancellationIfUnused(InflightOperation operation)
+    {
+        if (!operation.IsCompleted ||
+            operation.Waiters != 0 ||
+            operation.CancellationInProgress ||
+            operation.CancellationDisposed)
+        {
+            return;
+        }
+
+        operation.Cancellation.Dispose();
+        operation.CancellationDisposed = true;
     }
 
     private sealed class InflightOperation(Type valueType)
@@ -148,6 +193,10 @@ public sealed class AnalyticsReportCache : IDisposable
         public CancellationTokenSource Cancellation { get; } = new();
         public Lazy<Task<object?>>? Task { get; set; }
         public int Waiters { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool CancellationRequested { get; set; }
+        public bool CancellationInProgress { get; set; }
+        public bool CancellationDisposed { get; set; }
     }
 }
 

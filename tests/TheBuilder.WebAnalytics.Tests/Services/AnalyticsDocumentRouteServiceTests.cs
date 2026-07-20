@@ -177,7 +177,7 @@ public sealed class AnalyticsDocumentRouteServiceTests
         params VercelAnalyticsConnectionOptions[] connections) => new(Options.Create(new VercelAnalyticsOptions
         {
             Enabled = true,
-            AccessToken = "secret",
+            Providers = { Vercel = { AccessToken = "secret" } },
             Connections = connections.ToList()
         }));
 

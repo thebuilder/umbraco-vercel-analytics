@@ -424,7 +424,7 @@ public sealed class VercelAnalyticsReportServiceTests
     private static VercelAnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null) => new(Options.Create(new VercelAnalyticsOptions
     {
         Enabled = true,
-        AccessToken = "secret",
+        Providers = { Vercel = { AccessToken = "secret" } },
         CacheDuration = cacheDuration ?? TimeSpan.FromMinutes(5),
         Connections =
         [

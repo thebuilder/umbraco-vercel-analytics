@@ -6,33 +6,33 @@ using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Tests.Services;
 
-public sealed class VercelProjectNameServiceTests
+public sealed class AnalyticsConnectionNameServiceTests
 {
     [Fact]
     public async Task Resolves_and_caches_the_vercel_project_name()
     {
-        var client = new Mock<IVercelAnalyticsClient>(MockBehavior.Strict);
+        var client = new Mock<IAnalyticsProviderClient>(MockBehavior.Strict);
         var connection = CreateConnection();
-        client.Setup(item => item.GetProjectNameAsync(connection, It.IsAny<CancellationToken>()))
+        client.Setup(item => item.GetDisplayNameAsync(connection, It.IsAny<CancellationToken>()))
             .ReturnsAsync("health-platform");
-        var service = new VercelProjectNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
+        var service = new AnalyticsConnectionNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
 
         var first = await service.GetDisplayNameAsync(connection, CancellationToken.None);
         var second = await service.GetDisplayNameAsync(connection, CancellationToken.None);
 
         Assert.Equal("health-platform", first);
         Assert.Equal(first, second);
-        client.Verify(item => item.GetProjectNameAsync(connection, It.IsAny<CancellationToken>()), Times.Once);
+        client.Verify(item => item.GetDisplayNameAsync(connection, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Falls_back_to_project_id_when_metadata_is_unavailable()
     {
-        var client = new Mock<IVercelAnalyticsClient>(MockBehavior.Strict);
+        var client = new Mock<IAnalyticsProviderClient>(MockBehavior.Strict);
         var connection = CreateConnection();
-        client.Setup(item => item.GetProjectNameAsync(connection, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new VercelAnalyticsApiException(System.Net.HttpStatusCode.Forbidden));
-        var service = new VercelProjectNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
+        client.Setup(item => item.GetDisplayNameAsync(connection, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AnalyticsProviderApiException(System.Net.HttpStatusCode.Forbidden));
+        var service = new AnalyticsConnectionNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
 
         var result = await service.GetDisplayNameAsync(connection, CancellationToken.None);
 
@@ -42,12 +42,12 @@ public sealed class VercelProjectNameServiceTests
     [Fact]
     public async Task Caches_project_names_per_connection_identity()
     {
-        var client = new Mock<IVercelAnalyticsClient>(MockBehavior.Strict);
-        client.Setup(item => item.GetProjectNameAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+        var client = new Mock<IAnalyticsProviderClient>(MockBehavior.Strict);
+        client.Setup(item => item.GetDisplayNameAsync(
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((VercelAnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
-        var service = new VercelProjectNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
+            .ReturnsAsync((AnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
+        var service = new AnalyticsConnectionNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
         var flags = CreateConnection() with
         {
             Key = Guid.Parse("22222222-2222-2222-2222-222222222220"),
@@ -69,12 +69,12 @@ public sealed class VercelProjectNameServiceTests
 
         Assert.Equal("Mock · Feature flags", flagName);
         Assert.Equal("Mock · Custom events", eventName);
-        client.Verify(item => item.GetProjectNameAsync(
-            It.IsAny<VercelAnalyticsConnection>(),
+        client.Verify(item => item.GetDisplayNameAsync(
+            It.IsAny<AnalyticsConnection>(),
             It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
-    private static VercelAnalyticsConnection CreateConnection() => new(
+    private static AnalyticsConnection CreateConnection() => new(
         Guid.Parse("11111111-1111-1111-1111-111111111110"),
         "Old display name",
         "secret",

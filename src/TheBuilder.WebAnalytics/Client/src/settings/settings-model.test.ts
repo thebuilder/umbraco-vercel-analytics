@@ -10,15 +10,18 @@ import {
 
 const settings = (): AnalyticsSettingsResponse => ({
   enabled: true,
-  hasAccessToken: false,
+  providerTokens: [{ provider: "Vercel", hasAccessToken: false }, { provider: "Plausible", hasAccessToken: false }],
   canCreateMockConnections: false,
   defaultRangeDays: 30,
   cacheDuration: "00:05:00",
   connections: [{
     key: "11111111-1111-1111-1111-111111111111",
     displayName: "Main",
+    provider: "Vercel",
     projectId: "project",
     team: null,
+    siteId: "",
+    capabilities: { dimensions: ["RequestPath"], events: true, eventProperties: true, flags: true },
     documentRootKeys: [],
     enableAllDocumentTypes: false,
     enabledDocumentTypeKeys: [],

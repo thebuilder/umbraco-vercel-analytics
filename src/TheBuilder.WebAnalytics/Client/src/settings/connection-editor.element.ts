@@ -19,7 +19,7 @@ export type EditableAnalyticsConnection = AnalyticsConnectionSettingsResponse;
 export type ConnectionActionStatus = { type: "success" | "error" | "info"; message: string };
 
 @customElement("vercel-analytics-connection-editor")
-export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitElement) {
+export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) connection!: EditableAnalyticsConnection;
   @property({ attribute: false }) errors: ConnectionValidationErrors = {};
   @property({ attribute: false }) status?: ConnectionActionStatus;
@@ -29,7 +29,7 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
   @state() private _tokenCopied = false;
 
   protected firstUpdated(): void {
-    if (!this.connection.projectId) {
+    if (!(this.connection.provider === "Plausible" ? this.connection.siteId : this.connection.projectId)) {
       this.shadowRoot?.querySelector<HTMLDetailsElement>(".connection-shell")?.setAttribute("open", "");
     }
   }
@@ -92,6 +92,7 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
   render() {
     const connection = this.connection;
     const isMock = connection.mockScenario != null;
+    const identifier = connection.provider === "Plausible" ? connection.siteId : connection.projectId;
     const mockScenario = getMockScenario(connection.mockScenario);
     const testHint = this.dirty
       ? "Save changes before testing this connection."
@@ -110,14 +111,14 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
       : connection.hasAccessToken ? "positive" : "warning";
     const testDisabled = this.testing
       || this.dirty
-      || (isMock ? !this.mockConnectionsEnabled : !connection.projectId);
+      || (isMock ? !this.mockConnectionsEnabled : !identifier);
     return html`
       <uui-box class="connection-card">
         <details class="connection-shell">
           <summary class="connection-summary">
             <span class="summary-copy">
-              <strong>${connection.displayName || connection.projectId || "New connection"}</strong>
-              <span>${isMock ? "Mock scenario" : connection.projectId || "Project ID required"} · ${this.#mappingSummary()}</span>
+              <strong>${connection.displayName || identifier || "New connection"}</strong>
+              <span>${isMock ? "Mock scenario" : `${connection.provider} · ${identifier || "Identifier required"}`} · ${this.#mappingSummary()}</span>
             </span>
             <span class="summary-state">
               <uui-tag color=${tokenColor}>${tokenStatus}</uui-tag>
@@ -146,11 +147,12 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
                 </div>
               </div>
               ${isMock ? html`
-                <p class="section-intro mock-description">${mockScenario?.description ?? "Deterministic analytics data."} This connection never contacts Vercel.</p>
+                <p class="section-intro mock-description">${mockScenario?.description ?? "Deterministic analytics data."} This connection never contacts an analytics provider.</p>
               ` : html`
                 <div class="fields two-columns">
-                  ${this.#field("Vercel project ID", "projectId", connection.projectId, undefined, this.errors.projectId)}
-                  ${this.#teamReferenceField(teamReference(connection), this.errors.team)}
+                  ${connection.provider === "Plausible"
+                    ? this.#field("Plausible site ID", "siteId", connection.siteId, "Use the domain exactly as registered in Plausible.", this.errors.siteId)
+                    : html`${this.#field("Vercel project ID", "projectId", connection.projectId, undefined, this.errors.projectId)}${this.#teamReferenceField(teamReference(connection), this.errors.team)}`}
                 </div>
               `}
             </section>
@@ -159,9 +161,9 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
               <summary><span>Token override</span><small>${connection.hasAccessTokenOverride ? "Configured on the server" : connection.hasAccessToken ? "Using shared token" : "Optional"}</small></summary>
               <div class="config-content token-content">
                 <p>
-                  Optional. Set a connection-specific token only when this project cannot use the shared token.
-                  <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener noreferrer" aria-label="Create a Vercel access token (opens in a new tab)">
-                    Create a Vercel access token<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
+                  Optional. Set a connection-specific token only when this connection cannot use the shared ${connection.provider} token.
+                  <a href=${connection.provider === "Plausible" ? "https://plausible.io/settings/api-keys" : "https://vercel.com/account/settings/tokens"} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} access token (opens in a new tab)`}>
+                    Create a ${connection.provider} access token<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
                   </a>
                 </p>
                 <div class="token-key"><code>WebAnalytics__ConnectionAccessTokens__${connection.key}</code><uui-button compact look="secondary" label="Copy access token setting name" @click=${this.#copyTokenKey}>${this._tokenCopied ? "Copied" : "Copy"}</uui-button></div>
@@ -171,7 +173,7 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
             <details class="config-section">
               <summary><span>Page analytics</span><small>${this.#mappingSummary()}</small></summary>
               <div class="config-content mapping-content">
-                <p class="section-intro">Optional. Select the Umbraco site roots that use this Vercel project. Leave empty for global analytics only.</p>
+                <p class="section-intro">Optional. Select the Umbraco site roots that use this analytics connection. Leave empty for global analytics only.</p>
                 <div class="fields">
                   <uui-form-layout-item>
                     <uui-label slot="label">Document roots</uui-label>
@@ -203,7 +205,7 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
 
   #field(
     label: string,
-    field: "projectId",
+    field: "projectId" | "siteId",
     value: string,
     description?: string,
     error?: string,
@@ -324,6 +326,6 @@ export class VercelAnalyticsConnectionEditorElement extends UmbElementMixin(LitE
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-connection-editor": VercelAnalyticsConnectionEditorElement;
+    "vercel-analytics-connection-editor": AnalyticsConnectionEditorElement;
   }
 }

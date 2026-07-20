@@ -20,9 +20,9 @@ public sealed class WebAnalyticsSettingsApiControllerTests
     [InlineData(false)]
     public async Task Settings_preserve_mock_identity_and_report_runtime_availability(bool mockConnectionsEnabled)
     {
-        var options = Options.Create(new VercelAnalyticsOptions());
-        var store = new VercelAnalyticsSettingsStore(options);
-        store.Save(new VercelAnalyticsSettings
+        var options = Options.Create(new WebAnalyticsOptions());
+        var store = new WebAnalyticsSettingsStore(options);
+        store.Save(new WebAnalyticsSettings
         {
             Enabled = true,
             Connections =
@@ -35,14 +35,14 @@ public sealed class WebAnalyticsSettingsApiControllerTests
                 }
             ]
         });
-        var registry = new VercelAnalyticsConnectionRegistry(store, options, mockConnectionsEnabled);
+        var registry = new AnalyticsConnectionRegistry(store, options, mockConnectionsEnabled);
         var controller = new WebAnalyticsSettingsApiController(
             CreateAdministratorSecurityAccessor(),
             store,
             registry,
             options,
-            Mock.Of<IVercelAnalyticsClient>(MockBehavior.Strict),
-            Mock.Of<IVercelProjectNameService>(MockBehavior.Strict));
+            Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict),
+            Mock.Of<IAnalyticsConnectionNameService>(MockBehavior.Strict));
 
         var result = await controller.Settings(CancellationToken.None);
 
@@ -55,15 +55,15 @@ public sealed class WebAnalyticsSettingsApiControllerTests
     [Fact]
     public async Task Save_settings_returns_bad_request_for_an_undefined_mock_scenario()
     {
-        var options = Options.Create(new VercelAnalyticsOptions());
-        var store = new VercelAnalyticsSettingsStore(options);
+        var options = Options.Create(new WebAnalyticsOptions());
+        var store = new WebAnalyticsSettingsStore(options);
         var controller = new WebAnalyticsSettingsApiController(
             CreateAdministratorSecurityAccessor(),
             store,
-            new VercelAnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: true),
+            new AnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: true),
             options,
-            Mock.Of<IVercelAnalyticsClient>(MockBehavior.Strict),
-            Mock.Of<IVercelProjectNameService>(MockBehavior.Strict));
+            Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict),
+            Mock.Of<IAnalyticsConnectionNameService>(MockBehavior.Strict));
         var request = new UpdateAnalyticsSettingsRequest(
             true,
             30,
@@ -86,6 +86,35 @@ public sealed class WebAnalyticsSettingsApiControllerTests
         Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
         var problem = Assert.IsType<ProblemDetails>(response.Value);
         Assert.Contains("unsupported mock analytics scenario", problem.Detail);
+    }
+
+    [Fact]
+    public async Task Save_settings_rejects_changing_provider_for_an_existing_connection()
+    {
+        var options = Options.Create(new WebAnalyticsOptions());
+        var store = new WebAnalyticsSettingsStore(options);
+        store.Save(new WebAnalyticsSettings
+        {
+            Connections = [new() { Key = MockKey, Provider = AnalyticsProvider.Vercel, ProjectId = "prj_example" }]
+        });
+        var controller = new WebAnalyticsSettingsApiController(
+            CreateAdministratorSecurityAccessor(),
+            store,
+            new AnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: false),
+            options,
+            Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict),
+            Mock.Of<IAnalyticsConnectionNameService>(MockBehavior.Strict));
+        var request = new UpdateAnalyticsSettingsRequest(
+            true,
+            30,
+            "00:05:00",
+            [new(MockKey, "Example", AnalyticsProvider.Plausible, string.Empty, null, "example.com", null, [], false, [])]);
+
+        var result = await controller.SaveSettings(request, CancellationToken.None);
+
+        var response = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
+        Assert.Contains("cannot change analytics provider", Assert.IsType<ProblemDetails>(response.Value).Detail);
     }
 
     private static IBackOfficeSecurityAccessor CreateAdministratorSecurityAccessor()

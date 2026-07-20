@@ -15,8 +15,8 @@ vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
 vi.mock("@umbraco-cms/backoffice/document", () => ({}));
 
 import type { AnalyticsConnectionSettingsResponse, AnalyticsSettingsResponse } from "../api/types.gen.js";
-import type { VercelAnalyticsSettingsDashboardElement } from "./settings-dashboard.element.js";
-import type { VercelAnalyticsConnectionEditorElement } from "./connection-editor.element.js";
+import type { WebAnalyticsSettingsDashboardElement } from "./settings-dashboard.element.js";
+import type { AnalyticsConnectionEditorElement } from "./connection-editor.element.js";
 import "./settings-dashboard.element.js";
 
 beforeEach(() => {
@@ -34,7 +34,7 @@ describe("analytics settings network recovery", () => {
     sdk.settings.mockRejectedValueOnce(new Error("Network unavailable"));
     sdk.settings.mockResolvedValueOnce(apiOk(settings()));
 
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
 
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("umb-empty-state")).not.toBeNull());
@@ -53,11 +53,11 @@ describe("analytics settings network recovery", () => {
     arrangeResponse();
     sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection()] })));
 
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor")).not.toBeNull());
 
-    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as VercelAnalyticsConnectionEditorElement;
+    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as AnalyticsConnectionEditorElement;
     editor.dispatchEvent(new CustomEvent("test-connection", { bubbles: true, composed: true }));
 
     await vi.waitFor(() => expect(editor.shadowRoot?.querySelector(".action-status")?.textContent).toContain("The connection test could not be completed."));
@@ -68,7 +68,7 @@ describe("analytics settings network recovery", () => {
   it("keeps edits dirty after a rejected save and allows a later save to succeed", async () => {
     sdk.saveSettings.mockRejectedValueOnce(new Error("Network unavailable"));
 
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("#default-range")).not.toBeNull());
 
@@ -96,7 +96,7 @@ describe("analytics settings network recovery", () => {
   it("shows the same save error for an SDK error result", async () => {
     sdk.saveSettings.mockResolvedValueOnce(apiError());
 
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("#default-range")).not.toBeNull());
 
@@ -115,7 +115,7 @@ describe("analytics settings network recovery", () => {
 function settings(overrides: Partial<AnalyticsSettingsResponse> = {}): AnalyticsSettingsResponse {
   return {
     enabled: true,
-    hasAccessToken: false,
+    providerTokens: [{ provider: "Vercel", hasAccessToken: false }, { provider: "Plausible", hasAccessToken: false }],
     canCreateMockConnections: false,
     defaultRangeDays: 30,
     cacheDuration: "00:05:00",
@@ -128,8 +128,11 @@ function connection(): AnalyticsConnectionSettingsResponse {
   return {
     key: "connection-1",
     displayName: "Example project",
+    provider: "Vercel",
     projectId: "prj_example",
     team: null,
+    siteId: "",
+    capabilities: { dimensions: ["RequestPath"], events: true, eventProperties: true, flags: true },
     documentRootKeys: [],
     enableAllDocumentTypes: false,
     enabledDocumentTypeKeys: [],
@@ -141,13 +144,13 @@ function connection(): AnalyticsConnectionSettingsResponse {
 
 describe("analytics settings onboarding", () => {
   it("guides the first connection without rendering an empty default selector", async () => {
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connection-empty-state")).not.toBeNull());
 
     expect(dashboard.shadowRoot?.querySelector("#default-connection")).toBeNull();
     expect(dashboard.shadowRoot?.querySelector(".save-bar")).toBeNull();
-    expect(dashboard.shadowRoot?.querySelector(".connection-empty-state h3")?.textContent).toBe("Connect your first Vercel project");
+    expect(dashboard.shadowRoot?.querySelector(".connection-empty-state h3")?.textContent).toBe("Connect your first analytics provider");
 
     dashboard.shadowRoot?.querySelector<HTMLElement>(".connection-empty-state uui-button")?.click();
     await dashboard.updateComplete;
@@ -156,7 +159,7 @@ describe("analytics settings onboarding", () => {
     expect(dashboard.shadowRoot?.querySelector("#default-connection")).toBeNull();
     const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor");
     expect(editor).not.toBeNull();
-    const generatedKey = (editor as VercelAnalyticsConnectionEditorElement).connection.key;
+    const generatedKey = (editor as AnalyticsConnectionEditorElement).connection.key;
     expect(generatedKey).toMatch(/^[0-9a-f-]{36}$/i);
     expect(editor?.shadowRoot?.querySelector(".token-key code")?.textContent)
       .toBe(`WebAnalytics__ConnectionAccessTokens__${generatedKey}`);
@@ -168,17 +171,18 @@ describe("analytics settings onboarding", () => {
       "teamReference",
     ]);
 
-    dashboard.shadowRoot?.querySelector<HTMLElement>(".section-heading > uui-button")?.click();
+    dashboard.shadowRoot?.querySelector<HTMLElement>('.section-heading [label="Add Plausible connection"]')?.click();
     await dashboard.updateComplete;
 
     const editors = dashboard.shadowRoot?.querySelectorAll("vercel-analytics-connection-editor");
-    expect((editors?.[1] as VercelAnalyticsConnectionEditorElement).connection.key).not.toBe(
-      (editors?.[0] as VercelAnalyticsConnectionEditorElement).connection.key,
+    expect((editors?.[1] as AnalyticsConnectionEditorElement).connection.key).not.toBe(
+      (editors?.[0] as AnalyticsConnectionEditorElement).connection.key,
     );
+    expect((editors?.[1] as AnalyticsConnectionEditorElement).connection.provider).toBe("Plausible");
   });
 
   it("shows the shared token setting before a connection is added", async () => {
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".shared-token")).not.toBeNull());
 
@@ -187,32 +191,30 @@ describe("analytics settings onboarding", () => {
     expect(dashboard.shadowRoot?.querySelector(".shared-token-help")?.textContent?.trim()).toBe(
       "Set this server environment variable to a Vercel access token.",
     );
-    expect(dashboard.shadowRoot?.querySelector(".shared-token-guidance")?.lastElementChild?.tagName).toBe("A");
     expect(dashboard.shadowRoot?.querySelector(".shared-token")?.textContent).not.toContain("Used by all connections");
   });
 
   it("marks new connections as using the configured shared token", async () => {
     sdk.settings.mockResolvedValue(apiOk({
       enabled: true,
-      hasAccessToken: true,
+      providerTokens: [{ provider: "Vercel", hasAccessToken: true }, { provider: "Plausible", hasAccessToken: false }],
       canCreateMockConnections: false,
       defaultRangeDays: 30,
       cacheDuration: "00:05:00",
       connections: [],
     }));
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connection-empty-state")).not.toBeNull());
 
     expect(dashboard.shadowRoot?.querySelector(".shared-token-status")?.textContent?.trim()).toBe("Configured");
-    expect(dashboard.shadowRoot?.querySelector(".shared-token-setup")).toBeNull();
-    expect(dashboard.shadowRoot?.querySelector(".shared-token code")).toBeNull();
-    expect(dashboard.shadowRoot?.querySelector('.shared-token a[href*="vercel.com/account/settings/tokens"]')).toBeNull();
-    expect(dashboard.shadowRoot?.querySelector('[label="Copy shared access token setting name"]')).toBeNull();
+    const vercelToken = dashboard.shadowRoot?.querySelectorAll(".shared-token")[0];
+    expect(vercelToken?.querySelector(".shared-token-setup")).toBeNull();
+    expect(vercelToken?.querySelector("code")).toBeNull();
     dashboard.shadowRoot?.querySelector<HTMLElement>(".connection-empty-state uui-button")?.click();
     await dashboard.updateComplete;
 
-    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as VercelAnalyticsConnectionEditorElement;
+    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as AnalyticsConnectionEditorElement;
     expect(editor.connection.hasAccessToken).toBe(true);
     expect(editor.connection.hasAccessTokenOverride).toBe(false);
     expect(editor.shadowRoot?.querySelector(".summary-state uui-tag")?.textContent?.trim()).toBe("Shared token");
@@ -221,13 +223,13 @@ describe("analytics settings onboarding", () => {
   it("adds development mock scenarios as deterministic connections", async () => {
     sdk.settings.mockResolvedValue(apiOk({
       enabled: true,
-      hasAccessToken: false,
+      providerTokens: [{ provider: "Vercel", hasAccessToken: false }, { provider: "Plausible", hasAccessToken: false }],
       canCreateMockConnections: true,
       defaultRangeDays: 30,
       cacheDuration: "00:05:00",
       connections: [],
     }));
-    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as VercelAnalyticsSettingsDashboardElement;
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".mock-settings")).not.toBeNull());
 
@@ -237,7 +239,7 @@ describe("analytics settings onboarding", () => {
     buttons?.[1].click();
     await dashboard.updateComplete;
 
-    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as VercelAnalyticsConnectionEditorElement;
+    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as AnalyticsConnectionEditorElement;
     expect(editor.connection).toMatchObject({
       displayName: "Mock · UTM campaigns",
       projectId: "",

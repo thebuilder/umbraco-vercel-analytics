@@ -10,7 +10,7 @@ namespace TheBuilder.WebAnalytics.Services;
 
 public sealed class VercelAnalyticsClient(
     HttpClient httpClient,
-    VercelAnalyticsRequestGate requestGate) : IVercelAnalyticsClient
+    AnalyticsProviderRequestGate requestGate) : IAnalyticsProviderClient
 {
     private const int EventPropertyLimit = 20;
     private const string CountPath = "v1/query/web-analytics/visits/count";
@@ -18,8 +18,8 @@ public sealed class VercelAnalyticsClient(
     private const string EventCountPath = "v1/query/web-analytics/events/count";
     private const string EventAggregatePath = "v1/query/web-analytics/events/aggregate";
 
-    public async Task<string> GetProjectNameAsync(
-        VercelAnalyticsConnection connection,
+    public async Task<string> GetDisplayNameAsync(
+        AnalyticsConnection connection,
         CancellationToken cancellationToken)
     {
         var parameters = new Dictionary<string, string?>();
@@ -34,7 +34,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<AnalyticsTotals> CountAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
@@ -52,7 +52,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<long> GetPageViewTotalAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
@@ -68,7 +68,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
@@ -81,7 +81,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         AnalyticsDimension dimension,
         int limit,
@@ -104,7 +104,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<AnalyticsEventTotals> CountEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
@@ -123,7 +123,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         int limit,
         string? search,
@@ -148,7 +148,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string? flagKey,
         int limit,
@@ -168,7 +168,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
@@ -189,7 +189,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     public async Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         string propertyName,
@@ -218,7 +218,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     private async Task<HttpResponseMessage> SendAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         string path,
         IDictionary<string, string?> parameters,
         CancellationToken cancellationToken)
@@ -235,7 +235,7 @@ public sealed class VercelAnalyticsClient(
             {
                 var statusCode = response.StatusCode;
                 response.Dispose();
-                throw new VercelAnalyticsApiException(statusCode);
+                throw new AnalyticsProviderApiException(statusCode);
             }
 
             return response;
@@ -243,7 +243,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     private static Dictionary<string, string?> BuildVisitParameters(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query)
     {
         if (query.Filters?.Any(filter => filter.Dimension == AnalyticsDimension.EventName) is true)
@@ -255,7 +255,7 @@ public sealed class VercelAnalyticsClient(
     }
 
     private static Dictionary<string, string?> BuildEventParameters(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query)
     {
         var parameters = new Dictionary<string, string?>

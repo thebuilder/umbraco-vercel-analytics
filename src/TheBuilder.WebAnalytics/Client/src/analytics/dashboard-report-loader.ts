@@ -29,6 +29,7 @@ export async function loadDashboardReports(
   signal: AbortSignal,
   onUpdate: (update: DashboardReportUpdate) => void,
   api: ReportApi = dashboardApi,
+  capabilities: { events: boolean; flags: boolean } = { events: true, flags: true },
 ): Promise<DashboardReportEvidence> {
   let baselineSucceeded = false;
   let utmSucceeded = false;
@@ -41,12 +42,12 @@ export async function loadDashboardReports(
       if (report.status === "success") baselineSucceeded = true;
       publish({ panel: "summary", ...report });
     }),
-    () => settleRequest(api.events({ query: { ...eventQuery, limit: 20 }, signal })).then((result) => {
+    ...(capabilities.events ? [() => settleRequest(api.events({ query: { ...eventQuery, limit: 20 }, signal })).then((result) => {
       publish({ panel: "events", ...toLoadedReport<AnalyticsEventsReport>(result) });
-    }),
-    () => settleRequest(api.flags({ query: { ...visitQuery, limit: 10 }, signal })).then((result) => {
+    })] : []),
+    ...(capabilities.flags ? [() => settleRequest(api.flags({ query: { ...visitQuery, limit: 10 }, signal })).then((result) => {
       publish({ panel: "flags", ...toLoadedReport<AnalyticsFlagsReport>(result) });
-    }),
+    })] : []),
     ...dimensions.map((dimension) => async () => {
       const { update, responseStatus } = await loadDashboardBreakdown(visitQuery, dimension, signal, api);
       if (isUtmDimension(dimension)) {

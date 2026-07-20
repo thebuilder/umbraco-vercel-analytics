@@ -1,5 +1,6 @@
 import type {
   AnalyticsBreakdown,
+  AnalyticsCapabilities,
   AnalyticsConnectionSummary,
   AnalyticsDimension,
   AnalyticsDocumentRoute,
@@ -195,13 +196,15 @@ export class AnalyticsDashboardController {
     if (!connection) return;
     this.#closeDialogs();
     this.#utmRequest.cancel();
-    const utmCapability = this.#utmCapabilityByConnection.get(connection) ?? "unknown";
+    const capabilities = this.#capabilities();
+    const supportsUtm = capabilities.dimensions.includes("UtmSource");
+    const utmCapability = supportsUtm ? this.#utmCapabilityByConnection.get(connection) ?? "unknown" : "unavailable";
     const { dimensions } = this.#dashboardReportPlan(utmCapability);
     this.#set({
       utmCapability,
       summary: loadingState(this.state.summary),
-      events: loadingState(this.state.events),
-      flags: loadingState(this.state.flags),
+      events: capabilities.events ? loadingState(this.state.events) : idleState(),
+      flags: capabilities.flags ? loadingState(this.state.flags) : idleState(),
       breakdowns: Object.fromEntries(dimensions.map((dimension) => [dimension, loadingState(this.state.breakdowns[dimension])])),
     });
     const visitQuery = this.#reportQuery(connection, this.#visitFilterQuery());
@@ -213,16 +216,17 @@ export class AnalyticsDashboardController {
       signal,
       (update) => this.#applyReportUpdate(update),
       this.#api,
+      capabilities,
     ));
     if (result.status !== "success") {
       if (result.status === "error") this.#failLoadingReports(reportErrorMessage(result.error), dimensions);
       return;
     }
-    const capability = detectUtmCapability(
+    const capability = supportsUtm ? detectUtmCapability(
       result.value.baselineSucceeded,
       result.value.utmSucceeded,
       result.value.utmStatuses,
-    );
+    ) : "unavailable";
     if (capability !== "unknown") {
       this.#utmCapabilityByConnection.set(connection, capability);
       this.#set({ utmCapability: capability });
@@ -322,6 +326,7 @@ export class AnalyticsDashboardController {
   closeBreakdown(): void { this.#expandedRequest.cancel(); this.#set({ expandedBreakdown: undefined }); }
 
   async openEvents(search = "", debounce = false): Promise<void> {
+    if (!this.#capabilities().events) return;
     const connection = this.state.connection;
     if (!connection) return;
     const previous = this.state.expandedEvents;
@@ -341,6 +346,7 @@ export class AnalyticsDashboardController {
   closeEvents(): void { this.#eventSearchRequest.cancel(); this.#set({ expandedEvents: undefined }); }
 
   async selectFlag(flagKey: string): Promise<void> {
+    if (!this.#capabilities().flags) return;
     const connection = this.state.connection;
     if (!connection) return;
     const previous = this.state.selectedFlag;
@@ -358,7 +364,11 @@ export class AnalyticsDashboardController {
 
   clearSelectedFlag(): void { this.#flagRequest.cancel(); this.#set({ selectedFlag: undefined }); }
 
-  async selectEvent(eventName: string): Promise<void> { this.closeEvents(); await this.#loadEventDetails(eventName); }
+  async selectEvent(eventName: string): Promise<void> {
+    if (!this.#capabilities().eventProperties) return;
+    this.closeEvents();
+    await this.#loadEventDetails(eventName);
+  }
 
   toggleEventPropertyFilter(property: string, value: string): void {
     const selected = this.state.selectedEvent;
@@ -401,7 +411,7 @@ export class AnalyticsDashboardController {
       if (result.status === "error") { this.#set({ configurationError: reportErrorMessage(result.error), summary: idleState() }); return; }
       const { data, error } = result.value;
       if (error || !data?.enabled) {
-        this.#set({ configurationError: "Vercel Analytics is disabled or unavailable. Ask an administrator to configure a connection.", summary: idleState() });
+        this.#set({ configurationError: "Web Analytics is disabled or unavailable. Ask an administrator to configure a connection.", summary: idleState() });
         return;
       }
       if (data.connections.length === 0) {
@@ -452,12 +462,34 @@ export class AnalyticsDashboardController {
   }
 
   #dashboardReportPlan(utmCapability = this.state.utmCapability): DashboardReportPlan {
-    return dashboardReportPlan(
+    const plan = dashboardReportPlan(
       Boolean(this.#documentId),
       utmCapability,
       this.state.acquisitionView,
       this.state.utmDimension,
     );
+    const supported = new Set(this.#capabilities().dimensions);
+    const cards = plan.cards.reduce<DashboardCard[]>((result, card) => {
+      if (card.kind === "breakdown") {
+        if (supported.has(card.dimension)) result.push(card);
+        return result;
+      }
+      const options = card.options.filter(({ dimension }) => supported.has(dimension));
+      if (options.length) result.push({ ...card, options });
+      return result;
+    }, []);
+    return { cards, dimensions: plan.dimensions.filter((dimension) => supported.has(dimension)) };
+  }
+
+  #capabilities(): AnalyticsCapabilities {
+    const route = this.state.route;
+    if (route) return route.capabilities;
+    return this.state.connections.find(({ key }) => key === this.state.connection)?.capabilities ?? {
+      dimensions: ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
+      events: true,
+      eventProperties: true,
+      flags: true,
+    };
   }
 
   #ensureUtmBreakdown(dimension: UtmDimension): void {

@@ -13,10 +13,10 @@ namespace TheBuilder.WebAnalytics.Controllers;
 [ApiExplorerSettings(GroupName = "TheBuilder.WebAnalytics")]
 public sealed class WebAnalyticsApiController(
     IAnalyticsAuthorizationService authorizationService,
-    VercelAnalyticsConnectionRegistry registry,
-    VercelAnalyticsReportService reportService,
+    AnalyticsConnectionRegistry registry,
+    AnalyticsReportService reportService,
     IAnalyticsDocumentRouteService routeService,
-    IVercelProjectNameService projectNames) : WebAnalyticsApiControllerBase
+    IAnalyticsConnectionNameService projectNames) : WebAnalyticsApiControllerBase
 {
     private enum ReportScope
     {
@@ -35,7 +35,7 @@ public sealed class WebAnalyticsApiController(
         var snapshot = registry.Capture();
         var connectionTasks = snapshot.Settings.Connections
             .Select(settings => snapshot.Get(settings.Key))
-            .OfType<VercelAnalyticsConnection>()
+            .OfType<AnalyticsConnection>()
             .Select((connection, index) => BuildConnectionSummaryAsync(connection, index == 0, cancellationToken))
             .ToArray();
         var connections = await Task.WhenAll(connectionTasks);
@@ -47,11 +47,13 @@ public sealed class WebAnalyticsApiController(
         return Ok(response);
 
         async Task<AnalyticsConnectionSummary> BuildConnectionSummaryAsync(
-            VercelAnalyticsConnection connection,
+            AnalyticsConnection connection,
             bool isDefault,
             CancellationToken token) => new(
                 connection.Key,
                 await projectNames.GetDisplayNameAsync(connection, token),
+                connection.Provider,
+                connection.Capabilities,
                 isDefault,
                 connection.IsConfigured,
                 await routeService.GetConnectionBaseUrlAsync(connection, token),
@@ -298,10 +300,10 @@ public sealed class WebAnalyticsApiController(
         }
         if (!registry.Settings.Enabled)
         {
-            return (null, VercelAnalyticsProblemFactory.CreateResult(
+            return (null, WebAnalyticsProblemFactory.CreateResult(
                 StatusCodes.Status503ServiceUnavailable,
-                VercelAnalyticsProblemCodes.AnalyticsDisabled,
-                "Vercel Analytics is disabled."));
+                WebAnalyticsProblemCodes.AnalyticsDisabled,
+                "Web Analytics is disabled."));
         }
 
         if (documentId is null)
@@ -326,20 +328,20 @@ public sealed class WebAnalyticsApiController(
     }
 
     private ActionResult ValidationProblem(string detail) =>
-        VercelAnalyticsProblemFactory.CreateResult(
+        WebAnalyticsProblemFactory.CreateResult(
             StatusCodes.Status400BadRequest,
-            VercelAnalyticsProblemCodes.InvalidQuery,
+            WebAnalyticsProblemCodes.InvalidQuery,
             "Invalid analytics query.",
             detail);
 
     private ActionResult NotFoundProblem(string detail) =>
-        VercelAnalyticsProblemFactory.CreateResult(
+        WebAnalyticsProblemFactory.CreateResult(
             StatusCodes.Status404NotFound,
-            VercelAnalyticsProblemCodes.ConfigurationNotFound,
+            WebAnalyticsProblemCodes.ConfigurationNotFound,
             "Analytics configuration was not found.",
             detail);
 
-    private static IReadOnlyList<string> ConnectionWarnings(VercelAnalyticsConnection connection)
+    private static IReadOnlyList<string> ConnectionWarnings(AnalyticsConnection connection)
     {
         var warnings = new List<string>();
         if (!connection.IsConfigured) warnings.Add("No server-side access token is configured for this connection.");

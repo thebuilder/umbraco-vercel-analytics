@@ -7,9 +7,9 @@ using Umbraco.Cms.Web.Common.Routing;
 namespace TheBuilder.WebAnalytics.Controllers
 {
     [ApiController]
-    [BackOfficeRoute("management/api/v{version:apiVersion}/vercel-analytics")]
+    [BackOfficeRoute("management/api/v{version:apiVersion}/web-analytics")]
     [Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
-    [TypeFilter(typeof(VercelAnalyticsExceptionFilter))]
+    [TypeFilter(typeof(WebAnalyticsExceptionFilter))]
     [MapToApi(Constants.ApiName)]
     public class WebAnalyticsApiControllerBase : ControllerBase
     {

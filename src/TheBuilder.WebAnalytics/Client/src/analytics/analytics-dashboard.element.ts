@@ -82,7 +82,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     if (state.setupRequired) return html`
       <main>
         <umb-empty-state headline="Connect Web Analytics">
-          <p>Add a Vercel project connection before viewing analytics.</p>
+          <p>Add an analytics connection before viewing reports.</p>
           <uui-button
             href="/umbraco/section/settings/dashboard/vercel-analytics"
             look="primary"
@@ -95,6 +95,7 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
     const expanded = state.expandedBreakdown;
     const expandedEvents = state.expandedEvents;
     const selected = state.selectedEvent;
+    const capabilities = state.route?.capabilities ?? state.connections.find(({ key }) => key === state.connection)?.capabilities;
     return html`
       <main @toggle-filter=${(event: CustomEvent<{ dimension?: AnalyticsDimension; value: string }>) => this.#controller.toggleFilter(event.detail.dimension, event.detail.value)}>
         <vercel-analytics-dashboard-header
@@ -126,6 +127,9 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           .acquisitionView=${state.acquisitionView}
           .utmDimension=${state.utmDimension}
           .baseUrl=${this.#controller.linkBaseUrl()}
+          .supportsEvents=${capabilities?.events ?? true}
+          .supportsEventProperties=${capabilities?.eventProperties ?? true}
+          .supportsFlags=${capabilities?.flags ?? true}
           @view-breakdown=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
           @view-events=${() => this.#controller.openEvents()}
           @select-event=${(event: CustomEvent<{ eventName: string }>) => this.#controller.selectEvent(event.detail.eventName)}
@@ -153,13 +157,14 @@ export class VercelAnalyticsDashboardElement extends UmbElementMixin(LitElement)
           <vercel-analytics-event-dialog
             .rows=${stateData(expandedEvents) ?? []}
             .filters=${state.filters}
+            .detailsEnabled=${capabilities?.eventProperties ?? true}
             .loading=${expandedEvents.status === "loading"}
             .unavailable=${this.#error(expandedEvents)}
             @search-events=${(event: CustomEvent<{ search: string }>) => this.#controller.openEvents(event.detail.search, true)}
             @select-event=${(event: CustomEvent<{ eventName: string }>) => this.#controller.selectEvent(event.detail.eventName)}
             @close-events=${() => this.#controller.closeEvents()}></vercel-analytics-event-dialog>
         ` : ""}
-        ${selected ? html`
+        ${selected && (capabilities?.eventProperties ?? true) ? html`
           <vercel-analytics-event-details-dialog
             .eventName=${selected.eventName}
             .details=${stateData(selected.details)}

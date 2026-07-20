@@ -161,7 +161,7 @@ public sealed class AnalyticsDocumentRouteServiceTests
         Guid.NewGuid(),
         [new AnalyticsPublishedRoute(culture, hostname, path, $"https://{hostname}{path}")]);
 
-    private static VercelAnalyticsConnectionOptions Connection(
+    private static AnalyticsConnectionOptions Connection(
         string alias,
         IReadOnlyList<Guid>? roots = null,
         IReadOnlyList<string>? documentTypes = null) => new()
@@ -173,8 +173,8 @@ public sealed class AnalyticsDocumentRouteServiceTests
             EnabledDocumentTypes = documentTypes?.ToArray() ?? ["articlePage"]
         };
 
-    private static VercelAnalyticsConnectionRegistry CreateRegistry(
-        params VercelAnalyticsConnectionOptions[] connections) => new(Options.Create(new VercelAnalyticsOptions
+    private static AnalyticsConnectionRegistry CreateRegistry(
+        params AnalyticsConnectionOptions[] connections) => new(Options.Create(new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Vercel = { AccessToken = "secret" } },

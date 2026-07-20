@@ -63,6 +63,8 @@ describe("analytics presentation components", () => {
     element.siteUrl = "https://example.com";
     element.route = {
       connection: "11111111-1111-1111-1111-111111111111",
+      provider: "Vercel",
+      capabilities: { dimensions: ["RequestPath"], events: true, eventProperties: true, flags: true },
       culture: "en-US",
       hostname: "example.com",
       path: "/products/example",

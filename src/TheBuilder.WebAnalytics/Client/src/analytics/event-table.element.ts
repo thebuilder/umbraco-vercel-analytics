@@ -12,6 +12,7 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
   @property({ type: Number }) skeletonRows = 10;
   @property({ attribute: false }) rows: AnalyticsEventRow[] = [];
   @property({ attribute: false }) filters: AnalyticsFilter[] = [];
+  @property({ type: Boolean }) detailsEnabled = true;
 
   #select(eventName: string): void {
     this.dispatchEvent(new CustomEvent("select-event", {
@@ -41,7 +42,9 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
               <tr>
                 <th scope="row">
                   <span class="bar" style=${`--bar-width:${(row.count / maximum) * 100}%;--bar-minimum:${row.count > 0 ? "4px" : "0px"}`}></span>
-                  <button class="details-action" type="button" title=${`View details for ${row.eventName}`} @click=${() => this.#select(row.eventName)}>${row.eventName}</button>
+                  ${this.detailsEnabled
+                    ? html`<button class="details-action" type="button" title=${`View details for ${row.eventName}`} @click=${() => this.#select(row.eventName)}>${row.eventName}</button>`
+                    : html`<span class="event-name">${row.eventName}</span>`}
                 </th>
                 <td><span class="metric-cell">
                   <button
@@ -89,6 +92,7 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
     .details-action { appearance: none; background: transparent; border: 0; color: var(--uui-color-text); cursor: pointer; font: inherit; max-width: 100%; overflow: hidden; padding: 0; position: relative; text-align: left; text-overflow: ellipsis; white-space: nowrap; z-index: 1; }
     .details-action:hover { text-decoration: underline; text-underline-offset: 0.18em; }
     .details-action:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
+    .event-name { position: relative; z-index: 1; }
     .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
     .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
     tbody tr:hover .filter-action, .filter-action:focus-visible, .filter-action[aria-pressed="true"] { opacity: 1; }

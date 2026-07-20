@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AnalyticsDocumentRoute } from "../api/types.gen.js";
+import type { AnalyticsCapabilities, AnalyticsDocumentRoute } from "../api/types.gen.js";
 import { AnalyticsDashboardController, type DashboardEnvironment } from "./analytics-dashboard.controller.js";
 import type { DashboardApi } from "./dashboard-api.js";
 import { dateRangeForPreset } from "./date-range.js";
+
+const fullCapabilities: AnalyticsCapabilities = {
+  dimensions: ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
+  events: true,
+  eventProperties: true,
+  flags: true,
+};
 
 describe("AnalyticsDashboardController", () => {
   it("uses the first connection when no requested or stored connection is valid", async () => {
@@ -11,8 +18,8 @@ describe("AnalyticsDashboardController", () => {
       enabled: true,
       defaultRangeDays: 30,
       connections: [
-        { key: "11111111-1111-1111-1111-111111111111", displayName: "First", isDefault: true, isConfigured: true, baseUrl: "https://first.example.com", warnings: [] },
-        { key: "22222222-2222-2222-2222-222222222222", displayName: "Second", isDefault: false, isConfigured: true, baseUrl: "https://second.example.com", warnings: [] },
+        { key: "11111111-1111-1111-1111-111111111111", displayName: "First", provider: "Vercel", capabilities: fullCapabilities, isDefault: true, isConfigured: true, baseUrl: "https://first.example.com", warnings: [] },
+        { key: "22222222-2222-2222-2222-222222222222", displayName: "Second", provider: "Vercel", capabilities: fullCapabilities, isDefault: false, isConfigured: true, baseUrl: "https://second.example.com", warnings: [] },
       ],
     }));
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
@@ -29,8 +36,8 @@ describe("AnalyticsDashboardController", () => {
       enabled: true,
       defaultRangeDays: 30,
       connections: [
-        { key: "11111111-1111-1111-1111-111111111111", displayName: "Demo", isDefault: true, isConfigured: true, baseUrl: "https://demo.example.com", warnings: [] },
-        { key: "22222222-2222-2222-2222-222222222222", displayName: "Unconfigured", isDefault: false, isConfigured: false, baseUrl: undefined, warnings: ["No server-side access token is configured for this connection."] },
+        { key: "11111111-1111-1111-1111-111111111111", displayName: "Demo", provider: "Vercel", capabilities: fullCapabilities, isDefault: true, isConfigured: true, baseUrl: "https://demo.example.com", warnings: [] },
+        { key: "22222222-2222-2222-2222-222222222222", displayName: "Unconfigured", provider: "Vercel", capabilities: fullCapabilities, isDefault: false, isConfigured: false, baseUrl: undefined, warnings: ["No server-side access token is configured for this connection."] },
       ],
     }));
     const nextEvents = deferred<Awaited<ReturnType<DashboardApi["events"]>>>();
@@ -308,6 +315,39 @@ describe("AnalyticsDashboardController", () => {
     expect(api.summary).not.toHaveBeenCalled();
   });
 
+  it("uses provider capabilities to skip flags and event details for Plausible", async () => {
+    const api = dashboardApi();
+    api.connections.mockResolvedValue(ok({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [{
+        key: "11111111-1111-1111-1111-111111111111",
+        displayName: "Plausible",
+        provider: "Plausible",
+        capabilities: {
+          dimensions: ["RequestPath", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "EventName"],
+          events: true,
+          eventProperties: false,
+          flags: false,
+        },
+        isDefault: true,
+        isConfigured: true,
+        baseUrl: "https://example.com",
+        warnings: [],
+      }],
+    }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    await controller.selectEvent("Signup");
+
+    expect(api.events).toHaveBeenCalled();
+    expect(api.flags).not.toHaveBeenCalled();
+    expect(api.eventDetails).not.toHaveBeenCalled();
+    expect(controller.cards().some((card) => card.kind === "tabbed-breakdown" && card.id === "utm")).toBe(true);
+  });
+
 });
 
 function dashboardApi() {
@@ -315,7 +355,7 @@ function dashboardApi() {
     connections: vi.fn<DashboardApi["connections"]>(async () => ok({
       enabled: true,
       defaultRangeDays: 30,
-      connections: [{ key: "11111111-1111-1111-1111-111111111111", displayName: "Main", isDefault: true, isConfigured: true, baseUrl: "https://example.com", warnings: [] }],
+      connections: [{ key: "11111111-1111-1111-1111-111111111111", displayName: "Main", provider: "Vercel", capabilities: fullCapabilities, isDefault: true, isConfigured: true, baseUrl: "https://example.com", warnings: [] }],
     })),
     documentRoutes: vi.fn<DashboardApi["documentRoutes"]>(async () => ok([])),
     summary: vi.fn<DashboardApi["summary"]>(async () => ok({ totals: { visitors: 10, pageViews: 20 }, points: [] })),
@@ -328,7 +368,7 @@ function dashboardApi() {
 }
 
 function route(path: string, culture: string): AnalyticsDocumentRoute {
-  return { connection: "11111111-1111-1111-1111-111111111111", culture, hostname: "example.com", path, url: `https://example.com${path}`, isCurrent: true, warnings: [] };
+  return { connection: "11111111-1111-1111-1111-111111111111", provider: "Vercel", capabilities: fullCapabilities, culture, hostname: "example.com", path, url: `https://example.com${path}`, isCurrent: true, warnings: [] };
 }
 
 function environment(): DashboardEnvironment {

@@ -1,17 +1,17 @@
 namespace TheBuilder.WebAnalytics.Services;
 
-public sealed class VercelAnalyticsRequestGate : IDisposable
+public sealed class AnalyticsProviderRequestGate : IDisposable
 {
     internal const int DefaultMaximumConcurrentRequests = 8;
 
     private readonly SemaphoreSlim _concurrency;
 
-    public VercelAnalyticsRequestGate()
+    public AnalyticsProviderRequestGate()
         : this(DefaultMaximumConcurrentRequests)
     {
     }
 
-    internal VercelAnalyticsRequestGate(int maximumConcurrentRequests)
+    internal AnalyticsProviderRequestGate(int maximumConcurrentRequests)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumConcurrentRequests);
         _concurrency = new SemaphoreSlim(maximumConcurrentRequests, maximumConcurrentRequests);

@@ -3,29 +3,29 @@ using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Services;
 
-public interface IVercelAnalyticsClient
+public interface IAnalyticsProviderClient
 {
-    Task<string> GetProjectNameAsync(
-        VercelAnalyticsConnection connection,
+    Task<string> GetDisplayNameAsync(
+        AnalyticsConnection connection,
         CancellationToken cancellationToken);
 
     Task<AnalyticsTotals> CountAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken);
 
     Task<long> GetPageViewTotalAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         AnalyticsDimension dimension,
         int limit,
@@ -33,35 +33,35 @@ public interface IVercelAnalyticsClient
         CancellationToken cancellationToken);
 
     Task<AnalyticsEventTotals> CountEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         int limit,
         string? search,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string? flagKey,
         int limit,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         string propertyName,

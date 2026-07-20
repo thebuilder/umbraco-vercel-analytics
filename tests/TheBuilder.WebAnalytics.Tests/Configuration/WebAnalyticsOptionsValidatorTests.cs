@@ -1,37 +1,38 @@
 using Microsoft.Extensions.Options;
 using TheBuilder.WebAnalytics.Configuration;
+using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Tests.Configuration;
 
-public sealed class VercelAnalyticsOptionsValidatorTests
+public sealed class WebAnalyticsOptionsValidatorTests
 {
     private static readonly Guid MainKey = Guid.Parse("11111111-1111-1111-1111-111111111110");
     private static readonly Guid OtherKey = Guid.Parse("22222222-2222-2222-2222-222222222220");
-    private readonly VercelAnalyticsOptionsValidator _sut = new();
+    private readonly WebAnalyticsOptionsValidator _sut = new();
 
     [Fact]
     public void Disabled_configuration_is_valid_without_connections()
     {
-        Assert.True(_sut.Validate(null, new VercelAnalyticsOptions { Enabled = false }).Succeeded);
+        Assert.True(_sut.Validate(null, new WebAnalyticsOptions { Enabled = false }).Succeeded);
     }
 
     [Fact]
     public void Web_analytics_is_enabled_by_default()
     {
-        Assert.True(new VercelAnalyticsOptions().Enabled);
-        Assert.True(new VercelAnalyticsSettings().Enabled);
+        Assert.True(new WebAnalyticsOptions().Enabled);
+        Assert.True(new WebAnalyticsSettings().Enabled);
     }
 
     [Fact]
     public void Enabled_configuration_is_valid_before_ui_setup()
     {
-        Assert.True(_sut.Validate(null, new VercelAnalyticsOptions { Enabled = true }).Succeeded);
+        Assert.True(_sut.Validate(null, new WebAnalyticsOptions { Enabled = true }).Succeeded);
     }
 
     [Fact]
     public void Shared_token_is_valid_before_ui_setup()
     {
-        var options = new VercelAnalyticsOptions
+        var options = new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Vercel = { AccessToken = "server-secret" } }
@@ -85,7 +86,7 @@ public sealed class VercelAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Connections[0].DocumentRootKeys = ["not-a-guid"];
         options.Connections[0].EnabledDocumentTypeKeys = ["also-not-a-guid"];
-        var registry = new VercelAnalyticsConnectionRegistry(Options.Create(options));
+        var registry = new AnalyticsConnectionRegistry(Options.Create(options));
 
         var connection = registry.Get(MainKey);
 
@@ -100,7 +101,7 @@ public sealed class VercelAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Providers.Vercel.AccessToken = "shared-token";
 
-        var connection = new VercelAnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
+        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
 
         Assert.NotNull(connection);
         Assert.Equal("shared-token", connection.AccessToken);
@@ -114,16 +115,43 @@ public sealed class VercelAnalyticsOptionsValidatorTests
         options.Providers.Vercel.AccessToken = "shared-token";
         options.ConnectionAccessTokens[MainKey.ToString()] = "connection-token";
 
-        var connection = new VercelAnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
+        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
 
         Assert.NotNull(connection);
         Assert.Equal("connection-token", connection.AccessToken);
     }
 
     [Fact]
+    public void Registry_resolves_plausible_provider_token()
+    {
+        var key = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        var options = CreateOptions();
+        options.Providers.Plausible.AccessToken = "plausible-token";
+        options.Connections =
+        [
+            new AnalyticsConnectionOptions
+            {
+                Key = key,
+                Provider = AnalyticsProvider.Plausible,
+                SiteId = "example.com"
+            }
+        ];
+
+        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(key);
+
+        Assert.NotNull(connection);
+        Assert.Equal(AnalyticsProvider.Plausible, connection.Provider);
+        Assert.Equal("plausible-token", connection.AccessToken);
+        Assert.True(connection.IsConfigured);
+        Assert.False(connection.Capabilities.Flags);
+        Assert.False(connection.Capabilities.EventProperties);
+        Assert.True(connection.Capabilities.Events);
+    }
+
+    [Fact]
     public void Connection_string_representation_redacts_access_token()
     {
-        var connection = new VercelAnalyticsConnectionRegistry(Options.Create(CreateOptions())).Get(MainKey);
+        var connection = new AnalyticsConnectionRegistry(Options.Create(CreateOptions())).Get(MainKey);
 
         var representation = connection!.ToString();
 
@@ -138,7 +166,7 @@ public sealed class VercelAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Providers.Vercel.AccessToken = string.Empty;
 
-        var connection = new VercelAnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
+        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
 
         Assert.NotNull(connection);
         Assert.False(connection.HasAccessToken);
@@ -150,17 +178,17 @@ public sealed class VercelAnalyticsOptionsValidatorTests
     {
         var options = CreateOptions();
         var optionsAccessor = Options.Create(options);
-        var store = new VercelAnalyticsSettingsStore(optionsAccessor);
-        var registry = new VercelAnalyticsConnectionRegistry(store, optionsAccessor);
+        var store = new WebAnalyticsSettingsStore(optionsAccessor);
+        var registry = new AnalyticsConnectionRegistry(store, optionsAccessor);
 
         var first = registry.Capture();
         var second = registry.Capture();
-        store.Save(new VercelAnalyticsSettings
+        store.Save(new WebAnalyticsSettings
         {
             Enabled = true,
             Connections =
             [
-                new VercelAnalyticsConnectionSettings
+                new AnalyticsConnectionSettings
                 {
                     Key = MainKey,
                     DisplayName = "Changed",
@@ -182,7 +210,7 @@ public sealed class VercelAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Connections.Add(CreateConnection(OtherKey,
             rootKeys: ["22222222-2222-2222-2222-222222222222"]));
-        var registry = new VercelAnalyticsConnectionRegistry(Options.Create(options));
+        var registry = new AnalyticsConnectionRegistry(Options.Create(options));
 
         var root = registry.FindNearestRoot([
             Guid.Parse("22222222-2222-2222-2222-222222222222"),
@@ -197,24 +225,24 @@ public sealed class VercelAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         var explicitKey = Guid.Parse("33333333-3333-3333-3333-333333333333");
         options.Connections[0].EnabledDocumentTypeKeys = [explicitKey.ToString()];
-        var registry = new VercelAnalyticsConnectionRegistry(Options.Create(options));
+        var registry = new AnalyticsConnectionRegistry(Options.Create(options));
 
         Assert.True(registry.Get(MainKey)!.IsDocumentTypeEnabled("anything", explicitKey));
         Assert.False(registry.Get(MainKey)!.IsDocumentTypeEnabled("anything", Guid.NewGuid()));
 
         options.Connections[0].EnableAllDocumentTypes = true;
-        registry = new VercelAnalyticsConnectionRegistry(Options.Create(options));
+        registry = new AnalyticsConnectionRegistry(Options.Create(options));
         Assert.True(registry.Get(MainKey)!.IsDocumentTypeEnabled("newPage", Guid.NewGuid()));
     }
 
-    private static VercelAnalyticsOptions CreateOptions() => new()
+    private static WebAnalyticsOptions CreateOptions() => new()
     {
         Enabled = true,
         Providers = { Vercel = { AccessToken = "test-token" } },
         Connections = [CreateConnection(MainKey)]
     };
 
-    private static VercelAnalyticsConnectionOptions CreateConnection(
+    private static AnalyticsConnectionOptions CreateConnection(
         Guid key,
         string[]? rootKeys = null) => new()
     {

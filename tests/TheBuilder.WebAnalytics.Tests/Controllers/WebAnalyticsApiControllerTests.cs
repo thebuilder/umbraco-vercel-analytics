@@ -52,15 +52,15 @@ public sealed class WebAnalyticsApiControllerTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = 0;
         var routes = new Mock<IAnalyticsDocumentRouteService>(MockBehavior.Strict);
-        var projectNames = new Mock<IVercelProjectNameService>(MockBehavior.Strict);
+        var projectNames = new Mock<IAnalyticsConnectionNameService>(MockBehavior.Strict);
         projectNames
             .Setup(service => service.GetDisplayNameAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((VercelAnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
+            .ReturnsAsync((AnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
         routes
             .Setup(service => service.GetConnectionBaseUrlAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
@@ -95,17 +95,17 @@ public sealed class WebAnalyticsApiControllerTests
         authorization.Setup(service => service.HasAnalyticsSectionAccess()).Returns(true);
         var routes = new Mock<IAnalyticsDocumentRouteService>(MockBehavior.Strict);
         routes.Setup(service => service.GetConnectionBaseUrlAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
-        var projectNames = new Mock<IVercelProjectNameService>(MockBehavior.Strict);
+        var projectNames = new Mock<IAnalyticsConnectionNameService>(MockBehavior.Strict);
         projectNames.Setup(service => service.GetDisplayNameAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("Demo");
-        var options = Options.Create(new VercelAnalyticsOptions());
-        var store = new VercelAnalyticsSettingsStore(options);
-        store.Save(new VercelAnalyticsSettings
+        var options = Options.Create(new WebAnalyticsOptions());
+        var store = new WebAnalyticsSettingsStore(options);
+        store.Save(new WebAnalyticsSettings
         {
             Enabled = true,
             Connections =
@@ -118,7 +118,7 @@ public sealed class WebAnalyticsApiControllerTests
                 }
             ]
         });
-        var registry = new VercelAnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: true);
+        var registry = new AnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: true);
         var controller = new WebAnalyticsApiController(
             authorization.Object,
             registry,
@@ -324,13 +324,13 @@ public sealed class WebAnalyticsApiControllerTests
     private static DateTimeOffset UtcDate(int year, int month, int day) =>
         new(year, month, day, 0, 0, 0, TimeSpan.Zero);
 
-    private static VercelAnalyticsConnectionRegistry EnabledRegistry(params string[] aliases) =>
-        new(Options.Create(new VercelAnalyticsOptions
+    private static AnalyticsConnectionRegistry EnabledRegistry(params string[] aliases) =>
+        new(Options.Create(new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Vercel = { AccessToken = "secret" } },
             Connections = (aliases.Length == 0 ? ["main"] : aliases).Select(
-                alias => new VercelAnalyticsConnectionOptions
+                alias => new AnalyticsConnectionOptions
                 {
                     Key = alias == "secondary" ? SecondaryKey : MainKey,
                     DisplayName = alias,
@@ -345,6 +345,6 @@ public sealed class WebAnalyticsApiControllerTests
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);
         var problem = Assert.IsType<AnalyticsProblemDetails>(objectResult.Value);
-        Assert.Equal(VercelAnalyticsProblemCodes.InvalidQuery, problem.Code);
+        Assert.Equal(WebAnalyticsProblemCodes.InvalidQuery, problem.Code);
     }
 }

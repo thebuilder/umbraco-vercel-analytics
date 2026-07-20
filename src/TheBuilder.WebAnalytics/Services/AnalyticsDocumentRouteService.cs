@@ -8,7 +8,7 @@ namespace TheBuilder.WebAnalytics.Services;
 public interface IAnalyticsDocumentRouteService
 {
     Task<string?> GetConnectionBaseUrlAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AnalyticsDocumentRoute>> GetRoutesAsync(
@@ -20,10 +20,10 @@ public interface IAnalyticsDocumentRouteService
 public sealed class AnalyticsDocumentRouteService(
     IContentService contentService,
     IAnalyticsPublishedContentAccessor publishedContent,
-    VercelAnalyticsConnectionRegistry registry) : IAnalyticsDocumentRouteService
+    AnalyticsConnectionRegistry registry) : IAnalyticsDocumentRouteService
 {
     public async Task<string?> GetConnectionBaseUrlAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         CancellationToken cancellationToken)
     {
         foreach (var rootKey in connection.DocumentRootKeys)
@@ -58,6 +58,8 @@ public sealed class AnalyticsDocumentRouteService(
 
             routes.Add(new AnalyticsDocumentRoute(
                 connection.Key,
+                connection.Provider,
+                connection.Capabilities,
                 publishedRoute.Culture,
                 publishedRoute.Hostname,
                 publishedRoute.Path,
@@ -69,7 +71,7 @@ public sealed class AnalyticsDocumentRouteService(
         return routes;
     }
 
-    private VercelAnalyticsConnection? FindRootConnection(IContent content)
+    private AnalyticsConnection? FindRootConnection(IContent content)
     {
         var ancestorKeys = new List<Guid>();
         var current = content;

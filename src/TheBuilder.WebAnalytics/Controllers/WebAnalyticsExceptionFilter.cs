@@ -8,7 +8,7 @@ using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Controllers;
 
-internal static class VercelAnalyticsProblemCodes
+internal static class WebAnalyticsProblemCodes
 {
     public const string AnalyticsDisabled = "analytics_disabled";
     public const string ConfigurationNotFound = "configuration_not_found";
@@ -22,11 +22,11 @@ internal static class VercelAnalyticsProblemCodes
     public const string UpstreamUnavailable = "upstream_unavailable";
 }
 
-internal sealed record VercelAnalyticsProblemDefinition(int Status, string Code, string Title);
+internal sealed record WebAnalyticsProblemDefinition(int Status, string Code, string Title);
 
-internal static class VercelAnalyticsProblemFactory
+internal static class WebAnalyticsProblemFactory
 {
-    public static ObjectResult CreateResult(VercelAnalyticsProblemDefinition definition, string? detail = null)
+    public static ObjectResult CreateResult(WebAnalyticsProblemDefinition definition, string? detail = null)
     {
         var problem = new AnalyticsProblemDetails
         {
@@ -39,52 +39,56 @@ internal static class VercelAnalyticsProblemFactory
     }
 
     public static ObjectResult CreateResult(int status, string code, string title, string? detail = null) =>
-        CreateResult(new VercelAnalyticsProblemDefinition(status, code, title), detail);
+        CreateResult(new WebAnalyticsProblemDefinition(status, code, title), detail);
 
-    public static VercelAnalyticsProblemDefinition? FromException(Exception exception) => exception switch
+    public static WebAnalyticsProblemDefinition? FromException(Exception exception) => exception switch
     {
-        VercelAnalyticsApiException apiException => FromVercelStatus(apiException.StatusCode),
+        AnalyticsProviderApiException apiException => FromProviderStatus(apiException.Provider, apiException.StatusCode),
         AnalyticsReportCapacityException => new(
             StatusCodes.Status503ServiceUnavailable,
-            VercelAnalyticsProblemCodes.ReportCapacity,
+            WebAnalyticsProblemCodes.ReportCapacity,
             "The analytics report service is busy. Try again shortly."),
         TaskCanceledException => new(
             StatusCodes.Status504GatewayTimeout,
-            VercelAnalyticsProblemCodes.UpstreamTimeout,
-            "Vercel Analytics did not respond in time."),
+            WebAnalyticsProblemCodes.UpstreamTimeout,
+            "The analytics provider did not respond in time."),
         HttpRequestException => new(
             StatusCodes.Status502BadGateway,
-            VercelAnalyticsProblemCodes.UpstreamTransport,
-            "Vercel Analytics could not be reached."),
+            WebAnalyticsProblemCodes.UpstreamTransport,
+            "The analytics provider could not be reached."),
         JsonException => new(
             StatusCodes.Status502BadGateway,
-            VercelAnalyticsProblemCodes.InvalidUpstreamPayload,
-            "Vercel Analytics returned an invalid response."),
+            WebAnalyticsProblemCodes.InvalidUpstreamPayload,
+            "The analytics provider returned an invalid response."),
         _ => null
     };
 
-    private static VercelAnalyticsProblemDefinition FromVercelStatus(HttpStatusCode statusCode) => statusCode switch
+    private static WebAnalyticsProblemDefinition FromProviderStatus(AnalyticsProvider provider, HttpStatusCode statusCode) => statusCode switch
     {
         HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => new(
             StatusCodes.Status502BadGateway,
-            VercelAnalyticsProblemCodes.InvalidCredentials,
-            "Vercel rejected the configured credentials or project access."),
+            WebAnalyticsProblemCodes.InvalidCredentials,
+            $"{provider} rejected the configured credentials or connection access."),
         HttpStatusCode.PaymentRequired => new(
             StatusCodes.Status402PaymentRequired,
-            VercelAnalyticsProblemCodes.PlanLimit,
-            "The report is unavailable for the current Vercel plan."),
+            WebAnalyticsProblemCodes.PlanLimit,
+            $"The report is unavailable for the current {provider} plan."),
         HttpStatusCode.BadRequest => new(
             StatusCodes.Status400BadRequest,
-            VercelAnalyticsProblemCodes.InvalidQuery,
-            "Vercel rejected the analytics query or reporting window."),
+            WebAnalyticsProblemCodes.InvalidQuery,
+            $"{provider} rejected the analytics query or reporting window."),
+        HttpStatusCode.TooManyRequests => new(
+            StatusCodes.Status503ServiceUnavailable,
+            WebAnalyticsProblemCodes.UpstreamUnavailable,
+            $"{provider} rate-limited the analytics request. Try again shortly."),
         _ => new(
             StatusCodes.Status502BadGateway,
-            VercelAnalyticsProblemCodes.UpstreamUnavailable,
-            "Vercel Analytics is temporarily unavailable.")
+            WebAnalyticsProblemCodes.UpstreamUnavailable,
+            $"{provider} Analytics is temporarily unavailable.")
     };
 }
 
-public sealed class VercelAnalyticsExceptionFilter : IExceptionFilter
+public sealed class WebAnalyticsExceptionFilter : IExceptionFilter
 {
     public void OnException(ExceptionContext context)
     {
@@ -93,10 +97,10 @@ public sealed class VercelAnalyticsExceptionFilter : IExceptionFilter
             return;
         }
 
-        var problem = VercelAnalyticsProblemFactory.FromException(context.Exception);
+        var problem = WebAnalyticsProblemFactory.FromException(context.Exception);
         if (problem is null) return;
 
-        context.Result = VercelAnalyticsProblemFactory.CreateResult(problem);
+        context.Result = WebAnalyticsProblemFactory.CreateResult(problem);
         context.ExceptionHandled = true;
     }
 }

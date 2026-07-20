@@ -11,21 +11,32 @@ import type { UUIInputElement, UUIToggleElement } from "@umbraco-cms/backoffice/
 import { WebAnalyticsService } from "../api/sdk.gen.js";
 import type {
   AnalyticsConnectionSettingsResponse,
+  AnalyticsCapabilities,
+  AnalyticsProvider,
   AnalyticsSettingsResponse,
   UpdateAnalyticsSettingsRequest,
 } from "../api/types.gen.js";
 import "./connection-editor.element.js";
-import type { ConnectionActionStatus, VercelAnalyticsConnectionEditorElement } from "./connection-editor.element.js";
+import type { ConnectionActionStatus, AnalyticsConnectionEditorElement } from "./connection-editor.element.js";
 import { createSettingsUpdate, validateConnection, validateEditableSettings } from "./settings-model.js";
 import { announceAnalyticsAvailability } from "../section/analytics-availability.js";
 import { MOCK_SCENARIOS, type MockScenarioDefinition } from "./mock-scenarios.js";
 
 type NewConnection =
-  | { kind: "vercel"; hasAccessToken: boolean }
+  | { kind: "provider"; provider: AnalyticsProvider; hasAccessToken: boolean }
   | { kind: "mock"; scenario: MockScenarioDefinition };
 
+const capabilities = (provider: AnalyticsProvider): AnalyticsCapabilities => ({
+  dimensions: provider === "Plausible"
+    ? ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "EventName"]
+    : ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
+  events: true,
+  eventProperties: provider === "Vercel",
+  flags: provider === "Vercel",
+});
+
 @customElement("vercel-analytics-settings-dashboard")
-export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(LitElement) {
+export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitElement) {
   @state() private _settings?: AnalyticsSettingsResponse;
   @state() private _loading = true;
   @state() private _saving = false;
@@ -75,8 +86,9 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     this.#patch({ connections });
   }
 
-  #addConnection(): void {
-    this.#appendConnection({ kind: "vercel", hasAccessToken: this._settings?.hasAccessToken ?? false });
+  #addConnection(provider: AnalyticsProvider): void {
+    const hasAccessToken = this._settings?.providerTokens.some((item) => item.provider === provider && item.hasAccessToken) ?? false;
+    this.#appendConnection({ kind: "provider", provider, hasAccessToken });
   }
 
   #addMockConnection(scenario: MockScenarioDefinition): void {
@@ -86,12 +98,16 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   #appendConnection(details: NewConnection): void {
     if (!this._settings) return;
     const isMock = details.kind === "mock";
+    const provider = isMock ? "Vercel" : details.provider;
     const key = crypto.randomUUID();
     const connection: AnalyticsConnectionSettingsResponse = {
       key,
       displayName: isMock ? details.scenario.displayName : "",
+      provider,
       projectId: "",
       team: null,
+      siteId: "",
+      capabilities: capabilities(provider),
       documentRootKeys: [],
       enableAllDocumentTypes: false,
       enabledDocumentTypeKeys: [],
@@ -110,8 +126,8 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     });
   }
 
-  async #copyTokenKey(): Promise<void> {
-    await navigator.clipboard.writeText("WebAnalytics__Providers__Vercel__AccessToken");
+  async #copyTokenKey(provider: AnalyticsProvider): Promise<void> {
+    await navigator.clipboard.writeText(`WebAnalytics__Providers__${provider}__AccessToken`);
     this._tokenKeyCopied = true;
     window.setTimeout(() => { this._tokenKeyCopied = false; }, 2000);
   }
@@ -119,7 +135,7 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   #removeConnection(index: number): void {
     if (!this._settings) return;
     const connection = this._settings.connections[index];
-    if (!window.confirm(`Remove “${connection.displayName || connection.projectId || "this connection"}”? This takes effect when settings are saved.`)) return;
+    if (!window.confirm(`Remove “${connection.displayName || connection.siteId || connection.projectId || "this connection"}”? This takes effect when settings are saved.`)) return;
     const connections = this._settings.connections.filter((_, itemIndex) => itemIndex !== index);
     this.#patch({ connections });
   }
@@ -189,7 +205,7 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   }
 
   #focusFirstInvalid(): void {
-    const editors = this.shadowRoot?.querySelectorAll<VercelAnalyticsConnectionEditorElement>("vercel-analytics-connection-editor") ?? [];
+    const editors = this.shadowRoot?.querySelectorAll<AnalyticsConnectionEditorElement>("vercel-analytics-connection-editor") ?? [];
     for (const editor of editors) {
       if (editor.focusFirstInvalid()) return;
     }
@@ -207,7 +223,7 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     return html`
       <form @submit=${this.#save} novalidate>
         <header>
-          <div class="page-heading"><h1>Web Analytics</h1><p>Connect Vercel projects and choose where page analytics appears.</p></div>
+          <div class="page-heading"><h1>Web Analytics</h1><p>Connect analytics providers and choose where page analytics appears.</p></div>
         </header>
 
         ${this._dirty ? html`
@@ -253,26 +269,25 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
                 <span id="cache-duration-help" class="field-help">Use <code>hh:mm:ss</code>, for example <code>00:05:00</code>.</span>
               </div>
             </uui-form-layout-item>
-            <section class="shared-token" aria-labelledby="shared-token-heading">
-              <div class="shared-token-summary">
-                <strong id="shared-token-heading">Access token</strong>
-                ${this._settings.hasAccessToken
-                  ? html`<span class="shared-token-status configured"><uui-icon name="icon-check" aria-hidden="true"></uui-icon>Configured</span>`
-                  : html`<uui-tag class="shared-token-status" color="warning">Not configured</uui-tag>`}
-              </div>
-              ${this._settings.hasAccessToken ? "" : html`
-                <div class="shared-token-setup">
-                  <div class="shared-token-guidance">
-                    <p class="shared-token-help">Set this server environment variable to a Vercel access token.</p>
-                    <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener noreferrer" aria-label="Create a Vercel access token (opens in a new tab)">Create token<uui-icon name="icon-out" aria-hidden="true"></uui-icon></a>
-                  </div>
-                  <div class="shared-token-key">
-                    <code>WebAnalytics__Providers__Vercel__AccessToken</code>
-                    <uui-button compact look="secondary" label="Copy shared access token setting name" @click=${this.#copyTokenKey}>${this._tokenKeyCopied ? "Copied" : "Copy"}</uui-button>
-                  </div>
+            ${this._settings.providerTokens.map((token) => html`
+              <section class="shared-token" aria-labelledby=${`shared-token-${token.provider}`}>
+                <div class="shared-token-summary">
+                  <strong id=${`shared-token-${token.provider}`}>${token.provider} access token</strong>
+                  ${token.hasAccessToken
+                    ? html`<span class="shared-token-status configured"><uui-icon name="icon-check" aria-hidden="true"></uui-icon>Configured</span>`
+                    : html`<uui-tag class="shared-token-status" color="warning">Not configured</uui-tag>`}
                 </div>
-              `}
-            </section>
+                ${token.hasAccessToken ? "" : html`
+                  <div class="shared-token-setup">
+                    <p class="shared-token-help">Set this server environment variable to a ${token.provider} access token.</p>
+                    <div class="shared-token-key">
+                      <code>WebAnalytics__Providers__${token.provider}__AccessToken</code>
+                      <uui-button compact look="secondary" label=${`Copy ${token.provider} access token setting name`} @click=${() => this.#copyTokenKey(token.provider)}>${this._tokenKeyCopied ? "Copied" : "Copy"}</uui-button>
+                    </div>
+                  </div>
+                `}
+              </section>
+            `)}
           </div>
         </uui-box>
 
@@ -300,10 +315,11 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
 
         <section aria-labelledby="connections-heading">
           <div class="section-heading">
-            <div><h2 id="connections-heading">Connections</h2><p>Add each Vercel project that editors should be able to view.</p></div>
-            ${hasConnections ? html`
-              <uui-button type="button" look="secondary" label="Add Vercel connection" @click=${this.#addConnection}>Add connection</uui-button>
-            ` : ""}
+            <div><h2 id="connections-heading">Connections</h2><p>Add each analytics site or project that editors should be able to view.</p></div>
+            <div class="connection-actions">
+              <uui-button type="button" look="secondary" label="Add Vercel connection" @click=${() => this.#addConnection("Vercel")}>Add Vercel</uui-button>
+              <uui-button type="button" look="secondary" label="Add Plausible connection" @click=${() => this.#addConnection("Plausible")}>Add Plausible</uui-button>
+            </div>
           </div>
           <div class="connections">
             ${this._settings.connections.map((connection, index) => html`
@@ -322,10 +338,10 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
               <div class="connection-empty-state">
                 <uui-icon name="icon-globe" aria-hidden="true"></uui-icon>
                 <div>
-                  <h3>Connect your first Vercel project</h3>
-                  <p>Add a Vercel project ID. The shared server-side access token above will be used automatically.</p>
+                  <h3>Connect your first analytics provider</h3>
+                  <p>Choose Vercel or Plausible. The matching server-side access token above will be used automatically.</p>
                 </div>
-                <uui-button type="button" look="primary" label="Add your first Vercel connection" @click=${this.#addConnection}>Add connection</uui-button>
+                <div class="connection-actions"><uui-button type="button" look="primary" label="Add your first Vercel connection" @click=${() => this.#addConnection("Vercel")}>Add Vercel</uui-button><uui-button type="button" look="secondary" label="Add your first Plausible connection" @click=${() => this.#addConnection("Plausible")}>Add Plausible</uui-button></div>
               </div>
             ` : ""}
           </div>
@@ -423,10 +439,10 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   `];
 }
 
-export default VercelAnalyticsSettingsDashboardElement;
+export default WebAnalyticsSettingsDashboardElement;
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-settings-dashboard": VercelAnalyticsSettingsDashboardElement;
+    "vercel-analytics-settings-dashboard": WebAnalyticsSettingsDashboardElement;
   }
 }

@@ -5,7 +5,7 @@ using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Tests.Services;
 
-public sealed class MockVercelAnalyticsClientTests
+public sealed class MockAnalyticsClientTests
 {
     private static readonly Guid MockKey = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
@@ -27,16 +27,16 @@ public sealed class MockVercelAnalyticsClientTests
     [Fact]
     public void Registry_disables_mock_connections_unless_the_package_harness_opts_in()
     {
-        var options = Options.Create(new VercelAnalyticsOptions
+        var options = Options.Create(new WebAnalyticsOptions
         {
             Connections =
             [
                 new() { Key = MockKey, DisplayName = "Mock analytics", MockScenario = MockAnalyticsScenario.Complete }
             ]
         });
-        var disabled = new VercelAnalyticsConnectionRegistry(new VercelAnalyticsSettingsStore(options), options);
+        var disabled = new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(options), options);
         options.Value.EnableMockConnections = true;
-        var enabled = new VercelAnalyticsConnectionRegistry(new VercelAnalyticsSettingsStore(options), options);
+        var enabled = new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(options), options);
 
         Assert.False(disabled.MockConnectionsEnabled);
         Assert.Null(disabled.Get(MockKey));
@@ -47,7 +47,7 @@ public sealed class MockVercelAnalyticsClientTests
     [Fact]
     public async Task Scenarios_expose_their_targeted_reports()
     {
-        var client = new MockVercelAnalyticsClient();
+        var client = new MockAnalyticsClient();
         var query = CreateQuery();
         var utm = CreateRegistry(MockAnalyticsScenario.Utm, true).Get(MockKey)!;
         var flags = CreateRegistry(MockAnalyticsScenario.Flags, true).Get(MockKey)!;
@@ -65,7 +65,7 @@ public sealed class MockVercelAnalyticsClientTests
     [Fact]
     public async Task Demo_exposes_every_report_with_a_non_repeating_trend()
     {
-        var client = new MockVercelAnalyticsClient();
+        var client = new MockAnalyticsClient();
         var connection = CreateRegistry(MockAnalyticsScenario.Complete, true).Get(MockKey)!;
         var query = new AnalyticsQuery(
             MockKey,
@@ -87,7 +87,7 @@ public sealed class MockVercelAnalyticsClientTests
     [Fact]
     public async Task Demo_totals_increase_slightly_over_the_previous_period()
     {
-        var client = new MockVercelAnalyticsClient();
+        var client = new MockAnalyticsClient();
         var connection = CreateRegistry(MockAnalyticsScenario.Complete, true).Get(MockKey)!;
         var current = new AnalyticsQuery(
             MockKey,
@@ -112,7 +112,7 @@ public sealed class MockVercelAnalyticsClientTests
     [Fact]
     public async Task Demo_filters_update_matching_and_cross_dimension_reports()
     {
-        var client = new MockVercelAnalyticsClient();
+        var client = new MockAnalyticsClient();
         var connection = CreateRegistry(MockAnalyticsScenario.Complete, true).Get(MockKey)!;
         var baseline = CreateQuery();
         var filtered = baseline with
@@ -135,7 +135,7 @@ public sealed class MockVercelAnalyticsClientTests
     [Fact]
     public async Task Demo_event_filter_returns_only_the_selected_event()
     {
-        var client = new MockVercelAnalyticsClient();
+        var client = new MockAnalyticsClient();
         var connection = CreateRegistry(MockAnalyticsScenario.Complete, true).Get(MockKey)!;
         var query = CreateQuery() with
         {
@@ -151,11 +151,11 @@ public sealed class MockVercelAnalyticsClientTests
     public async Task Router_serves_mock_reports_without_contacting_Vercel()
     {
         var handler = new RejectingHttpMessageHandler();
-        var router = new VercelAnalyticsClientRouter(
-            new VercelAnalyticsClient(new HttpClient(handler), new VercelAnalyticsRequestGate()),
-            new MockVercelAnalyticsClient());
+        var router = new AnalyticsProviderClientRouter(
+            new VercelAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate()),
+            new MockAnalyticsClient());
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(
+        var service = new AnalyticsReportService(
             CreateRegistry(MockAnalyticsScenario.Complete, true),
             router,
             cache);
@@ -174,11 +174,11 @@ public sealed class MockVercelAnalyticsClientTests
         new DateOnly(2026, 7, 15),
         AnalyticsInterval.Day);
 
-    private static VercelAnalyticsConnectionRegistry CreateRegistry(
+    private static AnalyticsConnectionRegistry CreateRegistry(
         MockAnalyticsScenario scenario,
         bool mockConnectionsEnabled)
     {
-        var options = Options.Create(new VercelAnalyticsOptions
+        var options = Options.Create(new WebAnalyticsOptions
         {
             Enabled = true,
             Connections =
@@ -191,8 +191,8 @@ public sealed class MockVercelAnalyticsClientTests
                 }
             ]
         });
-        return new VercelAnalyticsConnectionRegistry(
-            new VercelAnalyticsSettingsStore(options),
+        return new AnalyticsConnectionRegistry(
+            new WebAnalyticsSettingsStore(options),
             options,
             mockConnectionsEnabled);
     }

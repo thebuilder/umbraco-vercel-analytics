@@ -2,7 +2,7 @@ using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Configuration;
 
-public sealed class VercelAnalyticsOptions
+public sealed class WebAnalyticsOptions
 {
     public const string SectionName = "WebAnalytics";
 
@@ -14,7 +14,7 @@ public sealed class VercelAnalyticsOptions
 
     public TimeSpan CacheDuration { get; set; } = TimeSpan.FromMinutes(5);
 
-    public List<VercelAnalyticsConnectionOptions> Connections { get; set; } = [];
+    public List<AnalyticsConnectionOptions> Connections { get; set; } = [];
 
     public Dictionary<string, string> ConnectionAccessTokens { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
@@ -25,6 +25,8 @@ public sealed class VercelAnalyticsOptions
 public sealed class WebAnalyticsProvidersOptions
 {
     public VercelAnalyticsProviderOptions Vercel { get; set; } = new();
+
+    public PlausibleAnalyticsProviderOptions Plausible { get; set; } = new();
 }
 
 public sealed class VercelAnalyticsProviderOptions
@@ -32,15 +34,24 @@ public sealed class VercelAnalyticsProviderOptions
     public string AccessToken { get; set; } = string.Empty;
 }
 
-public sealed class VercelAnalyticsConnectionOptions
+public sealed class PlausibleAnalyticsProviderOptions
+{
+    public string AccessToken { get; set; } = string.Empty;
+}
+
+public sealed class AnalyticsConnectionOptions
 {
     public Guid Key { get; set; }
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public AnalyticsProvider Provider { get; set; } = AnalyticsProvider.Vercel;
+
     public string ProjectId { get; set; } = string.Empty;
 
     public string? Team { get; set; }
+
+    public string SiteId { get; set; } = string.Empty;
 
     public MockAnalyticsScenario? MockScenario { get; set; }
 

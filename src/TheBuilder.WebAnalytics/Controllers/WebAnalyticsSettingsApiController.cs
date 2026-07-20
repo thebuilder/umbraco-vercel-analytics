@@ -14,11 +14,11 @@ namespace TheBuilder.WebAnalytics.Controllers;
 [ApiExplorerSettings(GroupName = "TheBuilder.WebAnalytics")]
 public sealed class WebAnalyticsSettingsApiController(
     IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
-    VercelAnalyticsSettingsStore settingsStore,
-    VercelAnalyticsConnectionRegistry registry,
-    IOptions<VercelAnalyticsOptions> serverOptions,
-    IVercelAnalyticsClient vercelClient,
-    IVercelProjectNameService projectNames) : WebAnalyticsApiControllerBase
+    WebAnalyticsSettingsStore settingsStore,
+    AnalyticsConnectionRegistry registry,
+    IOptions<WebAnalyticsOptions> serverOptions,
+    IAnalyticsProviderClient providerClient,
+    IAnalyticsConnectionNameService projectNames) : WebAnalyticsApiControllerBase
 {
     [HttpGet("settings")]
     [ProducesResponseType<AnalyticsSettingsResponse>(StatusCodes.Status200OK)]
@@ -38,25 +38,32 @@ public sealed class WebAnalyticsSettingsApiController(
         if (!IsAdministrator()) return Forbid();
         if (!TimeSpan.TryParse(request.CacheDuration, out var cacheDuration))
             return InvalidSettings(["Cache duration must use the format hh:mm:ss."]);
+        var existingProviders = settingsStore.Get().Connections.ToDictionary(connection => connection.Key, connection => connection.Provider);
+        var changedProvider = request.Connections.FirstOrDefault(connection =>
+            existingProviders.TryGetValue(connection.Key, out var existingProvider) && existingProvider != connection.Provider);
+        if (changedProvider is not null)
+            return InvalidSettings([$"Connection '{changedProvider.Key}' cannot change analytics provider. Create a new connection instead."]);
 
-        var settings = new VercelAnalyticsSettings
+        var settings = new WebAnalyticsSettings
         {
             Enabled = request.Enabled,
             DefaultRangeDays = request.DefaultRangeDays,
             CacheDuration = cacheDuration,
-            Connections = request.Connections.Select(connection => new VercelAnalyticsConnectionSettings
+            Connections = request.Connections.Select(connection => new AnalyticsConnectionSettings
             {
                 Key = connection.Key,
                 DisplayName = connection.DisplayName,
+                Provider = connection.Provider,
                 ProjectId = connection.ProjectId,
                 Team = connection.Team,
+                SiteId = connection.SiteId,
                 MockScenario = connection.MockScenario,
                 DocumentRootKeys = connection.DocumentRootKeys.ToArray(),
                 EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
                 EnabledDocumentTypeKeys = connection.EnabledDocumentTypeKeys.ToArray()
             }).ToList()
         };
-        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
         if (failures.Count > 0) return InvalidSettings(failures);
 
         settingsStore.Save(settings);
@@ -73,42 +80,50 @@ public sealed class WebAnalyticsSettingsApiController(
         var connection = registry.Get(key);
         if (connection is null) return NotFound();
         if (!connection.IsConfigured)
-            return Ok(new AnalyticsConnectionTestResult(false, "Add a server-side Vercel access token."));
+            return Ok(new AnalyticsConnectionTestResult(false, $"Add a server-side {connection.Provider} access token and identifier."));
 
         try
         {
             var now = DateTimeOffset.UtcNow;
-            await vercelClient.CountAsync(
+            await providerClient.CountAsync(
                 connection,
                 new AnalyticsQuery(key, now.AddDays(-1), now, AnalyticsInterval.Hour),
                 cancellationToken);
             return Ok(new AnalyticsConnectionTestResult(true, "The analytics connection is ready."));
         }
-        catch (VercelAnalyticsApiException exception)
+        catch (AnalyticsProviderApiException exception)
         {
-            var message = exception.StatusCode switch
+            var message = (exception.Provider, exception.StatusCode) switch
             {
-                System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden =>
+                (AnalyticsProvider.Vercel, System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden) =>
                     "Vercel rejected the token or its project/team permissions.",
-                System.Net.HttpStatusCode.PaymentRequired =>
+                (AnalyticsProvider.Vercel, System.Net.HttpStatusCode.PaymentRequired) =>
                     "Web Analytics is unavailable for the current Vercel plan or reporting window.",
-                System.Net.HttpStatusCode.BadRequest =>
+                (AnalyticsProvider.Vercel, System.Net.HttpStatusCode.BadRequest) =>
                     "Vercel rejected the project or team configuration.",
-                _ => "Vercel Analytics is temporarily unavailable."
+                (AnalyticsProvider.Plausible, System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden) =>
+                    "Plausible rejected the Stats API key or site access.",
+                (AnalyticsProvider.Plausible, System.Net.HttpStatusCode.PaymentRequired) =>
+                    "The Plausible Stats API is unavailable for the current plan.",
+                (AnalyticsProvider.Plausible, System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound) =>
+                    "Plausible rejected the site ID or analytics query.",
+                (AnalyticsProvider.Plausible, System.Net.HttpStatusCode.TooManyRequests) =>
+                    "Plausible rate-limited the connection test. Try again shortly.",
+                _ => $"{connection.Provider} Analytics is temporarily unavailable."
             };
             return Ok(new AnalyticsConnectionTestResult(false, message));
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return Ok(new AnalyticsConnectionTestResult(false, "Vercel Analytics did not respond before the request timed out."));
+            return Ok(new AnalyticsConnectionTestResult(false, $"{connection.Provider} Analytics did not respond before the request timed out."));
         }
         catch (HttpRequestException)
         {
-            return Ok(new AnalyticsConnectionTestResult(false, "Vercel Analytics could not be reached."));
+            return Ok(new AnalyticsConnectionTestResult(false, $"{connection.Provider} Analytics could not be reached."));
         }
         catch (System.Text.Json.JsonException)
         {
-            return Ok(new AnalyticsConnectionTestResult(false, "Vercel returned an unexpected analytics response."));
+            return Ok(new AnalyticsConnectionTestResult(false, $"{connection.Provider} returned an unexpected analytics response."));
         }
     }
 
@@ -124,13 +139,16 @@ public sealed class WebAnalyticsSettingsApiController(
             var displayName = connection.IsMock
                 ? connection.DisplayName
                 : registered is null
-                    ? connection.ProjectId
+                    ? connection.Provider == AnalyticsProvider.Plausible ? connection.SiteId : connection.ProjectId
                     : await projectNames.GetDisplayNameAsync(registered, cancellationToken);
             return new AnalyticsConnectionSettingsResponse(
                 connection.Key,
                 displayName,
+                connection.Provider,
                 connection.ProjectId,
                 connection.Team,
+                connection.SiteId,
+                registered?.Capabilities ?? AnalyticsProviderCapabilities.For(AnalyticsConnection.Create(connection, null)),
                 connection.DocumentRootKeys,
                 connection.EnableAllDocumentTypes,
                 connection.EnabledDocumentTypeKeys,
@@ -141,7 +159,10 @@ public sealed class WebAnalyticsSettingsApiController(
         var responseConnections = await Task.WhenAll(responseTasks);
         return new AnalyticsSettingsResponse(
             settings.Enabled,
-            !string.IsNullOrWhiteSpace(vercelConfiguration.AccessToken),
+            [
+                new(AnalyticsProvider.Vercel, !string.IsNullOrWhiteSpace(vercelConfiguration.AccessToken)),
+                new(AnalyticsProvider.Plausible, !string.IsNullOrWhiteSpace(serverConfiguration.Providers.Plausible.AccessToken))
+            ],
             registry.MockConnectionsEnabled,
             settings.DefaultRangeDays,
             settings.CacheDuration.ToString("c"),

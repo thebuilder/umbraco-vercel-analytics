@@ -18,7 +18,7 @@ public sealed class VercelAnalyticsClientTests
         var client = CreateClient(handler);
         var connection = CreateConnection(team: "team_123");
 
-        var result = await client.GetProjectNameAsync(connection, CancellationToken.None);
+        var result = await client.GetDisplayNameAsync(connection, CancellationToken.None);
 
         Assert.Equal("health-platform", result);
         Assert.Equal("/v9/projects/project", handler.Request!.RequestUri!.AbsolutePath);
@@ -559,7 +559,7 @@ public sealed class VercelAnalyticsClientTests
         var client = CreateClient(handler);
         var connection = CreateConnection();
 
-        var exception = await Assert.ThrowsAsync<VercelAnalyticsApiException>(() => client.CountAsync(
+        var exception = await Assert.ThrowsAsync<AnalyticsProviderApiException>(() => client.CountAsync(
             connection,
             new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             CancellationToken.None));
@@ -571,7 +571,7 @@ public sealed class VercelAnalyticsClientTests
     [Fact]
     public async Task Request_gate_bounds_real_http_operations_across_client_instances()
     {
-        using var gate = new VercelAnalyticsRequestGate(maximumConcurrentRequests: 2);
+        using var gate = new AnalyticsProviderRequestGate(maximumConcurrentRequests: 2);
         var handler = new BlockingHandler(expectedStarts: 2);
         var firstClient = CreateClient(handler, gate);
         var secondClient = CreateClient(handler, gate);
@@ -606,7 +606,7 @@ public sealed class VercelAnalyticsClientTests
     [Fact]
     public async Task Request_gate_cancels_a_queued_operation_without_starting_http_work()
     {
-        using var gate = new VercelAnalyticsRequestGate(maximumConcurrentRequests: 1);
+        using var gate = new AnalyticsProviderRequestGate(maximumConcurrentRequests: 1);
         var handler = new BlockingHandler(expectedStarts: 1);
         var client = CreateClient(handler, gate);
         var connection = CreateConnection();
@@ -639,24 +639,24 @@ public sealed class VercelAnalyticsClientTests
     [Fact]
     public async Task Request_gate_releases_capacity_after_an_upstream_error()
     {
-        using var gate = new VercelAnalyticsRequestGate(maximumConcurrentRequests: 1);
+        using var gate = new AnalyticsProviderRequestGate(maximumConcurrentRequests: 1);
         var client = CreateClient(new SequencedHandler(HttpStatusCode.Forbidden, HttpStatusCode.OK), gate);
         var connection = CreateConnection();
         var query = new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day);
 
-        await Assert.ThrowsAsync<VercelAnalyticsApiException>(() => client.CountAsync(connection, query, CancellationToken.None));
+        await Assert.ThrowsAsync<AnalyticsProviderApiException>(() => client.CountAsync(connection, query, CancellationToken.None));
         var result = await client.CountAsync(connection, query, CancellationToken.None);
 
         Assert.Equal(new AnalyticsTotals(42, 31), result);
     }
 
     private static VercelAnalyticsClient CreateClient(HttpMessageHandler handler) =>
-        CreateClient(handler, new VercelAnalyticsRequestGate());
+        CreateClient(handler, new AnalyticsProviderRequestGate());
 
-    private static VercelAnalyticsClient CreateClient(HttpMessageHandler handler, VercelAnalyticsRequestGate gate) =>
+    private static VercelAnalyticsClient CreateClient(HttpMessageHandler handler, AnalyticsProviderRequestGate gate) =>
         new(new HttpClient(handler) { BaseAddress = new Uri("https://api.vercel.com/") }, gate);
 
-    private static VercelAnalyticsConnection CreateConnection(string? team = null) => new(
+    private static AnalyticsConnection CreateConnection(string? team = null) => new(
         Guid.Parse("11111111-1111-1111-1111-111111111110"), "Main", "secret", "project", team,
         [Guid.Parse("11111111-1111-1111-1111-111111111111")],
         false,

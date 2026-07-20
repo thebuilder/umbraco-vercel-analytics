@@ -27,7 +27,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/connections',
+            url: '/umbraco/management/api/v1/web-analytics/connections',
             ...options
         });
     }
@@ -40,7 +40,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/documents/{documentId}/routes',
+            url: '/umbraco/management/api/v1/web-analytics/documents/{documentId}/routes',
             ...options
         });
     }
@@ -53,7 +53,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/reports/breakdown/{dimension}',
+            url: '/umbraco/management/api/v1/web-analytics/reports/breakdown/{dimension}',
             ...options
         });
     }
@@ -66,7 +66,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/reports/events',
+            url: '/umbraco/management/api/v1/web-analytics/reports/events',
             ...options
         });
     }
@@ -79,7 +79,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/reports/flags',
+            url: '/umbraco/management/api/v1/web-analytics/reports/flags',
             ...options
         });
     }
@@ -92,7 +92,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/reports/events/details',
+            url: '/umbraco/management/api/v1/web-analytics/reports/events/details',
             ...options
         });
     }
@@ -105,7 +105,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/reports/events/property-values',
+            url: '/umbraco/management/api/v1/web-analytics/reports/events/property-values',
             ...options
         });
     }
@@ -118,7 +118,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/reports/summary',
+            url: '/umbraco/management/api/v1/web-analytics/reports/summary',
             ...options
         });
     }
@@ -131,7 +131,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/settings',
+            url: '/umbraco/management/api/v1/web-analytics/settings',
             ...options
         });
     }
@@ -144,7 +144,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/settings',
+            url: '/umbraco/management/api/v1/web-analytics/settings',
             ...options,
             headers: {
                 'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ export class WebAnalyticsService {
                     type: 'http'
                 }
             ],
-            url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{key}/test',
+            url: '/umbraco/management/api/v1/web-analytics/settings/connections/{key}/test',
             ...options
         });
     }

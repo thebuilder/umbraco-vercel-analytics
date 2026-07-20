@@ -18,8 +18,11 @@ export type AnalyticsBreakdownRow = {
 export type AnalyticsConnectionSettingsResponse = {
     key: string;
     displayName: string;
+    provider: AnalyticsProvider;
     projectId: string;
     team?: string | null;
+    siteId: string;
+    capabilities: AnalyticsCapabilities;
     documentRootKeys: Array<string>;
     enableAllDocumentTypes: boolean;
     enabledDocumentTypeKeys: Array<string>;
@@ -31,10 +34,26 @@ export type AnalyticsConnectionSettingsResponse = {
 export type AnalyticsConnectionSummary = {
     key: string;
     displayName: string;
+    provider: AnalyticsProvider;
+    capabilities: AnalyticsCapabilities;
     isDefault: boolean;
     isConfigured: boolean;
     baseUrl?: string | null;
     warnings: Array<string>;
+};
+
+export type AnalyticsCapabilities = {
+    dimensions: Array<AnalyticsDimension>;
+    events: boolean;
+    eventProperties: boolean;
+    flags: boolean;
+};
+
+export type AnalyticsProvider = 'Vercel' | 'Plausible';
+
+export type AnalyticsProviderTokenStatus = {
+    provider: AnalyticsProvider;
+    hasAccessToken: boolean;
 };
 
 export type AnalyticsConnectionTestResult = {
@@ -52,6 +71,8 @@ export type AnalyticsDimension = 'RequestPath' | 'Route' | 'ReferrerHostname' | 
 
 export type AnalyticsDocumentRoute = {
     connection: string;
+    provider: AnalyticsProvider;
+    capabilities: AnalyticsCapabilities;
     culture: string;
     hostname: string;
     path: string;
@@ -124,7 +145,7 @@ export type AnalyticsProblemDetails = {
 
 export type AnalyticsSettingsResponse = {
     enabled: boolean;
-    hasAccessToken: boolean;
+    providerTokens: Array<AnalyticsProviderTokenStatus>;
     canCreateMockConnections: boolean;
     defaultRangeDays: number;
     cacheDuration: string;
@@ -153,8 +174,10 @@ export type NotificationHeaderModel = {
 export type UpdateAnalyticsConnectionRequest = {
     key: string;
     displayName: string;
+    provider: AnalyticsProvider;
     projectId: string;
     team?: string | null;
+    siteId: string;
     mockScenario?: MockAnalyticsScenario | null;
     documentRootKeys: Array<string>;
     enableAllDocumentTypes: boolean;
@@ -172,7 +195,7 @@ export type ConnectionsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/umbraco/management/api/v1/vercel-analytics/connections';
+    url: '/umbraco/management/api/v1/web-analytics/connections';
 };
 
 export type ConnectionsErrors = {
@@ -203,7 +226,7 @@ export type DocumentRoutesData = {
     query?: {
         culture?: string;
     };
-    url: '/umbraco/management/api/v1/vercel-analytics/documents/{documentId}/routes';
+    url: '/umbraco/management/api/v1/web-analytics/documents/{documentId}/routes';
 };
 
 export type DocumentRoutesErrors = {
@@ -239,7 +262,7 @@ export type BreakdownData = {
         path?: string;
         filter?: Array<string>;
     };
-    url: '/umbraco/management/api/v1/vercel-analytics/reports/breakdown/{dimension}';
+    url: '/umbraco/management/api/v1/web-analytics/reports/breakdown/{dimension}';
 };
 
 export type BreakdownErrors = {
@@ -279,7 +302,7 @@ export type EventsData = {
         path?: string;
         filter?: Array<string>;
     };
-    url: '/umbraco/management/api/v1/vercel-analytics/reports/events';
+    url: '/umbraco/management/api/v1/web-analytics/reports/events';
 };
 
 export type EventsErrors = {
@@ -319,7 +342,7 @@ export type FlagsData = {
         path?: string;
         filter?: Array<string>;
     };
-    url: '/umbraco/management/api/v1/vercel-analytics/reports/flags';
+    url: '/umbraco/management/api/v1/web-analytics/reports/flags';
 };
 
 export type FlagsErrors = {
@@ -362,7 +385,7 @@ export type EventDetailsData = {
         path?: string;
         filter?: Array<string>;
     };
-    url: '/umbraco/management/api/v1/vercel-analytics/reports/events/details';
+    url: '/umbraco/management/api/v1/web-analytics/reports/events/details';
 };
 
 export type EventDetailsErrors = {
@@ -406,7 +429,7 @@ export type EventPropertyValuesData = {
         path?: string;
         filter?: Array<string>;
     };
-    url: '/umbraco/management/api/v1/vercel-analytics/reports/events/property-values';
+    url: '/umbraco/management/api/v1/web-analytics/reports/events/property-values';
 };
 
 export type EventPropertyValuesErrors = {
@@ -444,7 +467,7 @@ export type SummaryData = {
         path?: string;
         filter?: Array<string>;
     };
-    url: '/umbraco/management/api/v1/vercel-analytics/reports/summary';
+    url: '/umbraco/management/api/v1/web-analytics/reports/summary';
 };
 
 export type SummaryErrors = {
@@ -473,7 +496,7 @@ export type SettingsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/umbraco/management/api/v1/vercel-analytics/settings';
+    url: '/umbraco/management/api/v1/web-analytics/settings';
 };
 
 export type SettingsErrors = {
@@ -496,7 +519,7 @@ export type SaveSettingsData = {
     body?: UpdateAnalyticsSettingsRequest;
     path?: never;
     query?: never;
-    url: '/umbraco/management/api/v1/vercel-analytics/settings';
+    url: '/umbraco/management/api/v1/web-analytics/settings';
 };
 
 export type SaveSettingsErrors = {
@@ -525,7 +548,7 @@ export type TestConnectionData = {
         key: string;
     };
     query?: never;
-    url: '/umbraco/management/api/v1/vercel-analytics/settings/connections/{key}/test';
+    url: '/umbraco/management/api/v1/web-analytics/settings/connections/{key}/test';
 };
 
 export type TestConnectionErrors = {

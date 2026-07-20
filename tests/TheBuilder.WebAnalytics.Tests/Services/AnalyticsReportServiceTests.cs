@@ -5,7 +5,7 @@ using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Tests.Services;
 
-public sealed class VercelAnalyticsReportServiceTests
+public sealed class AnalyticsReportServiceTests
 {
     private static readonly Guid MainKey = Guid.Parse("11111111-1111-1111-1111-111111111110");
 
@@ -14,7 +14,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
         var query = CreateQuery();
 
         var first = await service.GetSummaryAsync(query, CancellationToken.None);
@@ -32,7 +32,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(
+        var service = new AnalyticsReportService(
             CreateRegistry(cacheDuration: TimeSpan.Zero),
             client,
             cache);
@@ -51,7 +51,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
 
@@ -67,7 +67,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient { FailPreviousCount = true };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
 
@@ -78,7 +78,7 @@ public sealed class VercelAnalyticsReportServiceTests
 
     public static TheoryData<Func<Exception>> OptionalPreviousRangeFailures =>
     [
-        () => new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired),
+        () => new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired),
         () => new HttpRequestException(),
         () => new System.Text.Json.JsonException(),
         () => new OperationCanceledException()
@@ -91,7 +91,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient { PreviousCountException = createException() };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
 
@@ -111,7 +111,7 @@ public sealed class VercelAnalyticsReportServiceTests
             BeforePreviousCountFailure = cancellation.Cancel
         };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             service.GetSummaryAsync(CreateQuery(), cancellation.Token));
@@ -130,7 +130,7 @@ public sealed class VercelAnalyticsReportServiceTests
             PreviousCountRelease = releasePreviousCount
         };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         var first = service.GetSummaryAsync(CreateQuery(), firstCancellation.Token);
         await previousCountStarted.Task;
@@ -153,7 +153,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient { CurrentCountException = new System.Text.Json.JsonException() };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAsync<System.Text.Json.JsonException>(() =>
             service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
@@ -164,7 +164,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient { PreviousCountException = new InvalidOperationException() };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
@@ -175,11 +175,11 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient
         {
-            PreviousCountException = new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired),
+            PreviousCountException = new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired),
             PreviousPageViewTotalException = new InvalidOperationException()
         };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
@@ -191,10 +191,10 @@ public sealed class VercelAnalyticsReportServiceTests
         var client = new CountingClient
         {
             PreviousCountException = new InvalidOperationException(),
-            PreviousPageViewTotalException = new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired)
+            PreviousPageViewTotalException = new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired)
         };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
@@ -205,7 +205,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
         var minimumDate = DateTimeOffset.MinValue;
 
         var summary = await service.GetSummaryAsync(
@@ -223,7 +223,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.Country, 10, null, CancellationToken.None);
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.DeviceType, 10, null, CancellationToken.None);
@@ -236,7 +236,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.RequestPath, 100, "news", CancellationToken.None);
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.RequestPath, 100, "about", CancellationToken.None);
@@ -249,7 +249,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         await service.GetSummaryAsync(CreateQuery() with
         {
@@ -270,7 +270,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
         var query = CreateQuery() with { RequestPath = "/news" };
 
         await service.GetEventsAsync(query, 100, "signup", CancellationToken.None);
@@ -285,7 +285,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         var first = await service.GetEventDetailsAsync(CreateQuery(), "Signup", null, CancellationToken.None);
         var second = await service.GetEventDetailsAsync(CreateQuery(), "Signup", null, CancellationToken.None);
@@ -306,7 +306,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
         var filter = new AnalyticsEventDataFilter("plan", "Enterprise");
 
         await service.GetEventDetailsAsync(CreateQuery(), "Signup", filter, CancellationToken.None);
@@ -322,7 +322,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
         var filter = new AnalyticsEventDataFilter("plan", "Pro");
 
         await service.GetEventDetailsAsync(CreateQuery(), "Signup:cGxhbg==:UHJv", null, CancellationToken.None);
@@ -339,7 +339,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         var first = await service.GetEventPropertyValuesAsync(CreateQuery(), "Signup", "plan", 100, "enterprise", null, CancellationToken.None);
         var second = await service.GetEventPropertyValuesAsync(CreateQuery(), "Signup", "plan", 100, "enterprise", null, CancellationToken.None);
@@ -357,7 +357,7 @@ public sealed class VercelAnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -376,7 +376,7 @@ public sealed class VercelAnalyticsReportServiceTests
         var releaseCounts = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var client = new CountingClient { CountStarted = countStarted, CountRelease = releaseCounts };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
 
         var first = service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
         await countStarted.Task;
@@ -399,7 +399,7 @@ public sealed class VercelAnalyticsReportServiceTests
         var releaseCounts = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var client = new CountingClient { CountStarted = countStarted, CountRelease = releaseCounts };
         using var cache = new AnalyticsReportCache();
-        var service = new VercelAnalyticsReportService(CreateRegistry(), client, cache);
+        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
         using var firstCancellation = new CancellationTokenSource();
 
         var first = service.GetSummaryAsync(CreateQuery(), firstCancellation.Token);
@@ -421,7 +421,7 @@ public sealed class VercelAnalyticsReportServiceTests
         new DateOnly(2026, 7, 15),
         AnalyticsInterval.Day);
 
-    private static VercelAnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null) => new(Options.Create(new VercelAnalyticsOptions
+    private static AnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null) => new(Options.Create(new WebAnalyticsOptions
     {
         Enabled = true,
         Providers = { Vercel = { AccessToken = "secret" } },
@@ -439,7 +439,7 @@ public sealed class VercelAnalyticsReportServiceTests
         ]
     }));
 
-    private sealed class CountingClient : IVercelAnalyticsClient
+    private sealed class CountingClient : IAnalyticsProviderClient
     {
         public int CountCalls { get; private set; }
         public int TrendCalls { get; private set; }
@@ -464,10 +464,10 @@ public sealed class VercelAnalyticsReportServiceTests
         public List<AnalyticsQuery> CountQueries { get; } = [];
         public List<(string EventName, AnalyticsEventDataFilter? Filter)> EventDetailCalls { get; } = [];
 
-        public Task<string> GetProjectNameAsync(VercelAnalyticsConnection connection, CancellationToken cancellationToken) =>
+        public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken) =>
             Task.FromResult(connection.DisplayName);
 
-        public async Task<AnalyticsTotals> CountAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
+        public async Task<AnalyticsTotals> CountAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LastCountCancellationToken = cancellationToken;
@@ -490,7 +490,7 @@ public sealed class VercelAnalyticsReportServiceTests
             }
             if (FailPreviousCount && query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero))
             {
-                throw new VercelAnalyticsApiException(System.Net.HttpStatusCode.PaymentRequired);
+                throw new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired);
             }
 
             CountStarted?.TrySetResult();
@@ -502,7 +502,7 @@ public sealed class VercelAnalyticsReportServiceTests
             return new AnalyticsTotals(20, 10);
         }
 
-        public Task<long> GetPageViewTotalAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
+        public Task<long> GetPageViewTotalAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             PageViewTotalCalls++;
@@ -513,7 +513,7 @@ public sealed class VercelAnalyticsReportServiceTests
             return Task.FromResult(20L);
         }
 
-        public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             TrendCalls++;
@@ -522,14 +522,14 @@ public sealed class VercelAnalyticsReportServiceTests
             ]);
         }
 
-        public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, AnalyticsDimension dimension, int limit, string? search, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(AnalyticsConnection connection, AnalyticsQuery query, AnalyticsDimension dimension, int limit, string? search, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             BreakdownCalls++;
             return Task.FromResult<IReadOnlyList<AnalyticsBreakdownRow>>([]);
         }
 
-        public Task<AnalyticsEventTotals> CountEventsAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
+        public Task<AnalyticsEventTotals> CountEventsAsync(AnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventCountCalls++;
@@ -538,27 +538,27 @@ public sealed class VercelAnalyticsReportServiceTests
             return Task.FromResult(new AnalyticsEventTotals(30, 12));
         }
 
-        public Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, int limit, string? search, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(AnalyticsConnection connection, AnalyticsQuery query, int limit, string? search, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventCalls++;
             return Task.FromResult<IReadOnlyList<AnalyticsEventRow>>([]);
         }
 
-        public Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string? flagKey, int limit, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(AnalyticsConnection connection, AnalyticsQuery query, string? flagKey, int limit, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult<IReadOnlyList<AnalyticsFlagRow>>([]);
         }
 
-        public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(AnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventPropertyNameCalls++;
             return Task.FromResult<IReadOnlyList<string>>(["plan"]);
         }
 
-        public Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, string eventName, string propertyName, int limit, string? search, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(AnalyticsConnection connection, AnalyticsQuery query, string eventName, string propertyName, int limit, string? search, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventPropertyValueCalls++;

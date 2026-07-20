@@ -11,30 +11,30 @@ using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Tests.Controllers;
 
-public sealed class VercelAnalyticsProblemFactoryTests
+public sealed class WebAnalyticsProblemFactoryTests
 {
     [Fact]
     public void Maps_credential_failures_to_stable_problem_code()
     {
-        var problem = Assert.IsType<VercelAnalyticsProblemDefinition>(
-            VercelAnalyticsProblemFactory.FromException(
-                new VercelAnalyticsApiException(HttpStatusCode.Forbidden)));
+        var problem = Assert.IsType<WebAnalyticsProblemDefinition>(
+            WebAnalyticsProblemFactory.FromException(
+                new AnalyticsProviderApiException(HttpStatusCode.Forbidden)));
 
         Assert.Equal(StatusCodes.Status502BadGateway, problem.Status);
-        Assert.Equal(VercelAnalyticsProblemCodes.InvalidCredentials, problem.Code);
+        Assert.Equal(WebAnalyticsProblemCodes.InvalidCredentials, problem.Code);
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.PaymentRequired, StatusCodes.Status402PaymentRequired, VercelAnalyticsProblemCodes.PlanLimit)]
-    [InlineData(HttpStatusCode.BadRequest, StatusCodes.Status400BadRequest, VercelAnalyticsProblemCodes.InvalidQuery)]
-    [InlineData(HttpStatusCode.ServiceUnavailable, StatusCodes.Status502BadGateway, VercelAnalyticsProblemCodes.UpstreamUnavailable)]
+    [InlineData(HttpStatusCode.PaymentRequired, StatusCodes.Status402PaymentRequired, WebAnalyticsProblemCodes.PlanLimit)]
+    [InlineData(HttpStatusCode.BadRequest, StatusCodes.Status400BadRequest, WebAnalyticsProblemCodes.InvalidQuery)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, StatusCodes.Status502BadGateway, WebAnalyticsProblemCodes.UpstreamUnavailable)]
     public void Maps_vercel_failures_to_stable_problem_codes(
         HttpStatusCode upstreamStatus,
         int expectedStatus,
         string expectedCode)
     {
-        var problem = Assert.IsType<VercelAnalyticsProblemDefinition>(
-            VercelAnalyticsProblemFactory.FromException(new VercelAnalyticsApiException(upstreamStatus)));
+        var problem = Assert.IsType<WebAnalyticsProblemDefinition>(
+            WebAnalyticsProblemFactory.FromException(new AnalyticsProviderApiException(upstreamStatus)));
 
         Assert.Equal(expectedStatus, problem.Status);
         Assert.Equal(expectedCode, problem.Code);
@@ -44,36 +44,36 @@ public sealed class VercelAnalyticsProblemFactoryTests
     public void Maps_transport_timeout_and_payload_failures()
     {
         Assert.Equal(
-            VercelAnalyticsProblemCodes.UpstreamTransport,
-            VercelAnalyticsProblemFactory.FromException(new HttpRequestException())?.Code);
+            WebAnalyticsProblemCodes.UpstreamTransport,
+            WebAnalyticsProblemFactory.FromException(new HttpRequestException())?.Code);
         Assert.Equal(
-            VercelAnalyticsProblemCodes.UpstreamTimeout,
-            VercelAnalyticsProblemFactory.FromException(new TaskCanceledException())?.Code);
+            WebAnalyticsProblemCodes.UpstreamTimeout,
+            WebAnalyticsProblemFactory.FromException(new TaskCanceledException())?.Code);
         Assert.Equal(
-            VercelAnalyticsProblemCodes.InvalidUpstreamPayload,
-            VercelAnalyticsProblemFactory.FromException(new JsonException())?.Code);
+            WebAnalyticsProblemCodes.InvalidUpstreamPayload,
+            WebAnalyticsProblemFactory.FromException(new JsonException())?.Code);
     }
 
     [Fact]
     public void Maps_report_capacity_failures_to_service_unavailable()
     {
-        var problem = Assert.IsType<VercelAnalyticsProblemDefinition>(
-            VercelAnalyticsProblemFactory.FromException(new AnalyticsReportCapacityException()));
+        var problem = Assert.IsType<WebAnalyticsProblemDefinition>(
+            WebAnalyticsProblemFactory.FromException(new AnalyticsReportCapacityException()));
 
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, problem.Status);
-        Assert.Equal(VercelAnalyticsProblemCodes.ReportCapacity, problem.Code);
+        Assert.Equal(WebAnalyticsProblemCodes.ReportCapacity, problem.Code);
     }
 
     [Fact]
     public void Returns_a_typed_problem_details_contract()
     {
-        var result = VercelAnalyticsProblemFactory.CreateResult(
+        var result = WebAnalyticsProblemFactory.CreateResult(
             StatusCodes.Status400BadRequest,
-            VercelAnalyticsProblemCodes.InvalidQuery,
+            WebAnalyticsProblemCodes.InvalidQuery,
             "Invalid analytics query.");
 
         var details = Assert.IsType<AnalyticsProblemDetails>(result.Value);
-        Assert.Equal(VercelAnalyticsProblemCodes.InvalidQuery, details.Code);
+        Assert.Equal(WebAnalyticsProblemCodes.InvalidQuery, details.Code);
     }
 
     [Fact]
@@ -81,9 +81,9 @@ public sealed class VercelAnalyticsProblemFactoryTests
     {
         var context = CreateExceptionContext(new HttpRequestException());
 
-        new VercelAnalyticsExceptionFilter().OnException(context);
+        new WebAnalyticsExceptionFilter().OnException(context);
 
-        AssertProblem(context, StatusCodes.Status502BadGateway, VercelAnalyticsProblemCodes.UpstreamTransport);
+        AssertProblem(context, StatusCodes.Status502BadGateway, WebAnalyticsProblemCodes.UpstreamTransport);
     }
 
     [Fact]
@@ -91,9 +91,9 @@ public sealed class VercelAnalyticsProblemFactoryTests
     {
         var context = CreateExceptionContext(new JsonException());
 
-        new VercelAnalyticsExceptionFilter().OnException(context);
+        new WebAnalyticsExceptionFilter().OnException(context);
 
-        AssertProblem(context, StatusCodes.Status502BadGateway, VercelAnalyticsProblemCodes.InvalidUpstreamPayload);
+        AssertProblem(context, StatusCodes.Status502BadGateway, WebAnalyticsProblemCodes.InvalidUpstreamPayload);
     }
 
     private static ExceptionContext CreateExceptionContext(Exception exception)

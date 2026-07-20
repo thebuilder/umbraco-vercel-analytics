@@ -13,24 +13,29 @@ namespace TheBuilder.WebAnalytics.Composers
         public void Compose(IUmbracoBuilder builder)
         {
             builder.Services
-                .AddOptions<VercelAnalyticsOptions>()
-                .Bind(builder.Config.GetSection(VercelAnalyticsOptions.SectionName))
+                .AddOptions<WebAnalyticsOptions>()
+                .Bind(builder.Config.GetSection(WebAnalyticsOptions.SectionName))
                 .ValidateOnStart();
-            builder.Services.AddSingleton<IValidateOptions<VercelAnalyticsOptions>, VercelAnalyticsOptionsValidator>();
-            builder.Services.AddSingleton<VercelAnalyticsSettingsStore>();
-            builder.Services.AddSingleton<VercelAnalyticsConnectionRegistry>();
+            builder.Services.AddSingleton<IValidateOptions<WebAnalyticsOptions>, WebAnalyticsOptionsValidator>();
+            builder.Services.AddSingleton<WebAnalyticsSettingsStore>();
+            builder.Services.AddSingleton<AnalyticsConnectionRegistry>();
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<AnalyticsReportCache>();
-            builder.Services.AddSingleton<VercelAnalyticsRequestGate>();
+            builder.Services.AddSingleton<AnalyticsProviderRequestGate>();
             builder.Services.AddHttpClient<VercelAnalyticsClient>(client =>
             {
                 client.BaseAddress = new Uri("https://api.vercel.com/");
                 client.Timeout = TimeSpan.FromSeconds(15);
             });
-            builder.Services.AddSingleton<MockVercelAnalyticsClient>();
-            builder.Services.AddTransient<IVercelAnalyticsClient, VercelAnalyticsClientRouter>();
-            builder.Services.AddTransient<VercelAnalyticsReportService>();
-            builder.Services.AddTransient<IVercelProjectNameService, VercelProjectNameService>();
+            builder.Services.AddHttpClient<PlausibleAnalyticsClient>(client =>
+            {
+                client.BaseAddress = new Uri("https://plausible.io/");
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
+            builder.Services.AddSingleton<MockAnalyticsClient>();
+            builder.Services.AddTransient<IAnalyticsProviderClient, AnalyticsProviderClientRouter>();
+            builder.Services.AddTransient<AnalyticsReportService>();
+            builder.Services.AddTransient<IAnalyticsConnectionNameService, AnalyticsConnectionNameService>();
             builder.Services.AddTransient<IAnalyticsAuthorizationService, AnalyticsAuthorizationService>();
             builder.Services.AddTransient<IAnalyticsPublishedContentAccessor, UmbracoAnalyticsPublishedContentAccessor>();
             builder.Services.AddTransient<IAnalyticsDocumentRouteService, AnalyticsDocumentRouteService>();

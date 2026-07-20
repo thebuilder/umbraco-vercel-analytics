@@ -8,6 +8,13 @@ public sealed class AnalyticsProblemDetails : ProblemDetails
     public string Code { get; init; } = string.Empty;
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<AnalyticsProvider>))]
+public enum AnalyticsProvider
+{
+    Vercel,
+    Plausible
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<AnalyticsInterval>))]
 public enum AnalyticsInterval
 {
@@ -43,6 +50,12 @@ public enum AnalyticsDimension
     UtmContent,
     EventName
 }
+
+public sealed record AnalyticsCapabilities(
+    IReadOnlyList<AnalyticsDimension> Dimensions,
+    bool Events,
+    bool EventProperties,
+    bool Flags);
 
 public sealed record AnalyticsQuery(
     Guid Connection,
@@ -113,6 +126,8 @@ public sealed record AnalyticsEventDetails(
 public sealed record AnalyticsConnectionSummary(
     Guid Key,
     string DisplayName,
+    AnalyticsProvider Provider,
+    AnalyticsCapabilities Capabilities,
     bool IsDefault,
     bool IsConfigured,
     string? BaseUrl,
@@ -125,16 +140,49 @@ public sealed record AnalyticsConnectionsResponse(
 
 public sealed record AnalyticsDocumentRoute(
     Guid Connection,
+    AnalyticsProvider Provider,
+    AnalyticsCapabilities Capabilities,
     string Culture,
     string Hostname,
     string Path,
     string Url,
     bool IsCurrent,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings)
+{
+    public AnalyticsDocumentRoute(
+        Guid connection,
+        string culture,
+        string hostname,
+        string path,
+        string url,
+        bool isCurrent,
+        IReadOnlyList<string> warnings)
+        : this(
+            connection,
+            AnalyticsProvider.Vercel,
+            AnalyticsProviderCapabilitiesDefaults.Vercel,
+            culture,
+            hostname,
+            path,
+            url,
+            isCurrent,
+            warnings)
+    {
+    }
+}
+
+internal static class AnalyticsProviderCapabilitiesDefaults
+{
+    public static readonly AnalyticsCapabilities Vercel = new(
+        Enum.GetValues<AnalyticsDimension>(),
+        Events: true,
+        EventProperties: true,
+        Flags: true);
+}
 
 public sealed record AnalyticsSettingsResponse(
     bool Enabled,
-    bool HasAccessToken,
+    IReadOnlyList<AnalyticsProviderTokenStatus> ProviderTokens,
     bool CanCreateMockConnections,
     int DefaultRangeDays,
     string CacheDuration,
@@ -143,8 +191,11 @@ public sealed record AnalyticsSettingsResponse(
 public sealed record AnalyticsConnectionSettingsResponse(
     Guid Key,
     string DisplayName,
+    AnalyticsProvider Provider,
     string ProjectId,
     string? Team,
+    string SiteId,
+    AnalyticsCapabilities Capabilities,
     IReadOnlyList<string> DocumentRootKeys,
     bool EnableAllDocumentTypes,
     IReadOnlyList<string> EnabledDocumentTypeKeys,
@@ -161,11 +212,41 @@ public sealed record UpdateAnalyticsSettingsRequest(
 public sealed record UpdateAnalyticsConnectionRequest(
     Guid Key,
     string DisplayName,
+    AnalyticsProvider Provider,
     string ProjectId,
     string? Team,
+    string SiteId,
     MockAnalyticsScenario? MockScenario,
     IReadOnlyList<string> DocumentRootKeys,
     bool EnableAllDocumentTypes,
-    IReadOnlyList<string> EnabledDocumentTypeKeys);
+    IReadOnlyList<string> EnabledDocumentTypeKeys)
+{
+    public UpdateAnalyticsConnectionRequest(
+        Guid key,
+        string displayName,
+        string projectId,
+        string? team,
+        MockAnalyticsScenario? mockScenario,
+        IReadOnlyList<string> documentRootKeys,
+        bool enableAllDocumentTypes,
+        IReadOnlyList<string> enabledDocumentTypeKeys)
+        : this(
+            key,
+            displayName,
+            AnalyticsProvider.Vercel,
+            projectId,
+            team,
+            string.Empty,
+            mockScenario,
+            documentRootKeys,
+            enableAllDocumentTypes,
+            enabledDocumentTypeKeys)
+    {
+    }
+}
+
+public sealed record AnalyticsProviderTokenStatus(
+    AnalyticsProvider Provider,
+    bool HasAccessToken);
 
 public sealed record AnalyticsConnectionTestResult(bool Success, string Message);

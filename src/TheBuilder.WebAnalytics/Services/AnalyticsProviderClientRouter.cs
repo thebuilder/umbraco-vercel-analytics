@@ -3,24 +3,25 @@ using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Services;
 
-public sealed class VercelAnalyticsClientRouter(
+public sealed class AnalyticsProviderClientRouter(
     VercelAnalyticsClient vercelClient,
-    MockVercelAnalyticsClient mockClient) : IVercelAnalyticsClient
+    MockAnalyticsClient mockClient,
+    PlausibleAnalyticsClient? plausibleClient = null) : IAnalyticsProviderClient
 {
-    public Task<string> GetProjectNameAsync(VercelAnalyticsConnection connection, CancellationToken cancellationToken) =>
-        ClientFor(connection).GetProjectNameAsync(connection, cancellationToken);
+    public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken) =>
+        ClientFor(connection).GetDisplayNameAsync(connection, cancellationToken);
 
-    public Task<AnalyticsTotals> CountAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
+    public Task<AnalyticsTotals> CountAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
         ClientFor(connection).CountAsync(connection, query, cancellationToken);
 
-    public Task<long> GetPageViewTotalAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
+    public Task<long> GetPageViewTotalAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
         ClientFor(connection).GetPageViewTotalAsync(connection, query, cancellationToken);
 
-    public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
         ClientFor(connection).GetTrendAsync(connection, query, cancellationToken);
 
     public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         AnalyticsDimension dimension,
         int limit,
@@ -29,7 +30,7 @@ public sealed class VercelAnalyticsClientRouter(
         ClientFor(connection).GetBreakdownAsync(connection, query, dimension, limit, search, cancellationToken);
 
     public Task<AnalyticsEventTotals> CountEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
@@ -37,7 +38,7 @@ public sealed class VercelAnalyticsClientRouter(
         ClientFor(connection).CountEventsAsync(connection, query, eventName, eventDataFilter, cancellationToken);
 
     public Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         int limit,
         string? search,
@@ -45,7 +46,7 @@ public sealed class VercelAnalyticsClientRouter(
         ClientFor(connection).GetEventsAsync(connection, query, limit, search, cancellationToken);
 
     public Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string? flagKey,
         int limit,
@@ -53,7 +54,7 @@ public sealed class VercelAnalyticsClientRouter(
         ClientFor(connection).GetFlagsAsync(connection, query, flagKey, limit, cancellationToken);
 
     public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
@@ -61,7 +62,7 @@ public sealed class VercelAnalyticsClientRouter(
         ClientFor(connection).GetEventPropertyNamesAsync(connection, query, eventName, eventDataFilter, cancellationToken);
 
     public Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         string propertyName,
@@ -79,6 +80,12 @@ public sealed class VercelAnalyticsClientRouter(
             eventDataFilter,
             cancellationToken);
 
-    private IVercelAnalyticsClient ClientFor(VercelAnalyticsConnection connection) =>
-        connection.IsMock ? mockClient : vercelClient;
+    private IAnalyticsProviderClient ClientFor(AnalyticsConnection connection) =>
+        connection.IsMock
+            ? mockClient
+            : connection.Provider switch
+            {
+                AnalyticsProvider.Plausible => plausibleClient ?? throw new InvalidOperationException("Plausible Analytics is not registered."),
+                _ => vercelClient
+            };
 }

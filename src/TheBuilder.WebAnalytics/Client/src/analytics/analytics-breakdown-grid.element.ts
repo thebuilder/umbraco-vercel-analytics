@@ -24,6 +24,9 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
   @property() acquisitionView: AcquisitionView = "referrers";
   @property() utmDimension: UtmDimension = "UtmSource";
   @property() baseUrl?: string;
+  @property({ type: Boolean }) supportsEvents = true;
+  @property({ type: Boolean }) supportsEventProperties = true;
+  @property({ type: Boolean }) supportsFlags = true;
 
   #dispatch(name: string, detail?: unknown): void {
     this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail }));
@@ -187,7 +190,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     return html`
       <uui-box class="breakdown-card wide">
         <div class=${`breakdown-card-layout${empty ? " empty-card-layout" : ""}`}>
-          <vercel-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading}></vercel-analytics-event-table>
+          <vercel-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading} .detailsEnabled=${this.supportsEventProperties}></vercel-analytics-event-table>
           ${empty ? "" : html`<footer class="breakdown-footer">
             ${!loading && rows.length ? html`<uui-button look="secondary" label="View all events" @click=${() => this.#dispatch("view-events")}>View all</uui-button>` : ""}
           </footer>`}
@@ -207,11 +210,11 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     return html`
       <section class="grid" aria-label="Traffic breakdowns">
         ${cardsBeforeEvents.map(renderCard)}
-        ${this.#renderEvents()}
+        ${this.supportsEvents ? this.#renderEvents() : ""}
         ${cardsAfterEvents.map(renderCard)}
-        <uui-box class=${`breakdown-card flags-card${documentScoped ? " document-flags-card" : " wide"}`}>
+        ${this.supportsFlags ? html`<uui-box class=${`breakdown-card flags-card${documentScoped ? " document-flags-card" : " wide"}`}>
           <vercel-analytics-flag-card .report=${this.flags} .selected=${this.selectedFlag}></vercel-analytics-flag-card>
-        </uui-box>
+        </uui-box>` : ""}
       </section>
     `;
   }

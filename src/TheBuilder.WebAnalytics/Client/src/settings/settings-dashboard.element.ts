@@ -74,6 +74,8 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   #updateConnection(index: number, connection: AnalyticsConnectionSettingsResponse): void {
     if (!this._settings) return;
     const connections = this._settings.connections.map((item, itemIndex) => itemIndex === index ? connection : item);
+    const { [connection.key]: _discardedStatus, ...remainingStatuses } = this._connectionStatuses;
+    this._connectionStatuses = remainingStatuses;
     this.#patch({ connections });
   }
 
@@ -85,11 +87,13 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
 
   #toggleProviderPicker(): void {
     this._showProviderPicker = !this._showProviderPicker;
-    if (this._showProviderPicker) {
-      void this.updateComplete.then(() => {
+    void this.updateComplete.then(() => {
+      if (this._showProviderPicker) {
         this.shadowRoot?.querySelector<HTMLElement>(".provider-choice")?.focus();
-      });
-    }
+      } else {
+        this.shadowRoot?.querySelector<HTMLElement>('[label="Add analytics connection"], [label="Choose analytics provider"]')?.focus();
+      }
+    });
   }
 
   #addMockConnection(scenario: MockScenarioDefinition): void {
@@ -117,20 +121,27 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     };
     const connections = [...this._settings.connections, connection];
     this.#patch({ connections });
-    this.updateComplete.then(() => {
+    void this.updateComplete.then(async () => {
       const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-      this.shadowRoot?.querySelector<HTMLElement>("vercel-analytics-connection-editor:last-of-type")?.scrollIntoView({
+      const editor = this.shadowRoot?.querySelector<AnalyticsConnectionEditorElement>("vercel-analytics-connection-editor:last-of-type");
+      editor?.scrollIntoView({
         behavior: reducedMotion ? "auto" : "smooth",
         block: "start",
       });
+      await editor?.updateComplete;
+      const fieldName = provider === "Plausible" ? "siteId" : "projectId";
+      editor?.shadowRoot?.querySelector<HTMLElement>(`[name="${fieldName}"]`)?.focus();
     });
   }
 
   #removeConnection(index: number): void {
     if (!this._settings) return;
     const connection = this._settings.connections[index];
-    if (!window.confirm(`Remove “${connection.displayName || connection.siteId || connection.projectId || "this connection"}”? This takes effect when settings are saved.`)) return;
+    if (!connection) return;
+    if (!window.confirm(`Delete “${connection.displayName || connection.siteId || connection.projectId || "this connection"}” from Web Analytics? The connection is removed when you save settings.`)) return;
     const connections = this._settings.connections.filter((_, itemIndex) => itemIndex !== index);
+    const { [connection.key]: _discardedStatus, ...remainingStatuses } = this._connectionStatuses;
+    this._connectionStatuses = remainingStatuses;
     this.#patch({ connections });
   }
 
@@ -228,7 +239,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
                 </span>
                 <span class=${`provider-choice-status ${credential?.hasAccessToken ? "configured" : "missing"}`}>
                   <uui-icon name=${credential?.hasAccessToken ? "icon-check" : "icon-alert"} aria-hidden="true"></uui-icon>
-                  ${credential?.hasAccessToken ? "Credential detected" : "Credential not detected"}
+                  ${credential?.hasAccessToken ? "Shared credential detected" : "No shared credential detected"}
                 </span>
                 <uui-icon class="provider-choice-arrow" name="icon-navigation-right" aria-hidden="true"></uui-icon>
               </button>
@@ -243,7 +254,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     if (!this._settings) return "";
     return html`
       <uui-box headline="Providers" class="providers">
-        <p class="providers-intro">Web Analytics reads provider credentials from your server configuration. This page only reports whether a shared credential was detected.</p>
+        <p class="providers-intro">Web Analytics reads credentials from your server configuration. Detection confirms presence only; test each saved connection to verify access.</p>
         <div class="provider-list">
           ${ANALYTICS_PROVIDERS.map((item) => {
             const token = this._settings?.providerTokens.find((candidate) => candidate.provider === item.provider);
@@ -311,7 +322,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
                 aria-describedby="cache-duration-help"
                 .value=${this._settings.cacheDuration}
                 @input=${(event: Event) => this.#patch({ cacheDuration: String((event.target as UUIInputElement).value) })}></uui-input>
-              <span id="cache-duration-help" class="field-help">Use <code>hh:mm:ss</code>, for example <code>00:05:00</code>.</span>
+              <span id="cache-duration-help" class="field-help">How long reports stay cached before fresh data is requested. Use <code>hh:mm:ss</code>, for example <code>00:05:00</code>.</span>
             </div>
           </uui-form-layout-item>
         </div>
@@ -474,14 +485,14 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .provider-choice:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
     .provider-mark { align-items: center; background: var(--uui-color-surface-alt); block-size: var(--uui-size-8); color: var(--uui-color-text); display: inline-flex; inline-size: var(--uui-size-8); justify-content: center; }
     .provider-logo { block-size: var(--uui-size-5); fill: currentColor; inline-size: var(--uui-size-5); }
-    .provider-logo.plausible { color: #5850ec; }
     .provider-choice-copy { display: grid; gap: var(--uui-size-space-1); min-inline-size: 0; }
     .provider-choice-copy strong { font-size: var(--uui-type-h5-size); }
     .provider-choice-copy > span { color: var(--uui-color-text-alt); overflow-wrap: anywhere; }
     .provider-choice-status { align-items: center; display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-1); white-space: nowrap; }
     .provider-choice-status.configured { color: var(--uui-color-positive-standalone); }
     .provider-choice-status.missing { color: var(--uui-color-text-alt); }
-    .provider-choice-arrow { color: var(--uui-color-interactive); }
+    .provider-choice-arrow { color: var(--uui-color-interactive); transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .provider-choice:hover .provider-choice-arrow { transform: translateX(var(--uui-size-space-1)); }
     .connections { display: grid; gap: var(--uui-size-space-5); }
     .connection-empty-state {
       align-items: center;
@@ -520,6 +531,11 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     @media (forced-colors: active) {
       .unsaved-indicator::before { background: Highlight; }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .provider-choice-arrow { transition: none; }
+      .provider-choice:hover .provider-choice-arrow { transform: none; }
+    }
+    :host-context([dir="rtl"]) .provider-choice-arrow { transform: scaleX(-1); }
   `];
 }
 

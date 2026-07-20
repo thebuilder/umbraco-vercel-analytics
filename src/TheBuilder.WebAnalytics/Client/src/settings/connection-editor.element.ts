@@ -30,7 +30,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
   @property({ type: Boolean }) mockConnectionsEnabled = false;
   @property({ type: Boolean }) dirty = false;
   @property({ type: Boolean }) testing = false;
-  @state() private _tokenCopied = false;
+  @state() private _tokenCopyStatus?: "copied" | "failed";
   private _copyStatusTimer?: number;
 
   disconnectedCallback(): void {
@@ -90,10 +90,14 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
   }
 
   async #copyTokenKey(): Promise<void> {
-    await navigator.clipboard.writeText(`WebAnalytics__ConnectionAccessTokens__${this.connection.key}`);
     window.clearTimeout(this._copyStatusTimer);
-    this._tokenCopied = true;
-    this._copyStatusTimer = window.setTimeout(() => { this._tokenCopied = false; }, 2000);
+    try {
+      await navigator.clipboard.writeText(`WebAnalytics__ConnectionAccessTokens__${this.connection.key}`);
+      this._tokenCopyStatus = "copied";
+    } catch {
+      this._tokenCopyStatus = "failed";
+    }
+    this._copyStatusTimer = window.setTimeout(() => { this._tokenCopyStatus = undefined; }, 3000);
   }
 
   #dispatch(name: "test-connection" | "remove-connection"): void {
@@ -117,10 +121,10 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     const tokenStatus = isMock
       ? this.mockConnectionsEnabled ? "Development mock" : "Inactive mock"
       : connection.hasAccessTokenOverride
-      ? "Token override"
+      ? "Credential override"
       : connection.hasAccessToken
-        ? "Shared token"
-        : "Token missing";
+        ? "Shared credential"
+          : "Credential missing";
     const health = this.testing
       ? { label: "Testing", color: undefined }
       : this.status?.type === "success"
@@ -197,7 +201,13 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
                     Create a ${connection.provider} ${credentialName(connection.provider)}<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
                   </a>
                 </p>
-                <div class="token-key"><code>WebAnalytics__ConnectionAccessTokens__${connection.key}</code><uui-button compact look="secondary" label="Copy credential setting name" @click=${this.#copyTokenKey}>${this._tokenCopied ? "Copied" : "Copy"}</uui-button></div>
+                <div class="token-key">
+                  <code>WebAnalytics__ConnectionAccessTokens__${connection.key}</code>
+                  <uui-button compact look="secondary" label="Copy credential setting name" @click=${this.#copyTokenKey}>${this._tokenCopyStatus === "copied" ? "Copied" : "Copy"}</uui-button>
+                </div>
+                <span class=${`copy-feedback${this._tokenCopyStatus === "failed" ? " error" : ""}`} role="status" aria-live="polite">
+                  ${this._tokenCopyStatus === "failed" ? "Could not copy the setting name. Select and copy it manually." : this._tokenCopyStatus === "copied" ? "Setting name copied." : ""}
+                </span>
               </div>
             </details>`}
 
@@ -292,11 +302,11 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     .summary-copy > span { color: var(--uui-color-text-alt); overflow-wrap: anywhere; }
     .provider-mark { align-items: center; background: var(--uui-color-surface-alt); block-size: var(--uui-size-8); color: var(--uui-color-text); display: inline-flex; inline-size: var(--uui-size-8); justify-content: center; }
     .provider-logo { block-size: var(--uui-size-5); fill: currentColor; inline-size: var(--uui-size-5); }
-    .provider-logo.plausible { color: #5850ec; }
     .provider-mark > uui-icon { font-size: var(--uui-size-5); }
     .summary-state { align-items: end; display: grid; gap: var(--uui-size-space-1); justify-items: end; min-inline-size: 0; }
     .summary-state small { color: var(--uui-color-text-alt); max-inline-size: 24ch; overflow-wrap: anywhere; text-align: end; }
     .summary-health { align-items: center; display: flex; gap: var(--uui-size-space-3); }
+    .summary-health > uui-icon { transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1); }
     .connection-shell[open] .summary-health > uui-icon { transform: rotate(180deg); }
     .connection-body { border-top: 1px solid var(--uui-color-border); padding: 0 var(--uui-size-space-5) var(--uui-size-space-4); }
     .essentials { padding: var(--uui-size-space-4) 0 var(--uui-size-space-5); }
@@ -331,6 +341,8 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     .token-content a { align-items: center; color: var(--uui-color-interactive); display: inline-flex; gap: var(--uui-size-space-1); margin-inline-start: var(--uui-size-space-1); }
     .token-content a uui-icon { font-size: 0.875em; }
     .token-key { align-items: center; background: var(--uui-color-surface-alt); display: flex; gap: var(--uui-size-space-3); justify-content: space-between; max-inline-size: 52rem; padding: var(--uui-size-space-3); }
+    .copy-feedback { color: var(--uui-color-positive-standalone); display: block; margin-block-start: var(--uui-size-space-2); min-block-size: 1lh; }
+    .copy-feedback.error { color: var(--uui-color-danger-standalone); }
     code { font-family: var(--uui-font-monospace); overflow-wrap: anywhere; }
     .mapping-content .fields { max-inline-size: 32rem; }
     .document-types { margin-top: var(--uui-size-space-4); }
@@ -355,6 +367,9 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
       .config-section > summary { align-items: flex-start; flex-wrap: wrap; }
       .config-section > summary small { margin-inline-start: 0; }
       .token-key { align-items: stretch; flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .summary-health > uui-icon { transition: none; }
     }
   `];
 }

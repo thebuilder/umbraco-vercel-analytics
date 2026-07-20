@@ -21,6 +21,10 @@ import "./settings-dashboard.element.js";
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: vi.fn().mockResolvedValue(undefined) },
+  });
   sdk.settings.mockResolvedValue(apiOk(settings()));
 });
 
@@ -63,6 +67,20 @@ describe("analytics settings network recovery", () => {
     await vi.waitFor(() => expect(editor.shadowRoot?.querySelector(".action-status")?.textContent).toContain("The connection test could not be completed."));
     expect(editor.testing).toBe(false);
     expect(editor.shadowRoot?.querySelector<HTMLElement>('[label="Test the saved connection."]')?.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("promotes a successful connection test into the connection summary", async () => {
+    sdk.testConnection.mockResolvedValueOnce(apiOk({ success: true, message: "Connection successful." }));
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection()] })));
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor")).not.toBeNull());
+
+    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as AnalyticsConnectionEditorElement;
+    editor.dispatchEvent(new CustomEvent("test-connection", { bubbles: true, composed: true }));
+
+    await vi.waitFor(() => expect(editor.shadowRoot?.querySelector(".summary-health uui-tag")?.textContent?.trim()).toBe("Connected"));
+    expect(editor.shadowRoot?.querySelector(".action-status")?.textContent).toContain("Connection successful.");
   });
 
   it("keeps edits dirty after a rejected save and allows a later save to succeed", async () => {
@@ -176,7 +194,6 @@ describe("analytics settings onboarding", () => {
       "projectId",
       "teamReference",
     ]);
-
     dashboard.shadowRoot?.querySelector<HTMLElement>('.section-heading [label="Add analytics connection"]')?.click();
     await dashboard.updateComplete;
     dashboard.shadowRoot?.querySelector<HTMLElement>('.provider-choice[aria-label="Add Plausible connection"]')?.click();
@@ -228,7 +245,35 @@ describe("analytics settings onboarding", () => {
     expect(editor.connection.hasAccessToken).toBe(true);
     expect(editor.connection.hasAccessTokenOverride).toBe(false);
     expect(editor.shadowRoot?.querySelector(".summary-state uui-tag")?.textContent?.trim()).toBe("Setup required");
-    expect(editor.shadowRoot?.querySelector(".summary-state small")?.textContent?.trim()).toBe("Shared token");
+    expect(editor.shadowRoot?.querySelector(".summary-state small")?.textContent?.trim()).toBe("Shared credential");
+  });
+
+  it("prevents testing until both the identifier and server credential are available", async () => {
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [{ ...connection(), hasAccessToken: false }] })));
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor")).not.toBeNull());
+
+    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as AnalyticsConnectionEditorElement;
+    const testButton = editor.shadowRoot?.querySelector<HTMLElement>('[label="Add a server-side credential before testing this connection."]');
+    expect(testButton?.hasAttribute("disabled")).toBe(true);
+    expect(editor.shadowRoot?.querySelector(".summary-health uui-tag")?.textContent?.trim()).toBe("Setup required");
+  });
+
+  it("shows a recoverable message when the override setting name cannot be copied", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error("Clipboard unavailable")) },
+    });
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection()] })));
+    const dashboard = document.createElement("vercel-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor")).not.toBeNull());
+
+    const editor = dashboard.shadowRoot?.querySelector("vercel-analytics-connection-editor") as AnalyticsConnectionEditorElement;
+    editor.shadowRoot?.querySelector<HTMLElement>('[label="Copy credential setting name"]')?.click();
+
+    await vi.waitFor(() => expect(editor.shadowRoot?.querySelector(".copy-feedback")?.textContent).toContain("Select and copy it manually"));
   });
 
   it("adds development mock scenarios as deterministic connections", async () => {

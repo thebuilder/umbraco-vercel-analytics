@@ -23,6 +23,8 @@ export type DashboardCard =
       planLimited: boolean;
     };
 
+export type AcquisitionView = "referrers" | "utm";
+
 const AUDIENCE_OPTIONS: ReadonlyArray<DimensionOption<AudienceDimension>> = [
   { dimension: "DeviceType", headline: "Devices", label: "Devices" },
   { dimension: "BrowserName", headline: "Browsers", label: "Browsers" },
@@ -56,14 +58,18 @@ export function dashboardCards(documentScoped: boolean, utmCapability: UtmCapabi
     ...(documentScoped ? [] : [{ kind: "breakdown" as const, dimension: "RequestPath" as const, headline: "Pages", span: "wide" as const }]),
     ...SHARED_CARDS,
   ];
-  if (utmCapability !== "unavailable") cards.push(UTM_CARD);
+  if (utmCapability === "available") cards.push(UTM_CARD);
   return cards;
 }
 
-export function requestedDimensions(cards: ReadonlyArray<DashboardCard>): AnalyticsDimension[] {
-  return cards.flatMap((card) => card.kind === "breakdown"
+export function requestedDimensions(
+  cards: ReadonlyArray<DashboardCard>,
+  utmDimension?: UtmDimension,
+): AnalyticsDimension[] {
+  const dimensions = cards.flatMap((card) => card.kind === "breakdown"
     ? [card.dimension]
-    : card.options.map(({ dimension }) => dimension));
+    : card.id === "audience" ? card.options.map(({ dimension }) => dimension) : []);
+  return utmDimension ? [...dimensions, utmDimension] : dimensions;
 }
 
 export function selectedCardDimension(

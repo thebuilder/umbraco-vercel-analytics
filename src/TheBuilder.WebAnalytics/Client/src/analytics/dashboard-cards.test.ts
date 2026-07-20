@@ -7,18 +7,24 @@ describe("dashboardCards", () => {
     expect(requestedDimensions(dashboardCards(true, "available"))).not.toContain("RequestPath");
   });
 
-  it("models audience and UTM dimensions as tabbed cards", () => {
+  it("models audience and UTM dimensions as tabbed cards without eagerly loading hidden UTM tabs", () => {
     const cards = dashboardCards(false, "available");
     expect(cards.find((card) => card.kind === "tabbed-breakdown" && card.id === "audience")).toBeDefined();
     expect(cards.find((card) => card.kind === "tabbed-breakdown" && card.id === "utm")).toBeDefined();
-    expect(requestedDimensions(cards)).toEqual(expect.arrayContaining([
+    expect(requestedDimensions(cards)).toEqual(expect.arrayContaining(["DeviceType", "BrowserName"]));
+    expect(requestedDimensions(cards)).not.toEqual(expect.arrayContaining([
       "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent",
+    ]));
+    expect(requestedDimensions(cards, "UtmCampaign")).toEqual(expect.arrayContaining(["UtmCampaign"]));
+    expect(requestedDimensions(cards, "UtmCampaign")).not.toEqual(expect.arrayContaining([
+      "UtmSource", "UtmMedium", "UtmTerm", "UtmContent",
     ]));
   });
 
-  it("removes the UTM card when the capability is unavailable", () => {
-    expect(requestedDimensions(dashboardCards(false, "unavailable")))
-      .not.toEqual(expect.arrayContaining(["UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent"]));
+  it("shows the UTM card only after capability is known to be available", () => {
+    for (const capability of ["unknown", "unavailable"] as const) {
+      expect(dashboardCards(false, capability).some((card) => card.kind === "tabbed-breakdown" && card.id === "utm")).toBe(false);
+    }
   });
 
   it("selects the active option from a tabbed card", () => {

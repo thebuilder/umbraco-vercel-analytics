@@ -47,11 +47,13 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
 
     const style = getComputedStyle(this);
     const color = style.getPropertyValue("--vercel-analytics-chart-color").trim() || "oklch(51.51% .2399 257.85)";
+    const lineColor = `color-mix(in srgb, ${color} 72%, transparent)`;
     const fillColor = style.getPropertyValue("--vercel-analytics-chart-fill").trim() || "oklch(51.51% .2399 257.85 / 0.12)";
     const guideColor = style.getPropertyValue("--uui-color-text").trim() || "#1b264f";
     const mutedColor = style.getPropertyValue("--uui-color-text-alt").trim() || "#5c5c5c";
     const surfaceColor = style.getPropertyValue("--uui-color-surface").trim() || "#ffffff";
     const borderColor = style.getPropertyValue("--uui-color-border").trim() || "#d8d7d9";
+    const gridColor = `color-mix(in srgb, ${borderColor} 55%, transparent)`;
     const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
@@ -78,6 +80,21 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
         ctx.restore();
       },
     };
+    const currentPeriodSeparator: Plugin<"line"> = {
+      id: "vercelAnalyticsCurrentPeriodSeparator",
+      afterDatasetsDraw: (chart) => {
+        if (!latestPeriodInProgress || this.points.length < 2) return;
+
+        const previousPoint = chart.getDatasetMeta(0).data[this.points.length - 2];
+        if (!previousPoint) return;
+
+        const { ctx, chartArea } = chart;
+        ctx.save();
+        ctx.fillStyle = surfaceColor;
+        ctx.fillRect(Math.round(previousPoint.x), chartArea.top, 1, chartArea.bottom - chartArea.top);
+        ctx.restore();
+      },
+    };
     const locale = this.localize.lang() || undefined;
     this.#chart = new Chart(canvas, {
       type: "line",
@@ -86,7 +103,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
         datasets: [{
           label,
           data: this.points.map((point) => point[this.metric] ?? 0),
-          borderColor: color,
+          borderColor: lineColor,
           borderWidth: 2,
           backgroundColor: fillColor,
           fill: true,
@@ -138,7 +155,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
           y: {
             beginAtZero: true,
             border: { display: false },
-            grid: { color: borderColor },
+            grid: { color: gridColor },
             ticks: {
               callback: (value) => formatChartAxisValue(
                 Number(value),
@@ -151,7 +168,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
           },
         },
       },
-      plugins: [hoverGuide],
+      plugins: [currentPeriodSeparator, hoverGuide],
     });
   }
 

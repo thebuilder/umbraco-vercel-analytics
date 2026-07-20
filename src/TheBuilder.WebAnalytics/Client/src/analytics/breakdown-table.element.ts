@@ -149,11 +149,13 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
     thead th:nth-child(2) { color: var(--uui-color-text-alt); text-align: right; width: var(--metric-column-width); }
     .subheading-row th { background: color-mix(in srgb, var(--uui-color-surface-alt) 35%, var(--uui-color-surface)); padding-block: 0; }
     th, td { box-sizing: border-box; padding: var(--uui-size-space-3) var(--uui-size-space-5); text-align: left; }
+    tbody tr { height: 2rem; }
+    tbody th, tbody td { padding-block: 0; }
     td { font-variant-numeric: tabular-nums; position: relative; text-align: right; z-index: 1; }
     tbody tr:hover, tbody tr:focus-within { position: relative; z-index: 2; }
     .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
     .metric-number { font-weight: 700; min-inline-size: 0; }
-    .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
+    .filter-action { align-items: center; appearance: none; background: transparent; block-size: 1.75rem; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; inline-size: 1.75rem; justify-content: center; opacity: 0; padding: 0; }
     tbody tr:hover .filter-action, .filter-action:focus-visible, .filter-action[aria-pressed="true"] { opacity: 1; }
     .filter-action:hover, .filter-action[aria-pressed="true"] { background: color-mix(in srgb, var(--uui-color-interactive) 15%, var(--uui-color-surface)); color: var(--uui-color-interactive-emphasis); }
     .filter-action:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 1px; }

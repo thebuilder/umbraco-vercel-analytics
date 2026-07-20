@@ -46,7 +46,7 @@ describe("analytics settings network recovery", () => {
 
     dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Retry loading settings"]')?.click();
 
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".page-heading")).not.toBeNull());
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connections-section")).not.toBeNull());
     expect(sdk.settings).toHaveBeenCalledTimes(2);
   });
 
@@ -166,6 +166,8 @@ describe("analytics settings onboarding", () => {
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connection-empty-state")).not.toBeNull());
 
     expect(dashboard.shadowRoot?.querySelector("#default-connection")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector("h1")).toBeNull();
+    expect(dashboard.shadowRoot?.textContent).not.toContain("Connect analytics providers and choose where page analytics appears.");
     expect(dashboard.shadowRoot?.querySelector(".save-bar")).toBeNull();
     expect(dashboard.shadowRoot?.querySelector(".connection-empty-state h3")?.textContent).toBe("Connect your first analytics provider");
 

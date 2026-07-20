@@ -153,10 +153,14 @@ describe("analytics date ranges", () => {
     expect(formatAnalyticsDate("2026-07-15T00:00:00Z", "Day", "en-US")).toBe("Jul 15");
     expect(formatAnalyticsDate("2026-07-15T14:00:00Z", "Hour", "en-US", "Europe/Copenhagen")).toBe("4:00 PM");
     expect(formatAnalyticsDate("2026-07-15T14:00:00Z", "Hour", "da-DK", "Europe/Copenhagen")).toBe("16.00");
+    expect(formatAnalyticsDate("2026-06-01T00:00:00Z", "Week", "en-US")).toBe("Jun 1–7");
+    expect(formatAnalyticsDate("2026-06-29T00:00:00Z", "Week", "en-US")).toBe("Jun 29–Jul 5");
     expect(formatAnalyticsDate("2026-07-01T00:00:00Z", "Month", "en-US")).toBe("Jul ’26");
     expect(formatAnalyticsTooltipDate("2026-07-14T00:00:00Z", "Day", "en-US")).toBe("Jul 14 · Tue");
     expect(formatAnalyticsTooltipDate("2026-07-15T14:00:00Z", "Hour", "da-DK", "Europe/Copenhagen")).toContain("16.00");
-    expect(formatAnalyticsTooltipDate("2026-07-01T00:00:00Z", "Month", "en-US")).toBe("Jul ’26");
+    expect(formatAnalyticsTooltipDate("2026-06-01T00:00:00Z", "Week", "en-US")).toBe("Jun 1–7, 2026");
+    expect(formatAnalyticsTooltipDate("2026-12-28T00:00:00Z", "Week", "en-US")).toBe("Dec 28, 2026–Jan 3, 2027");
+    expect(formatAnalyticsTooltipDate("2026-07-01T00:00:00Z", "Month", "en-US")).toBe("July 2026");
   });
 
   it("identifies the current aggregate bucket as incomplete", () => {

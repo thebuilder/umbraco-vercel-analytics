@@ -37,10 +37,10 @@ public static class VercelAnalyticsSettingsValidator
         IDictionary<Guid, Guid> roots,
         bool requireConnectionMetadata)
     {
-        if (connection.MockScenario is { } mockScenario && !Enum.IsDefined(mockScenario))
+        var hasSupportedMockScenario = connection.MockScenario is { } mockScenario && Enum.IsDefined(mockScenario);
+        if (connection.MockScenario is not null && !hasSupportedMockScenario)
         {
             failures.Add($"Connection '{connection.Key}' defines an unsupported mock analytics scenario.");
-            return;
         }
 
         var label = connection.MockScenario?.ToString() ??
@@ -49,11 +49,11 @@ public static class VercelAnalyticsSettingsValidator
             failures.Add("Every connection requires a valid key.");
         else if (!keys.Add(connection.Key))
             failures.Add($"Connection key '{connection.Key}' is used more than once.");
-        if (requireConnectionMetadata && !connection.IsMock && string.IsNullOrWhiteSpace(connection.ProjectId))
+        if (requireConnectionMetadata && !hasSupportedMockScenario && string.IsNullOrWhiteSpace(connection.ProjectId))
             failures.Add($"Connection '{label}' requires a project ID.");
-        if (connection.IsMock && !string.IsNullOrWhiteSpace(connection.ProjectId))
+        if (hasSupportedMockScenario && !string.IsNullOrWhiteSpace(connection.ProjectId))
             failures.Add($"Mock connection '{label}' cannot define a Vercel project ID.");
-        if (connection.IsMock && !string.IsNullOrWhiteSpace(connection.Team))
+        if (hasSupportedMockScenario && !string.IsNullOrWhiteSpace(connection.Team))
             failures.Add($"Mock connection '{label}' cannot define a Vercel team.");
         foreach (var value in connection.DocumentRootKeys)
         {

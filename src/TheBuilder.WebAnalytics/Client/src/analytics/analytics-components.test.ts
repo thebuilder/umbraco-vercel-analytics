@@ -188,9 +188,9 @@ describe("analytics presentation components", () => {
     expect(table?.total).toBe(11_339);
   });
 
-  it("renders referrers as secure external links with favicons for attributed hosts", async () => {
+  it.each(["ReferrerHostname", "Referrer"] as const)("renders %s rows as secure external links with favicons for attributed hosts", async (dimension) => {
     const element = document.createElement("web-analytics-breakdown-table") as WebAnalyticsBreakdownTableElement;
-    element.dimension = "ReferrerHostname";
+    element.dimension = dimension;
     element.rows = [
       { value: "google.com", visitors: 22_304, pageViews: 30_000 },
       { value: "Unknown", visitors: 1, pageViews: 1 },

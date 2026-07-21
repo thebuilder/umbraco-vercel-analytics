@@ -426,6 +426,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .settings-actions {
       align-items: center;
       background: var(--uui-color-surface);
+      border-radius: var(--uui-border-radius);
       box-shadow: var(--uui-shadow-depth-3);
       box-sizing: border-box;
       display: flex;
@@ -438,7 +439,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       min-block-size: var(--uui-size-14);
       padding: var(--uui-size-space-3) var(--uui-size-space-4);
       position: fixed;
-      width: min(32rem, calc(100vw - 2 * var(--uui-size-layout-1)));
+      width: min(76rem, calc(100vw - 2 * var(--uui-size-layout-1)));
       z-index: var(--analytics-z-sticky-action);
     }
     .save-status { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); white-space: nowrap; }

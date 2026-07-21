@@ -117,7 +117,6 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
               <uui-icon name="icon-search" slot="prepend"></uui-icon>
             </uui-input>
           ` : ""}
-          ${this.#renderPropertyTabs(property)}
           ${this.filterProperty !== undefined && this.filterValue !== undefined ? html`
             <button type="button" class="active-filter" @click=${() => this.#toggleFilter(this.filterProperty!, this.filterValue!)}>
               <uui-icon name="icon-filter"></uui-icon>
@@ -131,7 +130,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
             <caption>${property.name} values for ${this.eventName}</caption>
             <thead>
               <tr class="metric-headings">
-                <th scope="col">${property.name}</th>
+                <th scope="col" class="property-heading">${this.#renderPropertyTabs(property)}</th>
                 <th scope="col">Visitors</th>
                 <th scope="col">Total events</th>
               </tr>
@@ -177,7 +176,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     return html`
       <dialog aria-label=${`${this.eventName} event details`} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
         <uui-dialog-layout headline=${`${this.eventName} event`}>
-          <div class=${`dialog-content${activeProperty ? "" : " no-properties"}`} aria-busy=${this.loading}>
+          <div class=${`dialog-content${this.details && !activeProperty ? " no-properties" : ""}`} aria-busy=${this.loading}>
             ${this.details ? html`
               ${activeProperty ? html`
                 ${this.#renderProperty(activeProperty)}
@@ -199,7 +198,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     .dialog-content { block-size: min(28rem, 52dvh); display: flex; flex-direction: column; min-block-size: 0; position: relative; }
     .dialog-content.no-properties { block-size: auto; min-block-size: var(--uui-size-14); }
     .property-controls { display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding-block-end: var(--uui-size-space-4); }
-    .property-tabs { display: flex; gap: var(--uui-size-space-1); margin-inline: calc(-1 * var(--uui-size-space-5)); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
+    .property-tabs { display: flex; gap: var(--uui-size-space-1); margin: calc(-1 * var(--uui-size-space-3)) calc(-1 * var(--uui-size-space-5)); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
     .property-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
     .property-tabs button:first-child { padding-inline-start: var(--uui-size-space-5); }
     .property-tabs button:hover { color: var(--uui-color-text); }
@@ -214,6 +213,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     th, td { box-sizing: border-box; padding: var(--uui-size-space-3) var(--uui-size-space-5); text-align: left; }
     thead { background: var(--uui-color-surface); box-shadow: 0 1px 0 var(--uui-color-border); position: sticky; top: 0; z-index: 3; }
     thead th { background: var(--uui-color-surface); font-weight: 700; }
+    .property-heading { overflow: hidden; padding-block: var(--uui-size-space-3); }
     .active-filter { align-items: center; background: var(--uui-color-surface-alt); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); color: var(--uui-color-text); cursor: pointer; display: inline-flex; gap: var(--uui-size-space-2); max-inline-size: 100%; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
     .active-filter span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .metric-headings th { box-shadow: 0 1px 0 var(--uui-color-border); }

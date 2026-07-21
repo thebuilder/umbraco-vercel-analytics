@@ -1,0 +1,46 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@umbraco-cms/backoffice/element-api", () => ({
+  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => base,
+}));
+vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
+
+import type { WebAnalyticsEventDetailsDialogElement } from "./event-details-dialog.element.js";
+import "./event-details-dialog.element.js";
+
+beforeEach(() => { HTMLDialogElement.prototype.showModal = vi.fn(); });
+afterEach(() => document.body.replaceChildren());
+
+describe("event details dialog layout", () => {
+  it("reserves the report height while initial details are loading", async () => {
+    const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
+    dialog.loading = true;
+    document.body.append(dialog);
+    await dialog.updateComplete;
+
+    expect(dialog.shadowRoot?.querySelector(".dialog-content")?.classList.contains("no-properties")).toBe(false);
+    expect(dialog.shadowRoot?.querySelector(".loading")?.textContent).toContain("Loading event details");
+  });
+
+  it("renders property tabs as the first table heading without repeating the active property", async () => {
+    const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
+    dialog.eventName = "Read case";
+    dialog.details = {
+      eventName: "Read case",
+      totals: { count: 15, visitors: 12 },
+      properties: [
+        { name: "title", values: [] },
+        { name: "locale", values: [] },
+      ],
+    };
+    document.body.append(dialog);
+    await dialog.updateComplete;
+
+    const heading = dialog.shadowRoot?.querySelector("thead .property-heading");
+    expect(heading?.querySelector('[role="tablist"]')).not.toBeNull();
+    expect(heading?.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(dialog.shadowRoot?.querySelectorAll("thead th")).toHaveLength(3);
+    expect(dialog.shadowRoot?.querySelector("thead")?.textContent?.match(/title/g)).toHaveLength(1);
+  });
+});

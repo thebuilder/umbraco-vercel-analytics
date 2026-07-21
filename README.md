@@ -54,7 +54,7 @@ Create a credential for the provider and grant it read access to the site or pro
 
 #### Vercel
 
-Create a token in the account settings and scope it to the account or team that owns the project. For a team-owned project, also copy either the team ID (`team_...`) or team slug. Personal projects do not need either value. The backoffice presents these as one **Team ID or slug** field. See the [Vercel REST API authentication documentation](https://vercel.com/docs/rest-api).
+Create a token in the account settings and scope it to the account or team that owns the project. For a team-owned project, also copy either the team ID (`team_...`) or team slug.
 
 #### Plausible
 

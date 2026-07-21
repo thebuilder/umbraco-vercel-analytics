@@ -4,7 +4,7 @@
 [![NuGet downloads](https://img.shields.io/nuget/dt/TheBuilder.WebAnalytics)](https://www.nuget.org/packages/TheBuilder.WebAnalytics)
 [![License](https://img.shields.io/github/license/thebuilder/web-analytics)](https://github.com/thebuilder/web-analytics/blob/main/LICENSE)
 
-Web Analytics brings supported analytics providers into Umbraco, giving editors site-wide and page-level insights without leaving the backoffice.
+Web Analytics brings Vercel and Plausible analytics into Umbraco, giving editors site-wide and page-level insights without leaving the backoffice.
 
 ![Web Analytics overview in the Umbraco backoffice](https://raw.githubusercontent.com/thebuilder/web-analytics/refs/heads/main/docs/screenshots/analytics-overview.png)
 
@@ -18,12 +18,6 @@ Web Analytics brings supported analytics providers into Umbraco, giving editors 
 
 The package reads analytics already collected by the configured provider. It does not add or replace tracking on your website.
 
-## Requirements
-
-- Umbraco CMS 17.1–18.x.
-- An account with a supported analytics provider and API access for the site or project.
-- A provider API credential and the provider-specific connection identifier.
-
 ## Supported providers
 
 The connection and reporting workflow is provider-neutral. Availability of individual panels and drill-downs depends on the selected provider's capabilities.
@@ -31,13 +25,13 @@ The connection and reporting workflow is provider-neutral. Availability of indiv
 | Provider | Connection identifier | Credential | Provider-specific capabilities |
 | --- | --- | --- | --- |
 | [Vercel Web Analytics](https://vercel.com/docs/analytics) | Project ID (`prj_...`) and optional team | [Scoped access token](https://vercel.com/kb/guide/how-do-i-use-a-vercel-api-access-token) | Custom-event property exploration and feature flags |
-| [Plausible Cloud](https://plausible.io/docs/stats-api) | Site ID, normally the registered domain | [Stats API key](https://plausible.io/docs/stats-api#authentication) | Goal and custom-event totals and drill-downs |
+| [Plausible](https://plausible.io/docs/stats-api) | Site ID, normally the registered domain | [Stats API key](https://plausible.io/docs/stats-api#authentication) | Goal and custom-event totals and drill-downs |
 
-Self-hosted Plausible is not currently supported.
+Plausible's Stats API requires a Business plan. Self-hosted Plausible is not currently supported.
 
 ## Install
 
-Add the package to the Umbraco web project:
+Web Analytics supports Umbraco CMS 17.1–18.x. Add the package to the Umbraco web project:
 
 ```sh
 dotnet add path/to/Your.Umbraco.Web.csproj package TheBuilder.WebAnalytics
@@ -52,7 +46,7 @@ Build and deploy the Umbraco application as usual. The package's `App_Plugins` a
 Configuration uses two sources:
 
 - Project details, mappings, and display settings are stored in Umbraco.
-- Provider access tokens stay in the application's secret configuration.
+- Provider credentials stay in the application's secret configuration.
 
 ### 1. Create a provider credential
 
@@ -66,9 +60,9 @@ Create a token in the account settings and scope it to the account or team that 
 
 Create a Stats API key from the Plausible account API Keys settings. The site ID must exactly match the domain registered in Plausible.
 
-### 2. Add the token to the Umbraco deployment
+### 2. Add the credential to the Umbraco deployment
 
-Configure a shared token for each provider you use:
+Configure a shared credential for each provider you use:
 
 ```text
 WebAnalytics__Providers__Vercel__AccessToken
@@ -92,11 +86,11 @@ dotnet user-secrets set \
   --project path/to/Your.Umbraco.Web.csproj
 ```
 
-Use the equivalent secret/app-setting facility in Azure App Service, Kubernetes, Docker, or the hosting platform. Do not commit the token to `appsettings.json` or source control.
+Use the equivalent secret/app-setting facility in Azure App Service, Kubernetes, Docker, or the hosting platform. Do not commit credentials to `appsettings.json` or source control.
 
-Restart every Umbraco application instance after adding or rotating a token. Tokens are loaded from server configuration at application startup.
+Restart every Umbraco application instance after adding or rotating a credential. Credentials are loaded from server configuration at application startup.
 
-Each provider token is used by connections of that provider. If a connection needs a different credential, expand **Token override** and use `WebAnalytics__ConnectionAccessTokens__{connection-guid}`.
+Each provider credential is used by connections of that provider. If a connection needs a different credential, expand **Token override** and use `WebAnalytics__ConnectionAccessTokens__{connection-guid}`.
 
 ### 3. Configure the connection in Umbraco
 
@@ -171,12 +165,19 @@ Package settings use the `WebAnalytics` section.
 | Key | Default | Description |
 | --- | --- | --- |
 | `Enabled` | `false` | Enables the Analytics section and configured document workspace views. |
-| `Providers:Vercel:AccessToken` | Empty | Shared Vercel access token used by every connection. Supply through secret configuration. |
-| `Providers:Plausible:AccessToken` | Empty | Shared Plausible Stats API key used by every Plausible connection. Supply through secret configuration. |
 | `DefaultRangeDays` | `30` | Initial report range in days. Valid values are 1–730. |
 | `CacheDuration` | `00:05:00` | Per-instance in-memory cache duration. Valid values are zero to one hour. |
 | `Connections` | `[]` | Provider connection definitions. The first connection becomes the initial default. |
 | `ConnectionAccessTokens` | Empty | Optional secret dictionary keyed by a connection GUID. Prefer the copyable environment-variable name shown in the settings UI. |
+
+#### Provider credentials
+
+Provider credentials are shared by every connection using that provider unless a connection-specific override is configured.
+
+| Provider | Configuration key | Description |
+| --- | --- | --- |
+| Vercel | `Providers:Vercel:AccessToken` | Scoped access token for the account or team that owns the configured projects. |
+| Plausible | `Providers:Plausible:AccessToken` | Stats API key from a Plausible Business account. |
 
 Each entry under `Connections` supports:
 
@@ -193,9 +194,9 @@ Each entry under `Connections` supports:
 | `EnabledDocumentTypeKeys` | `[]` | Document-type GUIDs that show document analytics when all types are not enabled. |
 | `EnabledDocumentTypes` | `[]` | Document-type aliases used by configuration-only bootstrapping. Prefer stable document-type keys for settings managed in Umbraco. |
 
-Keep tokens out of the JSON file. Supply provider tokens through `WebAnalytics__Providers__Vercel__AccessToken` or `WebAnalytics__Providers__Plausible__AccessToken`; only use `WebAnalytics__ConnectionAccessTokens__{connection-guid}` for an override.
+Keep credentials out of `appsettings.json` and source control. Supply the provider keys above through secret configuration. A connection-specific credential under `ConnectionAccessTokens` takes precedence over its provider credential.
 
-Before the settings screen has saved anything, Umbraco uses these server options as the initial configuration. After an administrator saves the settings screen, the non-secret settings are stored in Umbraco's database and become the source of truth. Access tokens continue to come from server configuration, with a connection-specific token taking precedence over the shared token.
+Before the settings screen has saved anything, Umbraco uses these server options as the initial configuration. After an administrator saves the settings screen, the non-secret settings are stored in Umbraco's database and become the source of truth.
 
 In a load-balanced deployment, restart all Umbraco instances after changing saved connection settings or server-side tokens so every process uses the same configuration.
 

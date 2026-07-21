@@ -12,4 +12,6 @@ Web Analytics brings analytics from [**Vercel Web Analytics**](https://vercel.co
 
 Web Analytics fits into the Umbraco permissions and editorial workflows teams already know, making analytics available where content decisions happen.
 
+The Plausible integration uses the Stats API, which requires a Plausible Business plan.
+
 Ready to bring your analytics into the backoffice? See the [installation and configuration guide](https://github.com/thebuilder/web-analytics#readme).

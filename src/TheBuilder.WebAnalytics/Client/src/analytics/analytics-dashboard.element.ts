@@ -96,6 +96,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
     const expandedEvents = state.expandedEvents;
     const selected = state.selectedEvent;
     const capabilities = state.capabilities;
+    const provider = state.connections.find(({ key }) => key === state.connection)?.provider;
     return html`
       <main @toggle-filter=${(event: CustomEvent<{ dimension?: AnalyticsDimension; value: string }>) => this.#controller.toggleFilter(event.detail.dimension, event.detail.value)}>
         <web-analytics-dashboard-header
@@ -169,6 +170,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
         ${selected && capabilities?.eventDetails ? html`
           <web-analytics-event-details-dialog
             .eventName=${selected.eventName}
+            .provider=${provider}
             .details=${stateData(selected.details)}
             .loading=${selected.details.status === "loading"}
             .unavailable=${this.#error(selected.details)}

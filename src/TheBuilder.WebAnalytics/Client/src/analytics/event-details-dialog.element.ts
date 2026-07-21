@@ -2,11 +2,12 @@ import { LitElement, css, customElement, html, property, state } from "@umbraco-
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
-import type { AnalyticsEventDetails, AnalyticsEventProperty } from "../api/types.gen.js";
+import type { AnalyticsEventDetails, AnalyticsEventProperty, AnalyticsProvider } from "../api/types.gen.js";
 
 @customElement("web-analytics-event-details-dialog")
 export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitElement) {
   @property() eventName = "Event";
+  @property() provider?: AnalyticsProvider;
   @property({ type: Boolean }) loading = false;
   @property() unavailable?: string;
   @property({ attribute: false }) details?: AnalyticsEventDetails;
@@ -171,16 +172,32 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     `;
   }
 
+  #renderNoProperties() {
+    const plausible = this.provider === "Plausible";
+    return html`
+      <div class="no-properties-state">
+        <umb-empty-state headline=${plausible ? "No properties configured" : "No property data"}>
+          <p>${plausible
+            ? "Add the Plausible custom property names used by this site to the connection before exploring their values."
+            : "No property values were recorded for this event in the selected period."}</p>
+          ${plausible ? html`
+            <uui-button href="/umbraco/section/settings/dashboard/web-analytics" look="secondary" label="Open Web Analytics settings">Open settings</uui-button>
+          ` : ""}
+        </umb-empty-state>
+      </div>
+    `;
+  }
+
   render() {
     const activeProperty = this.#activeProperty();
     return html`
       <dialog aria-label=${`${this.eventName} event details`} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
         <uui-dialog-layout headline=${`${this.eventName} event`}>
-          <div class=${`dialog-content${this.details && !activeProperty ? " no-properties" : ""}`} aria-busy=${this.loading}>
+          <div class="dialog-content" aria-busy=${this.loading}>
             ${this.details ? html`
               ${activeProperty ? html`
                 ${this.#renderProperty(activeProperty)}
-              ` : html`<p class="no-properties-state"><span>Custom properties:</span> <strong>(none)</strong></p>`}
+              ` : this.#renderNoProperties()}
               ${this.loading ? html`<div class="loading-overlay" role="status">Updating event details…</div>` : ""}
               ${this.unavailable ? html`<div class="error-overlay" role="alert">${this.unavailable}</div>` : ""}
             ` : this.loading ? html`<div class="loading" role="status">Loading event details…</div>` : this.unavailable ? html`<div class="state-message"><umb-empty-state headline="Event details unavailable"><p>${this.unavailable}</p></umb-empty-state></div>` : ""}
@@ -196,7 +213,6 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     dialog::backdrop { background: rgb(0 0 0 / 45%); }
     uui-dialog-layout { --uui-size-10: var(--uui-size-space-5); --uui-size-14: var(--uui-size-space-6); }
     .dialog-content { block-size: min(28rem, 52dvh); display: flex; flex-direction: column; min-block-size: 0; position: relative; }
-    .dialog-content.no-properties { block-size: auto; min-block-size: var(--uui-size-14); }
     .property-controls { display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding-block-end: var(--uui-size-space-4); }
     .property-tabs { display: flex; gap: var(--uui-size-space-1); margin: calc(-1 * var(--uui-size-space-3)) calc(-1 * var(--uui-size-space-5)); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
     .property-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
@@ -229,8 +245,8 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     .bar { inset-block: var(--uui-size-space-1); inset-inline-start: var(--bar-inset); inline-size: calc(100% + 16rem - 2 * var(--bar-inset)); position: absolute; }
     .bar::before { background: color-mix(in srgb, var(--uui-color-interactive) 4%, var(--uui-color-surface)); block-size: 100%; border-radius: var(--uui-border-radius); content: ""; display: block; inline-size: max(var(--bar-minimum), var(--bar-width)); }
     .loading, .state-message { box-sizing: border-box; flex: 1; padding: var(--uui-size-space-5); }
-    .no-properties-state { color: var(--uui-color-text-alt); margin: 0; padding-block: var(--uui-size-space-4); }
-    .no-properties-state strong { color: var(--uui-color-text); font-weight: 500; }
+    .no-properties-state { align-items: center; box-sizing: border-box; display: flex; flex: 1; justify-content: center; padding: var(--uui-size-space-5); text-align: center; }
+    .no-properties-state p { margin-inline: auto; max-inline-size: 34rem; }
     .loading-overlay { background: color-mix(in srgb, var(--uui-color-surface) 82%, transparent); inset: 0; padding: var(--uui-size-space-5); position: absolute; z-index: 4; }
     .error-overlay { background: color-mix(in srgb, var(--uui-color-warning) 8%, var(--uui-color-surface)); border: 1px solid color-mix(in srgb, var(--uui-color-warning) 28%, var(--uui-color-border)); border-radius: var(--uui-border-radius); inset-block-start: var(--uui-size-space-3); inset-inline: var(--uui-size-space-3); padding: var(--uui-size-space-4); position: absolute; z-index: 5; }
     .empty-row td { padding: var(--uui-size-space-5); text-align: left; }

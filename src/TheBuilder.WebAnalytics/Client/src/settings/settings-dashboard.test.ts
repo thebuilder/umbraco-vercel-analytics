@@ -79,9 +79,9 @@ describe("analytics settings network recovery", () => {
   });
 
   it.each([
-    ["an SDK error result", () => sdk.testConnection.mockResolvedValueOnce(apiError())],
-    ["a rejected request", () => sdk.testConnection.mockRejectedValueOnce(new Error("Network unavailable"))],
-  ])("shows a connection-local error and re-enables testing after %s", async (_description, arrangeResponse) => {
+    ["an SDK error result", () => sdk.testConnection.mockResolvedValueOnce(apiError()), "Umbraco logs"],
+    ["a rejected request", () => sdk.testConnection.mockRejectedValueOnce(new Error("Network unavailable")), "could not reach Umbraco"],
+  ])("shows a connection-local error and re-enables testing after %s", async (_description, arrangeResponse, message) => {
     arrangeResponse();
     sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection()] })));
 
@@ -92,7 +92,7 @@ describe("analytics settings network recovery", () => {
     const editor = dashboard.shadowRoot?.querySelector("web-analytics-connection-editor") as AnalyticsConnectionEditorElement;
     editor.dispatchEvent(new CustomEvent("test-connection", { bubbles: true, composed: true }));
 
-    await vi.waitFor(() => expect(editor.shadowRoot?.querySelector(".action-status")?.textContent).toContain("The connection test could not be completed."));
+    await vi.waitFor(() => expect(editor.shadowRoot?.querySelector(".action-status")?.textContent).toContain(message));
     expect(editor.testing).toBe(false);
     expect(editor.shadowRoot?.querySelector<HTMLElement>('[label="Test the saved connection."]')?.hasAttribute("disabled")).toBe(false);
   });
@@ -126,7 +126,7 @@ describe("analytics settings network recovery", () => {
     const form = dashboard.shadowRoot?.querySelector("form");
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
 
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("Settings were not saved."));
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("could not reach Umbraco"));
     expect(dashboard.shadowRoot?.querySelector(".save-status")?.textContent).toContain("Unsaved changes");
     expect(input!.value).toBe("31");
     expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.hasAttribute("disabled")).toBe(false);
@@ -152,9 +152,47 @@ describe("analytics settings network recovery", () => {
     await dashboard.updateComplete;
     dashboard.shadowRoot?.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
 
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("Settings were not saved."));
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("could not be completed"));
     expect(dashboard.shadowRoot?.querySelector(".save-status")?.textContent).toContain("Unsaved changes");
     expect(input!.value).toBe("31");
+  });
+
+  it.each([
+    [401, "session has expired"],
+    [404, "server and package files use the same version"],
+    [503, "Umbraco logs"],
+  ])("preserves edits and explains save HTTP %s failures", async (status, message) => {
+    sdk.saveSettings.mockResolvedValueOnce(apiError(status));
+
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("#default-range")).not.toBeNull());
+    const input = dashboard.shadowRoot?.querySelector<HTMLInputElement>("#default-range");
+    input!.value = "31";
+    input!.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    dashboard.shadowRoot?.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
+
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".status")?.textContent).toContain(message));
+    expect(dashboard.shadowRoot?.querySelector(".save-status")?.textContent).toContain("Unsaved changes");
+    expect(input!.value).toBe("31");
+  });
+
+  it.each([
+    [401, "session has expired"],
+    [404, "connection test API was not found"],
+    [503, "Umbraco logs"],
+  ])("explains connection-test HTTP %s failures", async (status, message) => {
+    sdk.testConnection.mockResolvedValueOnce(apiError(status));
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection()] })));
+
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("web-analytics-connection-editor")).not.toBeNull());
+    const editor = dashboard.shadowRoot?.querySelector("web-analytics-connection-editor") as AnalyticsConnectionEditorElement;
+    editor.dispatchEvent(new CustomEvent("test-connection", { bubbles: true, composed: true }));
+
+    await vi.waitFor(() => expect(editor.shadowRoot?.querySelector(".action-status")?.textContent).toContain(message));
+    expect(editor.testing).toBe(false);
   });
 });
 
@@ -295,6 +333,7 @@ describe("analytics settings onboarding", () => {
 
   it("marks new connections as using the configured shared token", async () => {
     sdk.settings.mockResolvedValue(apiOk({
+      packageVersion: "0.3.0",
       enabled: true,
       providers: PROVIDERS,
       providerTokens: [{ provider: "Vercel", hasAccessToken: true }, { provider: "Plausible", hasAccessToken: false }],
@@ -352,6 +391,7 @@ describe("analytics settings onboarding", () => {
 
   it("adds development mock scenarios as deterministic connections", async () => {
     sdk.settings.mockResolvedValue(apiOk({
+      packageVersion: "0.3.0",
       enabled: true,
       providers: PROVIDERS,
       providerTokens: [{ provider: "Vercel", hasAccessToken: false }, { provider: "Plausible", hasAccessToken: false }],

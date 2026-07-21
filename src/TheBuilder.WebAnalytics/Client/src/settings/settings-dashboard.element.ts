@@ -21,7 +21,7 @@ import { createSettingsUpdate, validateConnection, validateEditableSettings } fr
 import { announceAnalyticsAvailability } from "../section/analytics-availability.js";
 import { MOCK_SCENARIOS, type MockScenarioDefinition } from "./mock-scenarios.js";
 import { identifierField, providerDescriptor, providerLogo } from "./provider-identity.js";
-import { settingsLoadError, type SettingsLoadError } from "./settings-error.js";
+import { settingsActionError, settingsLoadError, type SettingsLoadError } from "./settings-error.js";
 
 type NewConnection =
   | { kind: "provider"; descriptor: AnalyticsProviderDescriptor; hasAccessToken: boolean }
@@ -158,17 +158,17 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     this._testingKey = key;
     this._connectionStatuses = { ...this._connectionStatuses, [key]: { type: "info", message: "Testing the saved connection…" } };
     try {
-      const { data, error } = await WebAnalyticsService.testConnection({ path: { key } });
+      const { data, error, response } = await WebAnalyticsService.testConnection({ path: { key } });
       this._connectionStatuses = {
         ...this._connectionStatuses,
         [key]: error || !data
-          ? { type: "error", message: "The connection test could not be completed." }
+          ? { type: "error", message: settingsActionError("test", error, response?.status) }
           : { type: data.success ? "success" : "error", message: data.message },
       };
-    } catch {
+    } catch (error) {
       this._connectionStatuses = {
         ...this._connectionStatuses,
-        [key]: { type: "error", message: "The connection test could not be completed." },
+        [key]: { type: "error", message: settingsActionError("test", error) },
       };
     } finally {
       this._testingKey = undefined;
@@ -195,9 +195,9 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     this._status = undefined;
     const body: UpdateAnalyticsSettingsRequest = createSettingsUpdate(this._settings);
     try {
-      const { data, error } = await WebAnalyticsService.saveSettings({ body });
+      const { data, error, response } = await WebAnalyticsService.saveSettings({ body });
       if (error || !data) {
-        this._status = { type: "error", message: "Settings were not saved. Check the connection fields and mapping values." };
+        this._status = { type: "error", message: settingsActionError("save", error, response?.status) };
         return false;
       }
       this._settings = data;
@@ -206,8 +206,8 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       announceAnalyticsAvailability(data.enabled);
       if (successMessage) this._status = { type: "success", message: successMessage };
       return true;
-    } catch {
-      this._status = { type: "error", message: "Settings were not saved. Check the connection fields and mapping values." };
+    } catch (error) {
+      this._status = { type: "error", message: settingsActionError("save", error) };
       return false;
     } finally {
       this._saving = false;

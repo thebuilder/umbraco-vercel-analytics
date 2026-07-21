@@ -4,13 +4,13 @@
 [![NuGet downloads](https://img.shields.io/nuget/dt/TheBuilder.WebAnalytics)](https://www.nuget.org/packages/TheBuilder.WebAnalytics)
 [![License](https://img.shields.io/github/license/thebuilder/web-analytics)](https://github.com/thebuilder/web-analytics/blob/main/LICENSE)
 
-Web Analytics brings analytics from [Vercel Web Analytics](https://vercel.com/docs/analytics) and [Plausible](https://plausible.io/docs/stats-api) into Umbraco, giving editors site-wide and page-level insights without leaving the backoffice.
+Web Analytics brings supported analytics providers into Umbraco, giving editors site-wide and page-level insights without leaving the backoffice.
 
 ![Web Analytics overview in the Umbraco backoffice](https://raw.githubusercontent.com/thebuilder/web-analytics/refs/heads/main/docs/screenshots/analytics-overview.png)
 
 ## What you get
 
-- A dedicated **Analytics** section for visitors, page views, traffic trends, audience, referrers, pages, routes, campaigns, custom events, and feature flags.
+- A dedicated **Analytics** section for visitors, page views, traffic trends, audience, referrers, pages, routes, campaigns, and provider-supported activity.
 - Page-level analytics on configured, published documents, automatically filtered to the document's route.
 - Date comparisons and drill-down views that turn site-wide trends into useful content context.
 - Multiple provider connections for multi-site Umbraco installations.
@@ -21,9 +21,19 @@ The package reads analytics already collected by the configured provider. It doe
 ## Requirements
 
 - Umbraco CMS 17.1–18.x.
-- Either a Vercel project with [Web Analytics enabled](https://vercel.com/docs/analytics/quickstart), or a Plausible Cloud site with Stats API access.
-- A provider API token: a scoped [Vercel access token](https://vercel.com/kb/guide/how-do-i-use-a-vercel-api-access-token) or [Plausible Stats API key](https://plausible.io/docs/stats-api#authentication).
-- The Vercel project ID (`prj_...`) or Plausible site ID (normally its registered domain).
+- An account with a supported analytics provider and API access for the site or project.
+- A provider API credential and the provider-specific connection identifier.
+
+## Supported providers
+
+The connection and reporting workflow is provider-neutral. Availability of individual panels and drill-downs depends on the selected provider's capabilities.
+
+| Provider | Connection identifier | Credential | Provider-specific capabilities |
+| --- | --- | --- | --- |
+| [Vercel Web Analytics](https://vercel.com/docs/analytics) | Project ID (`prj_...`) and optional team | [Scoped access token](https://vercel.com/kb/guide/how-do-i-use-a-vercel-api-access-token) | Custom-event property exploration and feature flags |
+| [Plausible Cloud](https://plausible.io/docs/stats-api) | Site ID, normally the registered domain | [Stats API key](https://plausible.io/docs/stats-api#authentication) | Goal and custom-event totals and drill-downs |
+
+Self-hosted Plausible is not currently supported.
 
 ## Install
 
@@ -44,11 +54,17 @@ Configuration uses two sources:
 - Project details, mappings, and display settings are stored in Umbraco.
 - Provider access tokens stay in the application's secret configuration.
 
-### 1. Create a provider access token
+### 1. Create a provider credential
 
-For Vercel, create a token in the account settings and scope it to the account or team that owns the project. For Plausible, create a Stats API key from the account API Keys settings. Copy either credential when it is created.
+Create a credential for the provider and grant it read access to the site or project being connected.
 
-For a team-owned project, also copy either the team ID (`team_...`) or team slug. Personal projects do not need either value. The backoffice presents these as one **Team ID or slug** field. See the [Vercel REST API authentication documentation](https://vercel.com/docs/rest-api).
+#### Vercel
+
+Create a token in the account settings and scope it to the account or team that owns the project. For a team-owned project, also copy either the team ID (`team_...`) or team slug. Personal projects do not need either value. The backoffice presents these as one **Team ID or slug** field. See the [Vercel REST API authentication documentation](https://vercel.com/docs/rest-api).
+
+#### Plausible
+
+Create a Stats API key from the Plausible account API Keys settings. The site ID must exactly match the domain registered in Plausible.
 
 ### 2. Add the token to the Umbraco deployment
 
@@ -87,8 +103,8 @@ Each provider token is used by connections of that provider. If a connection nee
 Sign in as an administrator and open **Settings → Web Analytics**.
 
 1. Select **Add connection**.
-2. Choose Vercel or Plausible when adding the connection. The provider is fixed after creation.
-3. Enter the Vercel project ID and optional team, or the Plausible site ID.
+2. Choose a provider when adding the connection. The provider is fixed after creation.
+3. Enter the identifier requested for that provider.
 4. Configure page analytics mappings if document-level reports are required.
 5. Select the document types that should display the Analytics workspace view, or enable all document types.
 6. Enable the package. The first connection is used as the initial default.
@@ -189,7 +205,7 @@ The default cache duration is five minutes. Each Umbraco instance maintains its 
 
 After deployment:
 
-1. Open **Settings → Web Analytics** and confirm the shared access token says **Configured on the server**.
+1. Open **Settings → Web Analytics** and confirm the provider says **Shared credential detected**.
 2. Select **Save settings**, then **Test connection**.
 3. Open the global **Analytics** section and confirm totals and history load.
 4. If document analytics is enabled, open a mapped published document and select its **Analytics** workspace view.

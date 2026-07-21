@@ -4,10 +4,11 @@ Web Analytics brings analytics from [**Vercel Web Analytics**](https://vercel.co
 
 ## Key features
 
-- **Site-wide analytics:** Follow visitors, page views, traffic trends, audience, referrers, campaigns, and custom events, with feature flags shown when the provider supports them.
+- **Site-wide analytics:** Follow visitors, page views, traffic trends, audience, referrers, campaigns, and provider-supported activity.
 - **Page-level insight:** Open analytics on a published document to see data automatically filtered to that page's route.
 - **Useful comparisons:** Compare date ranges and drill into the audience, content, and activity behind the headline numbers.
 - **Multi-provider and multi-site support:** Connect Umbraco sites to Vercel or Plausible and bring them together in one Analytics section.
+- **Capability-aware interface:** Panels and drill-downs adapt to the data available from each provider.
 
 Web Analytics fits into the Umbraco permissions and editorial workflows teams already know, making analytics available where content decisions happen.
 

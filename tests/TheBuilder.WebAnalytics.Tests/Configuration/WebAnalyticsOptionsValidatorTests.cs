@@ -86,7 +86,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Connections[0].DocumentRootKeys = ["not-a-guid"];
         options.Connections[0].EnabledDocumentTypeKeys = ["also-not-a-guid"];
-        var registry = new AnalyticsConnectionRegistry(Options.Create(options));
+        var registry = CreateRegistry(options);
 
         var connection = registry.Get(MainKey);
 
@@ -101,7 +101,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Providers.Vercel.AccessToken = "shared-token";
 
-        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
+        var connection = CreateRegistry(options).Get(MainKey);
 
         Assert.NotNull(connection);
         Assert.Equal("shared-token", connection.AccessToken);
@@ -115,7 +115,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
         options.Providers.Vercel.AccessToken = "shared-token";
         options.ConnectionAccessTokens[MainKey.ToString()] = "connection-token";
 
-        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
+        var connection = CreateRegistry(options).Get(MainKey);
 
         Assert.NotNull(connection);
         Assert.Equal("connection-token", connection.AccessToken);
@@ -137,7 +137,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
             }
         ];
 
-        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(key);
+        var connection = CreateRegistry(options).Get(key);
 
         Assert.NotNull(connection);
         Assert.Equal(AnalyticsProvider.Plausible, connection.Provider);
@@ -152,7 +152,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
     [Fact]
     public void Connection_string_representation_redacts_access_token()
     {
-        var connection = new AnalyticsConnectionRegistry(Options.Create(CreateOptions())).Get(MainKey);
+        var connection = CreateRegistry(CreateOptions()).Get(MainKey);
 
         var representation = connection!.ToString();
 
@@ -167,7 +167,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Providers.Vercel.AccessToken = string.Empty;
 
-        var connection = new AnalyticsConnectionRegistry(Options.Create(options)).Get(MainKey);
+        var connection = CreateRegistry(options).Get(MainKey);
 
         Assert.NotNull(connection);
         Assert.False(connection.HasAccessToken);
@@ -211,7 +211,7 @@ public sealed class WebAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         options.Connections.Add(CreateConnection(OtherKey,
             rootKeys: ["22222222-2222-2222-2222-222222222222"]));
-        var registry = new AnalyticsConnectionRegistry(Options.Create(options));
+        var registry = CreateRegistry(options);
 
         var root = registry.FindNearestRoot([
             Guid.Parse("22222222-2222-2222-2222-222222222222"),
@@ -226,13 +226,13 @@ public sealed class WebAnalyticsOptionsValidatorTests
         var options = CreateOptions();
         var explicitKey = Guid.Parse("33333333-3333-3333-3333-333333333333");
         options.Connections[0].EnabledDocumentTypeKeys = [explicitKey.ToString()];
-        var registry = new AnalyticsConnectionRegistry(Options.Create(options));
+        var registry = CreateRegistry(options);
 
         Assert.True(registry.Get(MainKey)!.IsDocumentTypeEnabled("anything", explicitKey));
         Assert.False(registry.Get(MainKey)!.IsDocumentTypeEnabled("anything", Guid.NewGuid()));
 
         options.Connections[0].EnableAllDocumentTypes = true;
-        registry = new AnalyticsConnectionRegistry(Options.Create(options));
+        registry = CreateRegistry(options);
         Assert.True(registry.Get(MainKey)!.IsDocumentTypeEnabled("newPage", Guid.NewGuid()));
     }
 
@@ -242,6 +242,12 @@ public sealed class WebAnalyticsOptionsValidatorTests
         Providers = { Vercel = { AccessToken = "test-token" } },
         Connections = [CreateConnection(MainKey)]
     };
+
+    private static AnalyticsConnectionRegistry CreateRegistry(WebAnalyticsOptions options)
+    {
+        var accessor = Options.Create(options);
+        return new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(accessor), accessor);
+    }
 
     private static AnalyticsConnectionOptions CreateConnection(
         Guid key,

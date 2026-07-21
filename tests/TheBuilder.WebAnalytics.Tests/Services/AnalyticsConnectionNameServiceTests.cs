@@ -77,9 +77,11 @@ public sealed class AnalyticsConnectionNameServiceTests
     private static AnalyticsConnection CreateConnection() => new(
         Guid.Parse("11111111-1111-1111-1111-111111111110"),
         "Old display name",
+        AnalyticsProvider.Vercel,
         "secret",
         "project",
         "team_123",
+        string.Empty,
         [],
         true,
         new HashSet<Guid>(),

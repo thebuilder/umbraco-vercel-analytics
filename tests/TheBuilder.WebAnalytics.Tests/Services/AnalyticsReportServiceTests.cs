@@ -392,23 +392,27 @@ public sealed class AnalyticsReportServiceTests
         AnalyticsReportCache cache) =>
         new(registry, new TestAnalyticsProviderClientResolver(client), cache);
 
-    private static AnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null) => new(Options.Create(new WebAnalyticsOptions
+    private static AnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null)
     {
-        Enabled = true,
-        Providers = { Vercel = { AccessToken = "secret" } },
-        CacheDuration = cacheDuration ?? TimeSpan.FromMinutes(5),
-        Connections =
-        [
-            new()
-            {
-                Key = MainKey,
-                DisplayName = "Main",
-                ProjectId = "project",
-                DocumentRootKeys = [Guid.NewGuid().ToString()],
-                EnabledDocumentTypes = ["articlePage"]
-            }
-        ]
-    }));
+        var options = Options.Create(new WebAnalyticsOptions
+        {
+            Enabled = true,
+            Providers = { Vercel = { AccessToken = "secret" } },
+            CacheDuration = cacheDuration ?? TimeSpan.FromMinutes(5),
+            Connections =
+            [
+                new()
+                {
+                    Key = MainKey,
+                    DisplayName = "Main",
+                    ProjectId = "project",
+                    DocumentRootKeys = [Guid.NewGuid().ToString()],
+                    EnabledDocumentTypes = ["articlePage"]
+                }
+            ]
+        });
+        return new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(options), options);
+    }
 
     private sealed class CountingClient :
         IAnalyticsProviderClient,

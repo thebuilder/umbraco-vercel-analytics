@@ -18,11 +18,6 @@ public sealed class AnalyticsConnectionRegistry
     {
     }
 
-    public AnalyticsConnectionRegistry(IOptions<WebAnalyticsOptions> serverOptions)
-        : this(new WebAnalyticsSettingsStore(serverOptions), serverOptions, false)
-    {
-    }
-
     internal AnalyticsConnectionRegistry(
         WebAnalyticsSettingsStore settingsStore,
         IOptions<WebAnalyticsOptions> serverOptions,
@@ -122,33 +117,6 @@ public sealed record AnalyticsConnection(
     IReadOnlySet<string> EnabledDocumentTypes,
     MockAnalyticsScenario? MockScenario = null)
 {
-    public AnalyticsConnection(
-        Guid key,
-        string displayName,
-        string accessToken,
-        string projectId,
-        string? team,
-        IReadOnlyList<Guid> documentRootKeys,
-        bool enableAllDocumentTypes,
-        IReadOnlySet<Guid> enabledDocumentTypeKeys,
-        IReadOnlySet<string> enabledDocumentTypes,
-        MockAnalyticsScenario? mockScenario = null)
-        : this(
-            key,
-            displayName,
-            AnalyticsProvider.Vercel,
-            accessToken,
-            projectId,
-            team,
-            string.Empty,
-            documentRootKeys,
-            enableAllDocumentTypes,
-            enabledDocumentTypeKeys,
-            enabledDocumentTypes,
-            mockScenario)
-    {
-    }
-
     public bool HasAccessToken => !string.IsNullOrWhiteSpace(AccessToken);
 
     public bool IsMock => MockScenario is not null;

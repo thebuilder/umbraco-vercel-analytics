@@ -173,13 +173,16 @@ public sealed class AnalyticsDocumentRouteServiceTests
             EnabledDocumentTypes = documentTypes?.ToArray() ?? ["articlePage"]
         };
 
-    private static AnalyticsConnectionRegistry CreateRegistry(
-        params AnalyticsConnectionOptions[] connections) => new(Options.Create(new WebAnalyticsOptions
+    private static AnalyticsConnectionRegistry CreateRegistry(params AnalyticsConnectionOptions[] connections)
+    {
+        var options = Options.Create(new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Vercel = { AccessToken = "secret" } },
             Connections = connections.ToList()
-        }));
+        });
+        return new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(options), options);
+    }
 
     private static Guid KeyFor(string alias) => alias == "root" ? RootConnectionKey : SiteConnectionKey;
 }

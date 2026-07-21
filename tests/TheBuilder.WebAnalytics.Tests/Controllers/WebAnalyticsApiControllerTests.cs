@@ -170,6 +170,8 @@ public sealed class WebAnalyticsApiControllerTests
             .ReturnsAsync([
                 new AnalyticsDocumentRoute(
                     MainKey,
+                    AnalyticsProvider.Vercel,
+                    AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel).Capabilities,
                     "en-US",
                     "example.com",
                     "/published",
@@ -414,7 +416,7 @@ public sealed class WebAnalyticsApiControllerTests
         new(year, month, day, 0, 0, 0, TimeSpan.Zero);
 
     private static AnalyticsConnectionRegistry EnabledRegistry(params string[] aliases) =>
-        new(Options.Create(new WebAnalyticsOptions
+        CreateRegistry(new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Vercel = { AccessToken = "secret" } },
@@ -427,10 +429,10 @@ public sealed class WebAnalyticsApiControllerTests
                     DocumentRootKeys = [Guid.NewGuid().ToString()],
                     EnableAllDocumentTypes = true
                 }).ToList()
-        }));
+        });
 
     private static AnalyticsConnectionRegistry PlausibleRegistry() =>
-        new(Options.Create(new WebAnalyticsOptions
+        CreateRegistry(new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Plausible = { AccessToken = "secret" } },
@@ -445,7 +447,13 @@ public sealed class WebAnalyticsApiControllerTests
                     EnableAllDocumentTypes = true
                 }
             ]
-        }));
+        });
+
+    private static AnalyticsConnectionRegistry CreateRegistry(WebAnalyticsOptions options)
+    {
+        var accessor = Options.Create(options);
+        return new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(accessor), accessor);
+    }
 
     private static void AssertInvalidQuery(ActionResult? result)
     {

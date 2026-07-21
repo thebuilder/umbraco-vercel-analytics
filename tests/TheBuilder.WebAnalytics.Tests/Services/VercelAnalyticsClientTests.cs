@@ -655,7 +655,7 @@ public sealed class VercelAnalyticsClientTests
         new(new HttpClient(handler) { BaseAddress = new Uri("https://api.vercel.com/") }, gate);
 
     private static AnalyticsConnection CreateConnection(string? team = null) => new(
-        Guid.Parse("11111111-1111-1111-1111-111111111110"), "Main", "secret", "project", team,
+        Guid.Parse("11111111-1111-1111-1111-111111111110"), "Main", AnalyticsProvider.Vercel, "secret", "project", team, string.Empty,
         [Guid.Parse("11111111-1111-1111-1111-111111111111")],
         false,
         new HashSet<Guid>(),

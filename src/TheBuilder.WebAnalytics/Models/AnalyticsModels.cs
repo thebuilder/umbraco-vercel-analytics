@@ -164,29 +164,7 @@ public sealed record AnalyticsDocumentRoute(
     string Path,
     string Url,
     bool IsCurrent,
-    IReadOnlyList<string> Warnings)
-{
-    public AnalyticsDocumentRoute(
-        Guid connection,
-        string culture,
-        string hostname,
-        string path,
-        string url,
-        bool isCurrent,
-        IReadOnlyList<string> warnings)
-        : this(
-            connection,
-            AnalyticsProvider.Vercel,
-            AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel).Capabilities,
-            culture,
-            hostname,
-            path,
-            url,
-            isCurrent,
-            warnings)
-    {
-    }
-}
+    IReadOnlyList<string> Warnings);
 
 public sealed record AnalyticsSettingsResponse(
     bool Enabled,

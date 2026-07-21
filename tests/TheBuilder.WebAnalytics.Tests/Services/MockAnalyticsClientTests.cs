@@ -213,6 +213,91 @@ public sealed class MockAnalyticsClientTests
         Assert.Contains("Events", exception.Message);
     }
 
+    [Fact]
+    public void Resolver_dispatches_an_asymmetric_client_using_the_closest_existing_provider_identity()
+    {
+        // AnalyticsProvider is currently a closed enum, so this extension-seam double uses Vercel.
+        var asymmetric = new AsymmetricAnalyticsClient(AnalyticsProvider.Vercel);
+        var resolver = CreateResolver(asymmetric);
+
+        var client = resolver.Get(new AnalyticsConnection(
+            MockKey,
+            "Asymmetric",
+            AnalyticsProvider.Vercel,
+            "",
+            "project",
+            null,
+            "",
+            [],
+            [],
+            false,
+            new HashSet<Guid>(),
+            new HashSet<string>()));
+
+        Assert.Same(asymmetric, client);
+        Assert.True(client.Definition.Capabilities.Events);
+        Assert.True(client.Definition.Capabilities.EventDetails);
+        Assert.False(client.Definition.Capabilities.EventProperties);
+        Assert.False(client.Definition.Capabilities.Flags);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidCapabilityClients))]
+    public void Resolver_rejects_invalid_capability_contracts(
+        IAnalyticsProviderClient invalidClient,
+        string expectedMessage)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => CreateResolver(invalidClient));
+
+        Assert.Contains(expectedMessage, exception.Message);
+    }
+
+    public static TheoryData<IAnalyticsProviderClient, string> InvalidCapabilityClients => new()
+    {
+        {
+            new AsymmetricAnalyticsClient(
+                AnalyticsProvider.Vercel,
+                eventDetails: false,
+                eventProperties: true),
+            "EventDetails capability does not match"
+        },
+        {
+            new AsymmetricAnalyticsClient(
+                AnalyticsProvider.Vercel,
+                events: false,
+                eventDetails: true),
+            "Events capability does not match"
+        },
+        {
+            new CoreOnlyAnalyticsClient(CreateDefinition(
+                AnalyticsProvider.Vercel,
+                events: false,
+                eventDetails: false,
+                eventProperties: true)),
+            "EventProperties capability does not match"
+        },
+        {
+            new FlagsWithoutAdvertisementAnalyticsClient(AnalyticsProvider.Vercel),
+            "Flags capability does not match"
+        }
+    };
+
+    private static AnalyticsProviderClientResolver CreateResolver(IAnalyticsProviderClient vercelClient) => new(
+        [vercelClient, new PlausibleAnalyticsClient(new HttpClient(new RejectingHttpMessageHandler()), new AnalyticsProviderRequestGate())],
+        new MockAnalyticsClient());
+
+    private static AnalyticsProviderDefinition CreateDefinition(
+        AnalyticsProvider provider,
+        bool events = true,
+        bool eventDetails = true,
+        bool eventProperties = false,
+        bool flags = false) => new(
+        provider,
+        new AnalyticsCapabilities([], events, eventDetails, eventProperties, false, flags, false),
+        AnalyticsConnectionIdentifier.ProjectId,
+        supportsTeam: true,
+        _ => string.Empty);
+
     private static AnalyticsQuery CreateQuery() => new(
         MockKey,
         new DateOnly(2026, 7, 1),
@@ -276,5 +361,91 @@ public sealed class MockAnalyticsClientTests
             string? search,
             CancellationToken cancellationToken,
             AnalyticsTrafficMetric? orderBy = null) => throw new NotSupportedException();
+    }
+
+    private sealed class AsymmetricAnalyticsClient :
+        IAnalyticsProviderClient,
+        IAnalyticsEventsProviderClient,
+        IAnalyticsEventDetailsProviderClient
+    {
+        public AsymmetricAnalyticsClient(
+            AnalyticsProvider provider,
+            bool events = true,
+            bool eventDetails = true,
+            bool eventProperties = false,
+            bool flags = false)
+        {
+            Definition = CreateDefinition(provider, events, eventDetails, eventProperties, flags);
+        }
+
+        public AnalyticsProviderDefinition Definition { get; }
+
+        public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<AnalyticsTotals> GetTotalsAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
+            AnalyticsConnection connection,
+            AnalyticsQuery query,
+            AnalyticsDimension dimension,
+            int limit,
+            string? search,
+            CancellationToken cancellationToken,
+            AnalyticsTrafficMetric? orderBy = null) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
+            AnalyticsConnection connection,
+            AnalyticsQuery query,
+            int limit,
+            string? search,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<AnalyticsEventTotals> CountEventsAsync(
+            AnalyticsConnection connection,
+            AnalyticsQuery query,
+            string eventName,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class FlagsWithoutAdvertisementAnalyticsClient(AnalyticsProvider provider) :
+        IAnalyticsProviderClient,
+        IAnalyticsFlagsProviderClient
+    {
+        public AnalyticsProviderDefinition Definition { get; } = CreateDefinition(
+            provider,
+            events: false,
+            eventDetails: false,
+            eventProperties: false,
+            flags: false);
+
+        public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<AnalyticsTotals> GetTotalsAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
+            AnalyticsConnection connection,
+            AnalyticsQuery query,
+            AnalyticsDimension dimension,
+            int limit,
+            string? search,
+            CancellationToken cancellationToken,
+            AnalyticsTrafficMetric? orderBy = null) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(
+            AnalyticsConnection connection,
+            AnalyticsQuery query,
+            string? flagKey,
+            int limit,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

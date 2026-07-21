@@ -300,6 +300,50 @@ public sealed class WebAnalyticsSettingsValidatorTests
         Assert.Equal("Changed on another node", observed.Settings.Connections[0].DisplayName);
     }
 
+    [Fact]
+    public void Store_loads_and_roundtrips_legacy_vercel_settings_without_provider_or_credentials()
+    {
+        var values = new FakeKeyValueService();
+        values.SetValue(StorageKey, LoadFixture("legacy-vercel-settings-v2.json"));
+        var store = new WebAnalyticsSettingsStore(values, Options.Create(new WebAnalyticsOptions()));
+
+        var loaded = store.Get();
+        var connection = Assert.Single(loaded.Connections);
+
+        Assert.True(loaded.Enabled);
+        Assert.Equal(45, loaded.DefaultRangeDays);
+        Assert.Equal(TimeSpan.FromMinutes(2), loaded.CacheDuration);
+        Assert.Equal(MainKey, connection.Key);
+        Assert.Equal(AnalyticsProvider.Vercel, connection.Provider);
+        Assert.Equal("Legacy Vercel", connection.DisplayName);
+        Assert.Equal("prj_legacy", connection.ProjectId);
+        Assert.Equal("team_legacy", connection.Team);
+        Assert.Equal(["11111111-1111-1111-1111-111111111111"], connection.DocumentRootKeys);
+        Assert.True(connection.EnableAllDocumentTypes);
+        Assert.Equal(["22222222-2222-2222-2222-222222222222"], connection.EnabledDocumentTypeKeys);
+        Assert.Equal(["articlePage"], connection.EnabledDocumentTypes);
+
+        store.Save(loaded);
+        var serialized = values.GetValue(StorageKey);
+        Assert.NotNull(serialized);
+        Assert.DoesNotContain("token", serialized, StringComparison.OrdinalIgnoreCase);
+
+        var reloaded = new WebAnalyticsSettingsStore(values, Options.Create(new WebAnalyticsOptions())).Get();
+        var reloadedConnection = Assert.Single(reloaded.Connections);
+        Assert.Equal(MainKey, reloadedConnection.Key);
+        Assert.Equal(AnalyticsProvider.Vercel, reloadedConnection.Provider);
+        Assert.Equal(connection.ProjectId, reloadedConnection.ProjectId);
+        Assert.Equal(connection.Team, reloadedConnection.Team);
+        Assert.Equal(connection.DocumentRootKeys, reloadedConnection.DocumentRootKeys);
+        Assert.Equal(connection.EnabledDocumentTypeKeys, reloadedConnection.EnabledDocumentTypeKeys);
+        Assert.Equal(connection.EnabledDocumentTypes, reloadedConnection.EnabledDocumentTypes);
+    }
+
+    private const string StorageKey = "TheBuilder.WebAnalytics.Settings.v2";
+
+    private static string LoadFixture(string fileName) => File.ReadAllText(
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName));
+
     private static WebAnalyticsSettings CreateSettings() => new()
     {
         Enabled = true,

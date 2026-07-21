@@ -335,7 +335,7 @@ describe("analytics presentation components", () => {
     expect(element.shadowRoot?.querySelector(".filter-action")?.getAttribute("aria-label")).toBe("Filter analytics by Read case event");
   });
 
-  it("shows Plausible event totals when property exploration is unavailable", async () => {
+  it("shows a compact state when event properties are unavailable", async () => {
     Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
       configurable: true,
       value: vi.fn(),
@@ -350,9 +350,26 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector(".event-totals")?.textContent).toContain("Total events9");
-    expect(element.shadowRoot?.querySelector(".event-totals")?.textContent).toContain("Visitors7");
-    expect(element.shadowRoot?.querySelector("umb-empty-state")?.getAttribute("headline")).toBe("No property breakdowns");
+    expect(element.shadowRoot?.querySelector("uui-dialog-layout")?.getAttribute("headline")).toBe("Read article event");
+    expect(element.shadowRoot?.querySelector(".event-totals")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".no-properties-state")?.textContent).toContain("Custom properties: (none)");
+  });
+
+  it("places event property search above the results table", async () => {
+    const element = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
+    element.eventName = "Read article";
+    element.details = {
+      eventName: "Read article",
+      totals: { count: 9, visitors: 7 },
+      properties: [{ name: "title", values: [{ value: "Analytics", count: 9, visitors: 7 }] }],
+    };
+    document.body.append(element);
+    await element.updateComplete;
+
+    const search = element.shadowRoot?.querySelector('uui-input[type="search"]');
+    expect(search?.parentElement?.classList.contains("property-controls")).toBe(true);
+    expect(element.shadowRoot?.querySelector("table uui-input")).toBeNull();
+    expect(search?.getAttribute("placeholder")).toBe("Search title");
   });
 
   it("drills from flag keys into their values and provides setup guidance when empty", async () => {

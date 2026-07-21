@@ -22,6 +22,10 @@
       "Caption": "Explore visitors, page views, traffic history, popular pages, and referrers from the Analytics section."
     },
     {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/web-analytics/refs/heads/main/docs/screenshots/settings.png",
+      "Caption": "Set up Vercel and Plausible connections, confirm shared credentials, and configure reporting from the Settings section."
+    },
+    {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/web-analytics/refs/heads/main/docs/screenshots/audience-events-and-flags.png",
       "Caption": "Understand audience devices and locations alongside provider-supported events and features."
     },

@@ -172,6 +172,7 @@ export type AnalyticsProviderTokenStatus = {
 };
 
 export type AnalyticsSettingsResponse = {
+    packageVersion: string;
     enabled: boolean;
     providers: Array<AnalyticsProviderDescriptor>;
     providerTokens: Array<AnalyticsProviderTokenStatus>;

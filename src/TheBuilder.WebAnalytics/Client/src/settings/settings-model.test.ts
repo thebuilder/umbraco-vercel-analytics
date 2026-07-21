@@ -10,6 +10,7 @@ import {
 import { providerDescriptor } from "./provider-identity.js";
 
 const settings = (): AnalyticsSettingsResponse => ({
+  packageVersion: "0.3.0",
   enabled: true,
   providers: [
     {

@@ -20,6 +20,9 @@ import type { AnalyticsConnectionEditorElement } from "./connection-editor.eleme
 import "./settings-dashboard.element.js";
 
 beforeEach(() => {
+  sdk.settings.mockReset();
+  sdk.saveSettings.mockReset();
+  sdk.testConnection.mockReset();
   Element.prototype.scrollIntoView = vi.fn();
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -41,13 +44,38 @@ describe("analytics settings network recovery", () => {
     const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
 
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("umb-empty-state")).not.toBeNull());
-    expect(dashboard.shadowRoot?.textContent).toContain("Analytics settings could not be loaded.");
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".load-error")).not.toBeNull());
+    expect(dashboard.shadowRoot?.querySelector("uui-box")?.getAttribute("headline")).toBe("Could not reach the settings service");
+    expect(dashboard.shadowRoot?.textContent).toContain("Check your connection and that Umbraco is running");
 
     dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Retry loading settings"]')?.click();
 
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connections-section")).not.toBeNull());
     expect(sdk.settings).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [401, "Sign in again", "session has expired"],
+    [403, "Administrator access required", "Only administrators"],
+    [404, "Package files are out of sync", "Restart Umbraco"],
+    [503, "Settings service unavailable", "Umbraco logs"],
+  ])("shows a specific recovery for HTTP %s", async (status, headline, message) => {
+    sdk.settings.mockResolvedValueOnce(apiError(status));
+
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".load-error")).not.toBeNull());
+    expect(dashboard.shadowRoot?.querySelector("uui-box")?.getAttribute("headline")).toBe(headline);
+    expect(dashboard.shadowRoot?.textContent).toContain(message);
+  });
+
+  it("shows the installed package version below the settings", async () => {
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".package-version")).not.toBeNull());
+    expect(dashboard.shadowRoot?.querySelector(".package-version")?.textContent).toContain("Current installed version of Web Analytics: 0.3.0");
   });
 
   it.each([
@@ -132,6 +160,7 @@ describe("analytics settings network recovery", () => {
 
 function settings(overrides: Partial<AnalyticsSettingsResponse> = {}): AnalyticsSettingsResponse {
   return {
+    packageVersion: "0.3.0",
     enabled: true,
     providerTokens: [{ provider: "Vercel", hasAccessToken: false }, { provider: "Plausible", hasAccessToken: false }],
     canCreateMockConnections: false,
@@ -359,6 +388,6 @@ function apiOk<T>(data: T) {
   return { data, error: undefined, request: new Request("https://example.com"), response: new Response(null, { status: 200 }) };
 }
 
-function apiError() {
-  return { data: undefined, error: { message: "Request failed" }, request: new Request("https://example.com"), response: new Response(null, { status: 500 }) };
+function apiError(status = 500) {
+  return { data: undefined, error: { message: "Request failed" }, request: new Request("https://example.com"), response: new Response(null, { status }) };
 }

@@ -1,15 +1,11 @@
+import { apiFailure } from "../api/api-failure.js";
+
 export function reportApiErrorMessage(error: unknown, status: number): string {
-  return reportErrorMessage(typeof error === "object" && error !== null
-    ? { ...error, status }
-    : { status });
+  return reportErrorMessage(apiFailure(error, status));
 }
 
 export function reportErrorMessage(error: unknown): string {
-  const problem = typeof error === "object" && error !== null
-    ? error as { code?: unknown; status?: unknown }
-    : undefined;
-  const code = typeof problem?.code === "string" ? problem.code : undefined;
-  const status = problem?.status === undefined ? undefined : Number(problem.status);
+  const { code, status } = apiFailure(error);
 
   switch (code) {
     case "invalid_credentials":

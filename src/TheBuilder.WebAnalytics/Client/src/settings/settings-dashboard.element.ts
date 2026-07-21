@@ -21,7 +21,7 @@ import { createSettingsUpdate, validateConnection, validateEditableSettings } fr
 import { announceAnalyticsAvailability } from "../section/analytics-availability.js";
 import { MOCK_SCENARIOS, type MockScenarioDefinition } from "./mock-scenarios.js";
 import { identifierField, providerDescriptor, providerLogo } from "./provider-identity.js";
-import { settingsActionError, settingsLoadError, type SettingsLoadError } from "./settings-error.js";
+import { settingsError, type SettingsError } from "./settings-error.js";
 
 type NewConnection =
   | { kind: "provider"; descriptor: AnalyticsProviderDescriptor; hasAccessToken: boolean }
@@ -36,7 +36,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   @state() private _showValidation = false;
   @state() private _testingKey?: string;
   @state() private _status?: { type: "success" | "error"; message: string };
-  @state() private _loadError?: SettingsLoadError;
+  @state() private _loadError?: SettingsError;
   @state() private _connectionStatuses: Record<string, ConnectionActionStatus> = {};
   @state() private _showProviderPicker = false;
 
@@ -50,7 +50,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     try {
       const { data, error, response } = await WebAnalyticsService.settings();
       if (error || !data) {
-        this._loadError = settingsLoadError(error, response?.status);
+        this._loadError = settingsError("load", error, response?.status);
         return;
       }
       this._settings = data;
@@ -59,7 +59,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       this._status = undefined;
       this._loadError = undefined;
     } catch (error) {
-      this._loadError = settingsLoadError(error);
+      this._loadError = settingsError("load", error);
     } finally {
       this._loading = false;
     }
@@ -162,13 +162,13 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       this._connectionStatuses = {
         ...this._connectionStatuses,
         [key]: error || !data
-          ? { type: "error", message: settingsActionError("test", error, response?.status) }
+          ? { type: "error", message: settingsError("test", error, response?.status).message }
           : { type: data.success ? "success" : "error", message: data.message },
       };
     } catch (error) {
       this._connectionStatuses = {
         ...this._connectionStatuses,
-        [key]: { type: "error", message: settingsActionError("test", error) },
+        [key]: { type: "error", message: settingsError("test", error).message },
       };
     } finally {
       this._testingKey = undefined;
@@ -197,7 +197,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     try {
       const { data, error, response } = await WebAnalyticsService.saveSettings({ body });
       if (error || !data) {
-        this._status = { type: "error", message: settingsActionError("save", error, response?.status) };
+        this._status = { type: "error", message: settingsError("save", error, response?.status).message };
         return false;
       }
       this._settings = data;
@@ -207,7 +207,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       if (successMessage) this._status = { type: "success", message: successMessage };
       return true;
     } catch (error) {
-      this._status = { type: "error", message: settingsActionError("save", error) };
+      this._status = { type: "error", message: settingsError("save", error).message };
       return false;
     } finally {
       this._saving = false;

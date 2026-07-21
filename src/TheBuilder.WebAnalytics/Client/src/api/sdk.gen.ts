@@ -26,7 +26,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static documentRoutes<ThrowOnError extends boolean = false>(options: Options<DocumentRoutesData, ThrowOnError>): RequestResult<DocumentRoutesResponses, DocumentRoutesErrors, ThrowOnError> {
         return (options.client ?? client).get<DocumentRoutesResponses, DocumentRoutesErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -34,7 +34,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static breakdown<ThrowOnError extends boolean = false>(options: Options<BreakdownData, ThrowOnError>): RequestResult<BreakdownResponses, BreakdownErrors, ThrowOnError> {
         return (options.client ?? client).get<BreakdownResponses, BreakdownErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -42,7 +42,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static events<ThrowOnError extends boolean = false>(options?: Options<EventsData, ThrowOnError>): RequestResult<EventsResponses, EventsErrors, ThrowOnError> {
         return (options?.client ?? client).get<EventsResponses, EventsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -50,7 +50,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static eventDetails<ThrowOnError extends boolean = false>(options?: Options<EventDetailsData, ThrowOnError>): RequestResult<EventDetailsResponses, EventDetailsErrors, ThrowOnError> {
         return (options?.client ?? client).get<EventDetailsResponses, EventDetailsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -58,7 +58,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static eventPropertyValues<ThrowOnError extends boolean = false>(options?: Options<EventPropertyValuesData, ThrowOnError>): RequestResult<EventPropertyValuesResponses, EventPropertyValuesErrors, ThrowOnError> {
         return (options?.client ?? client).get<EventPropertyValuesResponses, EventPropertyValuesErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -66,7 +66,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static flags<ThrowOnError extends boolean = false>(options?: Options<FlagsData, ThrowOnError>): RequestResult<FlagsResponses, FlagsErrors, ThrowOnError> {
         return (options?.client ?? client).get<FlagsResponses, FlagsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -74,7 +74,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static summary<ThrowOnError extends boolean = false>(options?: Options<SummaryData, ThrowOnError>): RequestResult<SummaryResponses, SummaryErrors, ThrowOnError> {
         return (options?.client ?? client).get<SummaryResponses, SummaryErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -82,7 +82,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static settings<ThrowOnError extends boolean = false>(options?: Options<SettingsData, ThrowOnError>): RequestResult<SettingsResponses, SettingsErrors, ThrowOnError> {
         return (options?.client ?? client).get<SettingsResponses, SettingsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -90,7 +90,7 @@ export class WebAnalyticsService {
             ...options
         });
     }
-    
+
     public static saveSettings<ThrowOnError extends boolean = false>(options?: Options<SaveSettingsData, ThrowOnError>): RequestResult<SaveSettingsResponses, SaveSettingsErrors, ThrowOnError> {
         return (options?.client ?? client).put<SaveSettingsResponses, SaveSettingsErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],
@@ -102,7 +102,7 @@ export class WebAnalyticsService {
             }
         });
     }
-    
+
     public static testConnection<ThrowOnError extends boolean = false>(options: Options<TestConnectionData, ThrowOnError>): RequestResult<TestConnectionResponses, TestConnectionErrors, ThrowOnError> {
         return (options.client ?? client).post<TestConnectionResponses, TestConnectionErrors, ThrowOnError>({
             security: [{ scheme: 'bearer', type: 'http' }],

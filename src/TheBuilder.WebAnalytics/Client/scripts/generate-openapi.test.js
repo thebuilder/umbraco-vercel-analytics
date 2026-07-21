@@ -1,8 +1,11 @@
 import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { generateOpenApiClient } from './generate-openapi.js';
+import { generateOpenApiClient, normalizeGeneratedClient } from './generate-openapi.js';
 
 const scriptPath = fileURLToPath(new URL('./generate-openapi.js', import.meta.url));
 
@@ -104,12 +107,16 @@ describe('generate-openapi', () => {
   it('does not report success until the client generator resolves', async () => {
     const logs = [];
     let resolveGeneration;
+    let normalized = false;
     const generation = generateOpenApiClient({
       swaggerUrl: 'http://localhost/openapi.json',
       fetchImplementation: async () => ({ ok: true, json: async () => ({ openapi: '3.0.0', paths: {} }) }),
       createClientImplementation: () => new Promise((resolve) => {
         resolveGeneration = resolve;
       }),
+      normalizeGeneratedOutput: async () => {
+        normalized = true;
+      },
       log: (message) => logs.push(message),
       error: () => {},
     });
@@ -121,7 +128,22 @@ describe('generate-openapi', () => {
     resolveGeneration();
 
     await expect(generation).resolves.toBe(true);
+    expect(normalized).toBe(true);
     expect(logs).toContain('OpenAPI client generated successfully');
+  });
+
+  it('normalizes trailing whitespace from generated TypeScript files', async () => {
+    const output = await mkdtemp(join(tmpdir(), 'web-analytics-openapi-'));
+    const generatedFile = join(output, 'sdk.gen.ts');
+    try {
+      await writeFile(generatedFile, 'export const generated = true;  \r\n    \r\n');
+
+      await normalizeGeneratedClient(output);
+
+      await expect(readFile(generatedFile, 'utf8')).resolves.toBe('export const generated = true;\r\n\r\n');
+    } finally {
+      await rm(output, { recursive: true, force: true });
+    }
   });
 
 });

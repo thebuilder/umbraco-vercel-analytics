@@ -4,6 +4,7 @@ using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
 using TheBuilder.WebAnalytics.Configuration;
+using TheBuilder.WebAnalytics.Providers;
 using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Composers
@@ -22,18 +23,8 @@ namespace TheBuilder.WebAnalytics.Composers
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<AnalyticsReportCache>();
             builder.Services.AddSingleton<AnalyticsProviderRequestGate>();
-            builder.Services.AddHttpClient<VercelAnalyticsClient>(client =>
-            {
-                client.BaseAddress = new Uri("https://api.vercel.com/");
-                client.Timeout = TimeSpan.FromSeconds(15);
-            });
-            builder.Services.AddTransient<IAnalyticsProviderClient>(services => services.GetRequiredService<VercelAnalyticsClient>());
-            builder.Services.AddHttpClient<PlausibleAnalyticsClient>(client =>
-            {
-                client.BaseAddress = new Uri("https://plausible.io/");
-                client.Timeout = TimeSpan.FromSeconds(15);
-            });
-            builder.Services.AddTransient<IAnalyticsProviderClient>(services => services.GetRequiredService<PlausibleAnalyticsClient>());
+            VercelProvider.AddClient(builder.Services);
+            PlausibleProvider.AddClient(builder.Services);
             builder.Services.AddSingleton<MockAnalyticsClient>();
             builder.Services.AddTransient<IAnalyticsProviderClientResolver, AnalyticsProviderClientResolver>();
             builder.Services.AddTransient<AnalyticsReportService>();

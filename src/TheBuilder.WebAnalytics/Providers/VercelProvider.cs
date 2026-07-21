@@ -1,5 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
+using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Providers;
 
@@ -41,4 +43,7 @@ internal static class VercelProvider
             new("access token", "Configure a Vercel access token in the server settings.", "https://vercel.com/docs/rest-api"),
             null),
         options => options.Providers.Vercel.AccessToken);
+
+    internal static IServiceCollection AddClient(IServiceCollection services) =>
+        services.AddAnalyticsProvider<VercelAnalyticsClient>(Definition, new Uri("https://api.vercel.com/"));
 }

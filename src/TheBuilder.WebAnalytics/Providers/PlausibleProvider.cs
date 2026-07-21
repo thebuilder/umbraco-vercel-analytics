@@ -1,6 +1,8 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
+using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Providers;
 
@@ -42,4 +44,7 @@ internal static class PlausibleProvider
             new("event properties", "Optional custom event property names configured for this Plausible site.", 20, 100)),
         options => options.Providers.Plausible.AccessToken,
         invalidQueryStatuses: new HashSet<HttpStatusCode> { HttpStatusCode.BadRequest, HttpStatusCode.NotFound });
+
+    internal static IServiceCollection AddClient(IServiceCollection services) =>
+        services.AddAnalyticsProvider<PlausibleAnalyticsClient>(Definition, new Uri("https://plausible.io/"));
 }

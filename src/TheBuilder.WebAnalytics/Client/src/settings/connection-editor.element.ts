@@ -242,7 +242,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
                         aria-describedby=${`${connection.key}-event-properties-${this.errors.eventPropertyNames ? "error" : "description"}`}
                         @input=${this.#eventPropertyNames}></uui-textarea>
                       <span id=${`${connection.key}-event-properties-${this.errors.eventPropertyNames ? "error" : "description"}`} class=${this.errors.eventPropertyNames ? "field-error" : "field-description"}>
-                        ${this.errors.eventPropertyNames ? html`<uui-icon name="icon-alert" aria-hidden="true"></uui-icon>${this.errors.eventPropertyNames}` : `Up to ${descriptor.eventProperties.maximumNames} names. Properties are queried only when an editor opens an event.`}
+                        ${this.errors.eventPropertyNames ? html`<uui-icon name="icon-alert" aria-hidden="true"></uui-icon>${this.errors.eventPropertyNames}` : `Up to ${descriptor.eventProperties.maximumNames} names.`}
                       </span>
                     </div>
                   </uui-form-layout-item>

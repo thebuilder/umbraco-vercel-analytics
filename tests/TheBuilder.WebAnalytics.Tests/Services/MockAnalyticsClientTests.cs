@@ -200,17 +200,15 @@ public sealed class MockAnalyticsClientTests
     }
 
     [Fact]
-    public void Resolver_rejects_capabilities_without_matching_provider_interfaces()
+    public void Capability_factory_rejects_global_event_filtering_without_event_operations()
     {
-        var handler = new RejectingHttpMessageHandler();
-        var vercel = new VercelAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate());
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            AnalyticsProviderCapabilities.FromClient<CoreOnlyAnalyticsClient>(
+                [],
+                globalEventFiltering: true,
+                breakdownOrdering: false));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => new AnalyticsProviderClientResolver(
-            [new CoreOnlyAnalyticsClient(vercel.Definition), new PlausibleAnalyticsClient(new HttpClient(handler), new AnalyticsProviderRequestGate())],
-            new MockAnalyticsClient()));
-
-        Assert.Contains("Vercel", exception.Message);
-        Assert.Contains("Events", exception.Message);
+        Assert.Contains(nameof(IAnalyticsEventsProviderClient), exception.Message);
     }
 
     [Fact]
@@ -241,59 +239,41 @@ public sealed class MockAnalyticsClientTests
         Assert.False(client.Definition.Capabilities.Flags);
     }
 
-    [Theory]
-    [MemberData(nameof(InvalidCapabilityClients))]
-    public void Resolver_rejects_invalid_capability_contracts(
-        IAnalyticsProviderClient invalidClient,
-        string expectedMessage)
+    [Fact]
+    public void Resolver_reports_unsupported_typed_operations()
     {
-        var exception = Assert.Throws<InvalidOperationException>(() => CreateResolver(invalidClient));
+        var asymmetric = new AsymmetricAnalyticsClient(AnalyticsProvider.Vercel);
+        var resolver = CreateResolver(asymmetric);
+        var connection = new AnalyticsConnection(
+            MockKey,
+            "Asymmetric",
+            AnalyticsProvider.Vercel,
+            "",
+            "project",
+            null,
+            "",
+            [],
+            [],
+            false,
+            new HashSet<Guid>(),
+            new HashSet<string>());
 
-        Assert.Contains(expectedMessage, exception.Message);
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            resolver.Get<IAnalyticsFlagsProviderClient>(connection));
+
+        Assert.Contains(nameof(IAnalyticsFlagsProviderClient), exception.Message);
     }
-
-    public static TheoryData<IAnalyticsProviderClient, string> InvalidCapabilityClients => new()
-    {
-        {
-            new AsymmetricAnalyticsClient(
-                AnalyticsProvider.Vercel,
-                eventDetails: false,
-                eventProperties: true),
-            "EventDetails capability does not match"
-        },
-        {
-            new AsymmetricAnalyticsClient(
-                AnalyticsProvider.Vercel,
-                events: false,
-                eventDetails: true),
-            "Events capability does not match"
-        },
-        {
-            new CoreOnlyAnalyticsClient(CreateDefinition(
-                AnalyticsProvider.Vercel,
-                events: false,
-                eventDetails: false,
-                eventProperties: true)),
-            "EventProperties capability does not match"
-        },
-        {
-            new FlagsWithoutAdvertisementAnalyticsClient(AnalyticsProvider.Vercel),
-            "Flags capability does not match"
-        }
-    };
 
     private static AnalyticsProviderClientResolver CreateResolver(IAnalyticsProviderClient vercelClient) => new(
         [vercelClient, new PlausibleAnalyticsClient(new HttpClient(new RejectingHttpMessageHandler()), new AnalyticsProviderRequestGate())],
         new MockAnalyticsClient());
 
-    private static AnalyticsProviderDefinition CreateDefinition(
-        AnalyticsProvider provider,
-        bool events = true,
-        bool eventDetails = true,
-        bool eventProperties = false,
-        bool flags = false) => new(
+    private static AnalyticsProviderDefinition CreateDefinition(AnalyticsProvider provider) => new(
         provider,
-        new AnalyticsCapabilities([], events, eventDetails, eventProperties, false, flags, false),
+        AnalyticsProviderCapabilities.FromClient<AsymmetricAnalyticsClient>(
+            [],
+            globalEventFiltering: false,
+            breakdownOrdering: false),
         new(
             AnalyticsConnectionIdentifier.ProjectId,
             "project ID",
@@ -349,9 +329,10 @@ public sealed class MockAnalyticsClientTests
         }
     }
 
-    private sealed class CoreOnlyAnalyticsClient(AnalyticsProviderDefinition definition) : IAnalyticsProviderClient
+    private sealed class CoreOnlyAnalyticsClient : IAnalyticsProviderClient
     {
-        public AnalyticsProviderDefinition Definition { get; } = definition;
+        public AnalyticsProviderDefinition Definition =>
+            AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel);
 
         public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
@@ -374,17 +355,11 @@ public sealed class MockAnalyticsClientTests
 
     private sealed class AsymmetricAnalyticsClient :
         IAnalyticsProviderClient,
-        IAnalyticsEventsProviderClient,
         IAnalyticsEventDetailsProviderClient
     {
-        public AsymmetricAnalyticsClient(
-            AnalyticsProvider provider,
-            bool events = true,
-            bool eventDetails = true,
-            bool eventProperties = false,
-            bool flags = false)
+        public AsymmetricAnalyticsClient(AnalyticsProvider provider)
         {
-            Definition = CreateDefinition(provider, events, eventDetails, eventProperties, flags);
+            Definition = CreateDefinition(provider);
         }
 
         public AnalyticsProviderDefinition Definition { get; }
@@ -421,40 +396,4 @@ public sealed class MockAnalyticsClientTests
             CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class FlagsWithoutAdvertisementAnalyticsClient(AnalyticsProvider provider) :
-        IAnalyticsProviderClient,
-        IAnalyticsFlagsProviderClient
-    {
-        public AnalyticsProviderDefinition Definition { get; } = CreateDefinition(
-            provider,
-            events: false,
-            eventDetails: false,
-            eventProperties: false,
-            flags: false);
-
-        public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<AnalyticsTotals> GetTotalsAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
-            AnalyticsConnection connection,
-            AnalyticsQuery query,
-            AnalyticsDimension dimension,
-            int limit,
-            string? search,
-            CancellationToken cancellationToken,
-            AnalyticsTrafficMetric? orderBy = null) => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(
-            AnalyticsConnection connection,
-            AnalyticsQuery query,
-            string? flagKey,
-            int limit,
-            CancellationToken cancellationToken) => throw new NotSupportedException();
-    }
 }

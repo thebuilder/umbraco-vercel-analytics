@@ -6,4 +6,9 @@ internal sealed class TestAnalyticsProviderClientResolver(IAnalyticsProviderClie
     : IAnalyticsProviderClientResolver
 {
     public IAnalyticsProviderClient Get(AnalyticsConnection _) => client;
+
+    public TCapability Get<TCapability>(AnalyticsConnection _)
+        where TCapability : class =>
+        client as TCapability
+        ?? throw new InvalidOperationException($"Test client does not support {typeof(TCapability).Name}.");
 }

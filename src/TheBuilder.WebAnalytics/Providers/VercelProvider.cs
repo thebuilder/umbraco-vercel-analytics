@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Services;
@@ -9,7 +8,7 @@ internal static class VercelProvider
 {
     internal static AnalyticsProviderDefinition Definition { get; } = new(
         AnalyticsProvider.Vercel,
-        new(
+        AnalyticsProviderCapabilities.FromClient<VercelAnalyticsClient>(
             [
                 AnalyticsDimension.RequestPath,
                 AnalyticsDimension.Route,
@@ -25,12 +24,8 @@ internal static class VercelProvider
                 AnalyticsDimension.UtmContent,
                 AnalyticsDimension.EventName
             ],
-            Events: true,
-            EventDetails: true,
-            EventProperties: true,
-            GlobalEventFiltering: false,
-            Flags: true,
-            BreakdownOrdering: false),
+            globalEventFiltering: false,
+            breakdownOrdering: false),
         new(
             AnalyticsConnectionIdentifier.ProjectId,
             "Vercel project ID",

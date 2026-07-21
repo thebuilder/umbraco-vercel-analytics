@@ -1,5 +1,4 @@
 using System.Net;
-using Microsoft.Extensions.DependencyInjection;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Services;
@@ -10,7 +9,7 @@ internal static class PlausibleProvider
 {
     internal static AnalyticsProviderDefinition Definition { get; } = new(
         AnalyticsProvider.Plausible,
-        new(
+        AnalyticsProviderCapabilities.FromClient<PlausibleAnalyticsClient>(
             [
                 AnalyticsDimension.RequestPath,
                 AnalyticsDimension.Referrer,
@@ -25,12 +24,8 @@ internal static class PlausibleProvider
                 AnalyticsDimension.UtmContent,
                 AnalyticsDimension.EventName
             ],
-            Events: true,
-            EventDetails: true,
-            EventProperties: true,
-            GlobalEventFiltering: true,
-            Flags: false,
-            BreakdownOrdering: true),
+            globalEventFiltering: true,
+            breakdownOrdering: true),
         new(
             AnalyticsConnectionIdentifier.SiteId,
             "Plausible site ID",

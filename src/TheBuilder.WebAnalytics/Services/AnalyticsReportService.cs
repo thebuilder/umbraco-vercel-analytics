@@ -60,7 +60,7 @@ public sealed class AnalyticsReportService(
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured || !connection.Capabilities.Events) return null;
-        var client = (IAnalyticsEventsProviderClient)clients.Get(connection);
+        var client = clients.Get<IAnalyticsEventsProviderClient>(connection);
         var normalizedSearch = search?.Trim();
         var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:events:{limit}:{normalizedSearch}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
@@ -79,7 +79,7 @@ public sealed class AnalyticsReportService(
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured || !connection.Capabilities.Flags) return null;
-        var client = (IAnalyticsFlagsProviderClient)clients.Get(connection);
+        var client = clients.Get<IAnalyticsFlagsProviderClient>(connection);
         var normalizedFlagKey = string.IsNullOrWhiteSpace(flagKey) ? null : flagKey.Trim();
         var flagKeyCacheKey = EncodeCachePart(normalizedFlagKey ?? string.Empty);
         var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:flags:{flagKeyCacheKey}:{limit}:{Normalize(query)}";
@@ -99,7 +99,10 @@ public sealed class AnalyticsReportService(
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured || !connection.Capabilities.EventDetails) return null;
-        var client = (IAnalyticsEventDetailsProviderClient)clients.Get(connection);
+        var propertiesClient = connection.Capabilities.EventProperties
+            ? clients.Get<IAnalyticsEventPropertiesProviderClient>(connection)
+            : null;
+        var client = propertiesClient ?? clients.Get<IAnalyticsEventDetailsProviderClient>(connection);
         var normalizedEventName = eventName.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
@@ -107,7 +110,6 @@ public sealed class AnalyticsReportService(
         var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:event-details:{EncodeCachePart(normalizedEventName)}{eventDataCacheKey}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var propertiesClient = client as IAnalyticsEventPropertiesProviderClient;
             var totals = eventDataFilter is null
                 ? client.CountEventsAsync(connection, query, normalizedEventName, operationCancellationToken)
                 : propertiesClient?.CountFilteredEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken)
@@ -171,7 +173,7 @@ public sealed class AnalyticsReportService(
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured || !connection.Capabilities.EventProperties) return null;
-        var client = (IAnalyticsEventPropertiesProviderClient)clients.Get(connection);
+        var client = clients.Get<IAnalyticsEventPropertiesProviderClient>(connection);
         var normalizedEventName = eventName.Trim();
         var normalizedPropertyName = propertyName.Trim();
         var normalizedSearch = search?.Trim();

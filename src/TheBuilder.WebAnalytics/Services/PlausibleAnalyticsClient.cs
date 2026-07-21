@@ -11,7 +11,7 @@ namespace TheBuilder.WebAnalytics.Services;
 
 public sealed class PlausibleAnalyticsClient(
     HttpClient httpClient,
-    AnalyticsProviderRequestGate requestGate) : IAnalyticsProviderClient, IAnalyticsEventsProviderClient, IAnalyticsEventPropertyDiscoveryProviderClient
+    AnalyticsProviderRequestGate requestGate) : IAnalyticsProviderClient, IAnalyticsEventPropertyDiscoveryProviderClient
 {
     private const string QueryPath = "api/v2/query";
 

@@ -6,7 +6,6 @@ namespace TheBuilder.WebAnalytics.Services;
 
 public sealed class MockAnalyticsClient :
     IAnalyticsProviderClient,
-    IAnalyticsEventsProviderClient,
     IAnalyticsEventPropertiesProviderClient,
     IAnalyticsFlagsProviderClient
 {

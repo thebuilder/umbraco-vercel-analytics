@@ -42,7 +42,7 @@ public interface IAnalyticsEventsProviderClient
         CancellationToken cancellationToken);
 }
 
-public interface IAnalyticsEventDetailsProviderClient
+public interface IAnalyticsEventDetailsProviderClient : IAnalyticsEventsProviderClient
 {
     Task<AnalyticsEventTotals> CountEventsAsync(
         AnalyticsConnection connection,
@@ -100,4 +100,7 @@ public interface IAnalyticsFlagsProviderClient
 public interface IAnalyticsProviderClientResolver
 {
     IAnalyticsProviderClient Get(AnalyticsConnection connection);
+
+    TCapability Get<TCapability>(AnalyticsConnection connection)
+        where TCapability : class;
 }

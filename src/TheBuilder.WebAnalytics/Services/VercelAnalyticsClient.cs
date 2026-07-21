@@ -13,7 +13,6 @@ public sealed class VercelAnalyticsClient(
     HttpClient httpClient,
     AnalyticsProviderRequestGate requestGate) :
     IAnalyticsProviderClient,
-    IAnalyticsEventsProviderClient,
     IAnalyticsEventPropertiesProviderClient,
     IAnalyticsFlagsProviderClient
 {

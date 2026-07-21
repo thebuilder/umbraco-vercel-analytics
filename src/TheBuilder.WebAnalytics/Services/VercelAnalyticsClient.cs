@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.WebUtilities;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
+using TheBuilder.WebAnalytics.Providers;
 
 namespace TheBuilder.WebAnalytics.Services;
 
@@ -16,39 +17,13 @@ public sealed class VercelAnalyticsClient(
     IAnalyticsEventPropertiesProviderClient,
     IAnalyticsFlagsProviderClient
 {
-    internal static AnalyticsProviderDefinition ProviderDefinition { get; } = new(
-        AnalyticsProvider.Vercel,
-        new(
-            [
-                AnalyticsDimension.RequestPath,
-                AnalyticsDimension.Route,
-                AnalyticsDimension.ReferrerHostname,
-                AnalyticsDimension.Country,
-                AnalyticsDimension.DeviceType,
-                AnalyticsDimension.BrowserName,
-                AnalyticsDimension.OsName,
-                AnalyticsDimension.UtmSource,
-                AnalyticsDimension.UtmMedium,
-                AnalyticsDimension.UtmCampaign,
-                AnalyticsDimension.UtmTerm,
-                AnalyticsDimension.UtmContent,
-                AnalyticsDimension.EventName
-            ],
-            Events: true,
-            EventDetails: true,
-            EventProperties: true,
-            Flags: true),
-        AnalyticsConnectionIdentifier.ProjectId,
-        supportsTeam: true,
-        options => options.Providers.Vercel.AccessToken);
-
     private const int EventPropertyLimit = 20;
     private const string CountPath = "v1/query/web-analytics/visits/count";
     private const string AggregatePath = "v1/query/web-analytics/visits/aggregate";
     private const string EventCountPath = "v1/query/web-analytics/events/count";
     private const string EventAggregatePath = "v1/query/web-analytics/events/aggregate";
 
-    public AnalyticsProviderDefinition Definition => ProviderDefinition;
+    public AnalyticsProviderDefinition Definition => VercelProvider.Definition;
 
     public async Task<string> GetDisplayNameAsync(
         AnalyticsConnection connection,

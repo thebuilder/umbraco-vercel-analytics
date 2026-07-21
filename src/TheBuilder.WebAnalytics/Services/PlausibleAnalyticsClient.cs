@@ -1,11 +1,11 @@
 using System.Globalization;
-using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
+using TheBuilder.WebAnalytics.Providers;
 
 namespace TheBuilder.WebAnalytics.Services;
 
@@ -13,35 +13,9 @@ public sealed class PlausibleAnalyticsClient(
     HttpClient httpClient,
     AnalyticsProviderRequestGate requestGate) : IAnalyticsProviderClient, IAnalyticsEventsProviderClient, IAnalyticsEventDetailsProviderClient
 {
-    internal static AnalyticsProviderDefinition ProviderDefinition { get; } = new(
-        AnalyticsProvider.Plausible,
-        new(
-            [
-                AnalyticsDimension.RequestPath,
-                AnalyticsDimension.Referrer,
-                AnalyticsDimension.Country,
-                AnalyticsDimension.DeviceType,
-                AnalyticsDimension.BrowserName,
-                AnalyticsDimension.OsName,
-                AnalyticsDimension.UtmSource,
-                AnalyticsDimension.UtmMedium,
-                AnalyticsDimension.UtmCampaign,
-                AnalyticsDimension.UtmTerm,
-                AnalyticsDimension.UtmContent,
-                AnalyticsDimension.EventName
-            ],
-            Events: true,
-            EventDetails: true,
-            EventProperties: false,
-            Flags: false),
-        AnalyticsConnectionIdentifier.SiteId,
-        supportsTeam: false,
-        options => options.Providers.Plausible.AccessToken,
-        invalidQueryStatuses: new HashSet<HttpStatusCode> { HttpStatusCode.BadRequest, HttpStatusCode.NotFound });
-
     private const string QueryPath = "api/v2/query";
 
-    public AnalyticsProviderDefinition Definition => ProviderDefinition;
+    public AnalyticsProviderDefinition Definition => PlausibleProvider.Definition;
 
     public Task<string> GetDisplayNameAsync(
         AnalyticsConnection connection,

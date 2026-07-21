@@ -1,5 +1,6 @@
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
+using TheBuilder.WebAnalytics.Providers;
 
 namespace TheBuilder.WebAnalytics.Services;
 
@@ -45,7 +46,7 @@ public sealed class MockAnalyticsClient :
         new("personalised-homepage", 4760, 3010)
     ];
 
-    public AnalyticsProviderDefinition Definition => VercelAnalyticsClient.ProviderDefinition;
+    public AnalyticsProviderDefinition Definition => VercelProvider.Definition;
 
     public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken)
     {

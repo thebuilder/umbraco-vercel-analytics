@@ -1,6 +1,6 @@
 using System.Net;
 using TheBuilder.WebAnalytics.Models;
-using TheBuilder.WebAnalytics.Services;
+using TheBuilder.WebAnalytics.Providers;
 
 namespace TheBuilder.WebAnalytics.Configuration;
 
@@ -14,8 +14,8 @@ public sealed class AnalyticsProviderCatalog
     {
         Definitions =
         [
-            VercelAnalyticsClient.ProviderDefinition,
-            PlausibleAnalyticsClient.ProviderDefinition
+            VercelProvider.Definition,
+            PlausibleProvider.Definition
         ];
         _definitions = Definitions.ToDictionary(definition => definition.Provider);
     }

@@ -251,40 +251,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     `;
   }
 
-  #renderProviders() {
-    if (!this._settings) return "";
-    return html`
-      <uui-box headline="Providers" class="providers">
-        <p class="providers-intro">Web Analytics reads credentials from your server configuration. Detection confirms presence only; test each saved connection to verify access.</p>
-        <div class="provider-list">
-          ${this._settings.providers.map((item) => {
-            const token = this._settings?.providerTokens.find((candidate) => candidate.provider === item.provider);
-            const connections = this._settings?.connections.filter((connection) => connection.mockScenario == null && connection.provider === item.provider) ?? [];
-            const overrideCount = connections.filter((connection) => connection.hasAccessTokenOverride).length;
-            const status = token?.hasAccessToken
-              ? { kind: "configured", label: "Shared credential detected", help: "Connections can use the credential from server configuration." }
-              : overrideCount > 0
-                ? { kind: "configured", label: `${overrideCount} connection override${overrideCount === 1 ? "" : "s"}`, help: "Connection-specific credentials can be tested after saving." }
-                : { kind: "missing", label: "No shared credential", help: `${item.credential.description} Then restart Umbraco.` };
-            return html`
-              <section class="provider-row" aria-labelledby=${`provider-${item.provider}`}>
-                <span class="provider-mark">${providerLogo(item)}</span>
-                <span class="provider-row-copy">
-                  <strong id=${`provider-${item.provider}`}>${item.provider}</strong>
-                  <span>${connections.length} connection${connections.length === 1 ? "" : "s"}</span>
-                </span>
-                <span class=${`provider-readiness ${status.kind}`}>
-                  <span><uui-icon name=${status.kind === "configured" ? "icon-check" : "icon-info"} aria-hidden="true"></uui-icon>${status.label}</span>
-                  <small>${status.help}</small>
-                </span>
-              </section>
-            `;
-          })}
-        </div>
-      </uui-box>
-    `;
-  }
-
   #renderGeneralSettings() {
     if (!this._settings) return "";
     return html`
@@ -413,7 +379,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
           </div>
         </section>
 
-        ${this.#renderProviders()}
         ${this.#renderGeneralSettings()}
         ${this.#renderDevelopmentData()}
 
@@ -475,8 +440,8 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .status.success { background: color-mix(in srgb, var(--uui-color-positive) 8%, var(--uui-color-surface)); border-color: color-mix(in srgb, var(--uui-color-positive) 35%, var(--uui-color-border)); }
     .status.error { background: color-mix(in srgb, var(--uui-color-danger) 7%, var(--uui-color-surface)); border-color: color-mix(in srgb, var(--uui-color-danger) 35%, var(--uui-color-border)); }
     .connections-section { margin-block-start: 0; }
-    .providers, .general, .mock-settings { margin-block-start: var(--uui-size-layout-2); }
-    .providers, .general { container-type: inline-size; }
+    .general, .mock-settings { margin-block-start: var(--uui-size-layout-2); }
+    .general { container-type: inline-size; }
     .mock-intro { color: var(--uui-color-text-alt); margin: 0 0 var(--uui-size-space-5); max-inline-size: 72ch; text-wrap: pretty; }
     .mock-scenarios { display: grid; gap: var(--uui-size-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .mock-scenario { align-items: center; border: 1px solid var(--uui-color-border); display: grid; gap: var(--uui-size-space-4); grid-template-columns: minmax(0, 1fr) max-content; min-inline-size: 0; padding: var(--uui-size-space-4); }
@@ -488,18 +453,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .field-with-help { display: grid; gap: var(--uui-size-space-1); }
     .field-help { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
     .package-status { min-inline-size: 0; }
-    .providers-intro { color: var(--uui-color-text-alt); margin: 0 0 var(--uui-size-space-5); max-inline-size: 70ch; text-wrap: pretty; }
-    .provider-list { border-block: 1px solid var(--uui-color-border); }
-    .provider-row { align-items: center; display: grid; gap: var(--uui-size-space-4); grid-template-columns: auto minmax(10rem, 0.75fr) minmax(18rem, 1.25fr); min-inline-size: 0; padding: var(--uui-size-space-4) 0; }
-    .provider-row + .provider-row { border-top: 1px solid var(--uui-color-border); }
-    .provider-row-copy { display: grid; gap: var(--uui-size-space-1); min-inline-size: 0; }
-    .provider-row-copy strong { font-size: var(--uui-type-h5-size); }
-    .provider-row-copy > span { color: var(--uui-color-text-alt); }
-    .provider-readiness { display: grid; gap: var(--uui-size-space-1); justify-items: start; min-inline-size: 0; }
-    .provider-readiness > span { align-items: center; display: inline-flex; font-weight: 700; gap: var(--uui-size-space-1); }
-    .provider-readiness.configured > span { color: var(--uui-color-positive-standalone); }
-    .provider-readiness.missing > span { color: var(--uui-color-text); }
-    .provider-readiness small { color: var(--uui-color-text-alt); overflow-wrap: anywhere; text-wrap: pretty; }
     .visually-hidden { block-size: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); inline-size: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
     .section-heading { margin-bottom: var(--uui-size-space-4); }
     .provider-picker { background: var(--uui-color-surface-alt); border-block: 1px solid var(--uui-color-border); margin-block-end: var(--uui-size-space-5); padding: var(--uui-size-space-4) var(--uui-size-space-5) var(--uui-size-space-5); }
@@ -540,8 +493,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     @container (max-width: 34rem) {
       .general-grid { grid-template-columns: 1fr; }
       .package-status { grid-column: auto; }
-      .provider-row { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
-      .provider-readiness { grid-column: 2; }
     }
     @media (max-width: 800px) {
       .section-heading { align-items: stretch; flex-direction: column; }

@@ -249,18 +249,19 @@ describe("analytics settings onboarding", () => {
     expect((editors?.[1] as AnalyticsConnectionEditorElement).connection.provider).toBe("Plausible");
   });
 
-  it("shows provider readiness without exposing server configuration keys", async () => {
+  it("shows provider readiness in the connection picker without exposing server configuration keys", async () => {
     const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".provider-row")).not.toBeNull());
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connection-empty-state")).not.toBeNull());
+    dashboard.shadowRoot?.querySelector<HTMLElement>('.connection-empty-state [label="Choose analytics provider"]')?.click();
+    await dashboard.updateComplete;
 
-    const providers = dashboard.shadowRoot?.querySelectorAll(".provider-row");
+    const providers = dashboard.shadowRoot?.querySelectorAll(".provider-choice");
     expect(providers).toHaveLength(2);
-    expect(providers?.[0].textContent).toContain("No shared credential");
-    expect(providers?.[0].textContent).toContain("Configure a Vercel access token in the server settings");
-    expect(providers?.[1].textContent).toContain("Configure a Plausible Stats API key in the server settings");
+    expect(providers?.[0].textContent).toContain("No shared credential detected");
+    expect(providers?.[1].textContent).toContain("No shared credential detected");
     expect(dashboard.shadowRoot?.textContent).not.toContain("WebAnalytics__Providers__");
-    expect(dashboard.shadowRoot?.querySelector(".providers code")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".providers")).toBeNull();
   });
 
   it("marks new connections as using the configured shared token", async () => {
@@ -277,11 +278,11 @@ describe("analytics settings onboarding", () => {
     document.body.append(dashboard);
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".connection-empty-state")).not.toBeNull());
 
-    const vercelProvider = dashboard.shadowRoot?.querySelectorAll(".provider-row")[0];
-    expect(vercelProvider?.textContent).toContain("Shared credential detected");
-    expect(vercelProvider?.querySelector("code")).toBeNull();
     dashboard.shadowRoot?.querySelector<HTMLElement>('.connection-empty-state [label="Choose analytics provider"]')?.click();
     await dashboard.updateComplete;
+    const vercelProvider = dashboard.shadowRoot?.querySelectorAll(".provider-choice")[0];
+    expect(vercelProvider?.textContent).toContain("Shared credential detected");
+    expect(vercelProvider?.querySelector("code")).toBeNull();
     dashboard.shadowRoot?.querySelector<HTMLElement>('.provider-choice[aria-label="Add Vercel connection"]')?.click();
     await dashboard.updateComplete;
 

@@ -5,7 +5,7 @@ using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Tests.Configuration;
 
-public sealed class VercelAnalyticsSettingsValidatorTests
+public sealed class WebAnalyticsSettingsValidatorTests
 {
     private static readonly Guid MainKey = Guid.Parse("11111111-1111-1111-1111-111111111110");
     [Fact]
@@ -13,7 +13,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     {
         var settings = CreateSettings();
 
-        Assert.Empty(VercelAnalyticsSettingsValidator.Validate(settings));
+        Assert.Empty(WebAnalyticsSettingsValidator.Validate(settings));
     }
 
     [Fact]
@@ -22,7 +22,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         var settings = CreateSettings();
         settings.Connections.Clear();
 
-        Assert.Empty(VercelAnalyticsSettingsValidator.Validate(settings));
+        Assert.Empty(WebAnalyticsSettingsValidator.Validate(settings));
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     {
         var settings = CreateSettings();
         settings.Connections[0].DocumentRootKeys = ["11111111-1111-1111-1111-111111111111"];
-        settings.Connections.Add(new VercelAnalyticsConnectionSettings
+        settings.Connections.Add(new AnalyticsConnectionSettings
         {
             Key = Guid.Parse("22222222-2222-2222-2222-222222222220"),
             DisplayName = "Other",
@@ -38,7 +38,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
             DocumentRootKeys = ["11111111-1111-1111-1111-111111111111"]
         });
 
-        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
 
         Assert.Contains(failures, failure => failure.Contains("assigned to both"));
     }
@@ -49,7 +49,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         var settings = CreateSettings();
         settings.Connections[0].EnabledDocumentTypeKeys = ["not-a-guid"];
 
-        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
 
         Assert.Contains(failures, failure => failure.Contains("invalid document type key"));
     }
@@ -60,7 +60,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         var settings = CreateSettings();
         settings.Connections[0].EnableAllDocumentTypes = true;
 
-        Assert.Empty(VercelAnalyticsSettingsValidator.Validate(settings));
+        Assert.Empty(WebAnalyticsSettingsValidator.Validate(settings));
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         settings.Connections[0].ProjectId = string.Empty;
         settings.Connections[0].MockScenario = MockAnalyticsScenario.Flags;
 
-        Assert.Empty(VercelAnalyticsSettingsValidator.Validate(settings));
+        Assert.Empty(WebAnalyticsSettingsValidator.Validate(settings));
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         settings.Connections[0].MockScenario = MockAnalyticsScenario.Events;
         settings.Connections[0].Team = "team_example";
 
-        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
 
         Assert.Contains(failures, failure => failure.Contains("cannot define a Vercel project ID"));
         Assert.Contains(failures, failure => failure.Contains("cannot define a Vercel team"));
@@ -92,7 +92,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         var settings = CreateSettings();
         settings.Connections[0].MockScenario = (MockAnalyticsScenario)999;
 
-        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
 
         var failure = Assert.Single(failures);
         Assert.Contains("unsupported mock analytics scenario", failure);
@@ -108,11 +108,11 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         settings.Connections[0].DocumentRootKeys = ["not-a-guid"];
         settings.Connections[0].EnabledDocumentTypeKeys = ["not-a-guid"];
 
-        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
 
         Assert.Contains(failures, failure => failure.Contains("unsupported mock analytics scenario"));
         Assert.Contains(failures, failure => failure.Contains("requires a valid key"));
-        Assert.Contains(failures, failure => failure.Contains("requires a project ID"));
+        Assert.Contains(failures, failure => failure.Contains("requires a Vercel project ID"));
         Assert.Contains(failures, failure => failure.Contains("invalid document root key"));
         Assert.Contains(failures, failure => failure.Contains("invalid document type key"));
     }
@@ -123,9 +123,9 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         var settings = CreateSettings();
         settings.Connections[0].MockScenario = (MockAnalyticsScenario)999;
 
-        var failures = VercelAnalyticsSettingsValidator.Validate(
+        var failures = WebAnalyticsSettingsValidator.Validate(
             settings,
-            VercelAnalyticsValidationMode.ServerOptions);
+            WebAnalyticsValidationMode.ServerOptions);
 
         var failure = Assert.Single(failures);
         Assert.Contains("unsupported mock analytics scenario", failure);
@@ -142,7 +142,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         settings.Connections[0].ProjectId = string.Empty;
         settings.Connections[0].MockScenario = scenario;
 
-        Assert.Empty(VercelAnalyticsSettingsValidator.Validate(settings));
+        Assert.Empty(WebAnalyticsSettingsValidator.Validate(settings));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     {
         var settings = CreateSettings();
         settings.Connections[0].MockScenario = (MockAnalyticsScenario)999;
-        settings.Connections.Add(new VercelAnalyticsConnectionSettings
+        settings.Connections.Add(new AnalyticsConnectionSettings
         {
             Key = Guid.Parse("22222222-2222-2222-2222-222222222220"),
             DisplayName = "Other",
@@ -158,7 +158,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
             EnabledDocumentTypeKeys = ["not-a-guid"]
         });
 
-        var failures = VercelAnalyticsSettingsValidator.Validate(settings);
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
 
         Assert.Contains(failures, failure => failure.Contains("unsupported mock analytics scenario"));
         Assert.Contains(failures, failure => failure.Contains("invalid document type key"));
@@ -167,7 +167,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     [Fact]
     public void Store_preserves_mock_identity_without_Vercel_metadata()
     {
-        var store = new VercelAnalyticsSettingsStore(Options.Create(new VercelAnalyticsOptions()));
+        var store = new WebAnalyticsSettingsStore(Options.Create(new WebAnalyticsOptions()));
         var settings = CreateSettings();
         settings.Connections[0].MockScenario = MockAnalyticsScenario.Utm;
         settings.Connections[0].Team = "team_example";
@@ -184,7 +184,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     [Fact]
     public void Store_normalizes_non_secret_values_without_adding_a_token()
     {
-        var store = new VercelAnalyticsSettingsStore(Options.Create(new VercelAnalyticsOptions()));
+        var store = new WebAnalyticsSettingsStore(Options.Create(new WebAnalyticsOptions()));
         var settings = CreateSettings();
         settings.Connections[0].DocumentRootKeys = ["11111111-1111-1111-1111-111111111111"];
 
@@ -196,9 +196,58 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     }
 
     [Fact]
+    public void Store_normalizes_plausible_event_property_names()
+    {
+        var store = new WebAnalyticsSettingsStore(Options.Create(new WebAnalyticsOptions()));
+        var settings = CreateSettings();
+        var connection = settings.Connections[0];
+        connection.Provider = AnalyticsProvider.Plausible;
+        connection.ProjectId = string.Empty;
+        connection.SiteId = "example.com";
+        connection.EventPropertyNames = [" locale ", "title", "LOCALE", ""];
+
+        store.Save(settings);
+
+        Assert.Equal(["locale", "title"], Assert.Single(store.Get().Connections).EventPropertyNames);
+    }
+
+    [Fact]
+    public void Event_property_names_are_bounded_and_plausible_only()
+    {
+        var settings = CreateSettings();
+        settings.Connections[0].EventPropertyNames = ["locale"];
+        var vercelFailures = WebAnalyticsSettingsValidator.Validate(settings);
+
+        settings.Connections[0].Provider = AnalyticsProvider.Plausible;
+        settings.Connections[0].ProjectId = string.Empty;
+        settings.Connections[0].SiteId = "example.com";
+        settings.Connections[0].EventPropertyNames = Enumerable.Range(1, 21).Select(index => $"property-{index}").ToArray();
+        var maximumFailures = WebAnalyticsSettingsValidator.Validate(settings);
+
+        Assert.Contains(vercelFailures, failure => failure.Contains("cannot define event properties"));
+        Assert.Contains(maximumFailures, failure => failure.Contains("cannot define more than 20 event properties"));
+    }
+
+    [Fact]
+    public void Null_event_property_names_from_external_json_are_normalized()
+    {
+        var settings = CreateSettings();
+        var connection = settings.Connections[0];
+        connection.Provider = AnalyticsProvider.Plausible;
+        connection.ProjectId = string.Empty;
+        connection.SiteId = "example.com";
+        connection.EventPropertyNames = null!;
+        var store = new WebAnalyticsSettingsStore(Options.Create(new WebAnalyticsOptions()));
+
+        store.Save(settings);
+
+        Assert.Empty(Assert.Single(store.Get().Connections).EventPropertyNames);
+    }
+
+    [Fact]
     public void Store_generates_and_preserves_a_missing_connection_key()
     {
-        var store = new VercelAnalyticsSettingsStore(Options.Create(new VercelAnalyticsOptions()));
+        var store = new WebAnalyticsSettingsStore(Options.Create(new WebAnalyticsOptions()));
         var settings = CreateSettings();
         settings.Connections[0].Key = Guid.Empty;
 
@@ -214,7 +263,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     public void Store_preserves_connection_order_from_server_options()
     {
         var secondKey = Guid.Parse("22222222-2222-2222-2222-222222222220");
-        var options = new VercelAnalyticsOptions
+        var options = new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Vercel = { AccessToken = "server-secret" } },
@@ -224,7 +273,7 @@ public sealed class VercelAnalyticsSettingsValidatorTests
                 new() { Key = secondKey, ProjectId = "second-project" }
             ]
         };
-        var store = new VercelAnalyticsSettingsStore(Options.Create(options));
+        var store = new WebAnalyticsSettingsStore(Options.Create(options));
 
         Assert.Equal([MainKey, secondKey], store.Get().Connections.Select(connection => connection.Key));
     }
@@ -233,9 +282,9 @@ public sealed class VercelAnalyticsSettingsValidatorTests
     public void Store_observes_settings_saved_by_another_application_node()
     {
         var values = new FakeKeyValueService();
-        var options = Options.Create(new VercelAnalyticsOptions());
-        var firstNode = new VercelAnalyticsSettingsStore(values, options);
-        var secondNode = new VercelAnalyticsSettingsStore(values, options);
+        var options = Options.Create(new WebAnalyticsOptions());
+        var firstNode = new WebAnalyticsSettingsStore(values, options);
+        var secondNode = new WebAnalyticsSettingsStore(values, options);
         var initial = CreateSettings();
         firstNode.Save(initial);
         var secondNodeInitialRevision = secondNode.GetSnapshot().Revision;
@@ -251,12 +300,56 @@ public sealed class VercelAnalyticsSettingsValidatorTests
         Assert.Equal("Changed on another node", observed.Settings.Connections[0].DisplayName);
     }
 
-    private static VercelAnalyticsSettings CreateSettings() => new()
+    [Fact]
+    public void Store_loads_and_roundtrips_legacy_vercel_settings_without_provider_or_credentials()
+    {
+        var values = new FakeKeyValueService();
+        values.SetValue(StorageKey, LoadFixture("legacy-vercel-settings-v2.json"));
+        var store = new WebAnalyticsSettingsStore(values, Options.Create(new WebAnalyticsOptions()));
+
+        var loaded = store.Get();
+        var connection = Assert.Single(loaded.Connections);
+
+        Assert.True(loaded.Enabled);
+        Assert.Equal(45, loaded.DefaultRangeDays);
+        Assert.Equal(TimeSpan.FromMinutes(2), loaded.CacheDuration);
+        Assert.Equal(MainKey, connection.Key);
+        Assert.Equal(AnalyticsProvider.Vercel, connection.Provider);
+        Assert.Equal("Legacy Vercel", connection.DisplayName);
+        Assert.Equal("prj_legacy", connection.ProjectId);
+        Assert.Equal("team_legacy", connection.Team);
+        Assert.Equal(["11111111-1111-1111-1111-111111111111"], connection.DocumentRootKeys);
+        Assert.True(connection.EnableAllDocumentTypes);
+        Assert.Equal(["22222222-2222-2222-2222-222222222222"], connection.EnabledDocumentTypeKeys);
+        Assert.Equal(["articlePage"], connection.EnabledDocumentTypes);
+
+        store.Save(loaded);
+        var serialized = values.GetValue(StorageKey);
+        Assert.NotNull(serialized);
+        Assert.DoesNotContain("token", serialized, StringComparison.OrdinalIgnoreCase);
+
+        var reloaded = new WebAnalyticsSettingsStore(values, Options.Create(new WebAnalyticsOptions())).Get();
+        var reloadedConnection = Assert.Single(reloaded.Connections);
+        Assert.Equal(MainKey, reloadedConnection.Key);
+        Assert.Equal(AnalyticsProvider.Vercel, reloadedConnection.Provider);
+        Assert.Equal(connection.ProjectId, reloadedConnection.ProjectId);
+        Assert.Equal(connection.Team, reloadedConnection.Team);
+        Assert.Equal(connection.DocumentRootKeys, reloadedConnection.DocumentRootKeys);
+        Assert.Equal(connection.EnabledDocumentTypeKeys, reloadedConnection.EnabledDocumentTypeKeys);
+        Assert.Equal(connection.EnabledDocumentTypes, reloadedConnection.EnabledDocumentTypes);
+    }
+
+    private const string StorageKey = "TheBuilder.WebAnalytics.Settings.v2";
+
+    private static string LoadFixture(string fileName) => File.ReadAllText(
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName));
+
+    private static WebAnalyticsSettings CreateSettings() => new()
     {
         Enabled = true,
         Connections =
         [
-            new VercelAnalyticsConnectionSettings
+            new AnalyticsConnectionSettings
             {
                 Key = MainKey,
                 DisplayName = "Main",

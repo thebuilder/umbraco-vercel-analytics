@@ -44,7 +44,6 @@ export const UTM_OPTIONS: ReadonlyArray<DimensionOption<UtmDimension>> = [
 ];
 
 const SHARED_CARDS: ReadonlyArray<DashboardCard> = [
-  { kind: "breakdown", dimension: "ReferrerHostname", headline: "Referrers", span: "wide" },
   { kind: "breakdown", dimension: "Country", headline: "Countries", span: "normal" },
   { kind: "tabbed-breakdown", id: "audience", options: AUDIENCE_OPTIONS, reportLoading: "eager", span: "normal", planLimited: false },
   { kind: "breakdown", dimension: "OsName", headline: "Operating systems", span: "normal" },
@@ -59,9 +58,14 @@ const UTM_CARD: DashboardCard = {
   planLimited: true,
 };
 
-export function dashboardCards(documentScoped: boolean, utmCapability: UtmCapability): ReadonlyArray<DashboardCard> {
+export function dashboardCards(
+  documentScoped: boolean,
+  utmCapability: UtmCapability,
+  referrerDimension: "ReferrerHostname" | "Referrer" = "ReferrerHostname",
+): ReadonlyArray<DashboardCard> {
   const cards: DashboardCard[] = [
     ...(documentScoped ? [] : [{ kind: "breakdown" as const, dimension: "RequestPath" as const, headline: "Pages", span: "wide" as const }]),
+    { kind: "breakdown", dimension: referrerDimension, headline: "Referrers", span: "wide" },
     ...SHARED_CARDS,
   ];
   if (utmCapability === "available") cards.push(UTM_CARD);
@@ -73,8 +77,9 @@ export function dashboardReportPlan(
   utmCapability: UtmCapability,
   acquisitionView: AcquisitionView,
   utmDimension: UtmDimension,
+  referrerDimension: "ReferrerHostname" | "Referrer" = "ReferrerHostname",
 ): DashboardReportPlan {
-  const cards = dashboardCards(documentScoped, utmCapability);
+  const cards = dashboardCards(documentScoped, utmCapability, referrerDimension);
   const dimensions = cards.flatMap((card) => card.kind === "breakdown"
     ? [card.dimension]
     : card.reportLoading === "eager" ? card.options.map(({ dimension }) => dimension) : []);

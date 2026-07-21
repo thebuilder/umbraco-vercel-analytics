@@ -1,11 +1,20 @@
 using System.Text.Json.Serialization;
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
+using TheBuilder.WebAnalytics.Configuration;
 
 namespace TheBuilder.WebAnalytics.Models;
 
 public sealed class AnalyticsProblemDetails : ProblemDetails
 {
     public string Code { get; init; } = string.Empty;
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<AnalyticsProvider>))]
+public enum AnalyticsProvider
+{
+    Vercel,
+    Plausible
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<AnalyticsInterval>))]
@@ -15,6 +24,13 @@ public enum AnalyticsInterval
     Day,
     Week,
     Month
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<AnalyticsTrafficMetric>))]
+public enum AnalyticsTrafficMetric
+{
+    Visitors,
+    PageViews
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<MockAnalyticsScenario>))]
@@ -32,6 +48,7 @@ public enum AnalyticsDimension
     RequestPath,
     Route,
     ReferrerHostname,
+    Referrer,
     Country,
     DeviceType,
     BrowserName,
@@ -43,6 +60,15 @@ public enum AnalyticsDimension
     UtmContent,
     EventName
 }
+
+public sealed record AnalyticsCapabilities(
+    IReadOnlyList<AnalyticsDimension> Dimensions,
+    bool Events,
+    bool EventDetails,
+    bool EventProperties,
+    bool GlobalEventFiltering,
+    bool Flags,
+    bool BreakdownOrdering);
 
 public sealed record AnalyticsQuery(
     Guid Connection,
@@ -76,7 +102,13 @@ public sealed record AnalyticsEventDataFilter(string Property, string Value);
 
 public sealed record AnalyticsTotals(long PageViews, long Visitors);
 
-public sealed record AnalyticsPoint(DateTimeOffset Timestamp, long PageViews, long Visitors);
+public sealed record AnalyticsPoint(string Timestamp, long PageViews, long Visitors)
+{
+    public AnalyticsPoint(DateTimeOffset timestamp, long pageViews, long visitors)
+        : this(timestamp.ToString("O", CultureInfo.InvariantCulture), pageViews, visitors)
+    {
+    }
+}
 
 public sealed record AnalyticsSummary(
     AnalyticsTotals Totals,
@@ -113,6 +145,8 @@ public sealed record AnalyticsEventDetails(
 public sealed record AnalyticsConnectionSummary(
     Guid Key,
     string DisplayName,
+    AnalyticsProvider Provider,
+    AnalyticsCapabilities Capabilities,
     bool IsDefault,
     bool IsConfigured,
     string? BaseUrl,
@@ -125,6 +159,8 @@ public sealed record AnalyticsConnectionsResponse(
 
 public sealed record AnalyticsDocumentRoute(
     Guid Connection,
+    AnalyticsProvider Provider,
+    AnalyticsCapabilities Capabilities,
     string Culture,
     string Hostname,
     string Path,
@@ -134,23 +170,38 @@ public sealed record AnalyticsDocumentRoute(
 
 public sealed record AnalyticsSettingsResponse(
     bool Enabled,
-    bool HasAccessToken,
+    IReadOnlyList<AnalyticsProviderDescriptor> Providers,
+    IReadOnlyList<AnalyticsProviderTokenStatus> ProviderTokens,
     bool CanCreateMockConnections,
     int DefaultRangeDays,
     string CacheDuration,
     IReadOnlyList<AnalyticsConnectionSettingsResponse> Connections);
 
-public sealed record AnalyticsConnectionSettingsResponse(
-    Guid Key,
-    string DisplayName,
-    string ProjectId,
-    string? Team,
-    IReadOnlyList<string> DocumentRootKeys,
-    bool EnableAllDocumentTypes,
-    IReadOnlyList<string> EnabledDocumentTypeKeys,
-    bool HasAccessToken,
-    bool HasAccessTokenOverride,
-    MockAnalyticsScenario? MockScenario);
+public sealed record AnalyticsProviderDescriptor(
+    AnalyticsProvider Provider,
+    string Description,
+    string LogoSlug,
+    AnalyticsIdentifierFieldDescriptor Identifier,
+    AnalyticsOptionalFieldDescriptor? Team,
+    AnalyticsCredentialDescriptor Credential,
+    AnalyticsEventPropertyDescriptor? EventProperties);
+
+public sealed class AnalyticsConnectionSettingsResponse
+{
+    public required Guid Key { get; init; }
+    public required string DisplayName { get; init; }
+    public required AnalyticsProvider Provider { get; init; }
+    public required string ProjectId { get; init; }
+    public string? Team { get; init; }
+    public required string SiteId { get; init; }
+    public IReadOnlyList<string> EventPropertyNames { get; init; } = [];
+    public required IReadOnlyList<string> DocumentRootKeys { get; init; }
+    public required bool EnableAllDocumentTypes { get; init; }
+    public required IReadOnlyList<string> EnabledDocumentTypeKeys { get; init; }
+    public required bool HasAccessToken { get; init; }
+    public required bool HasAccessTokenOverride { get; init; }
+    public MockAnalyticsScenario? MockScenario { get; init; }
+}
 
 public sealed record UpdateAnalyticsSettingsRequest(
     bool Enabled,
@@ -158,14 +209,23 @@ public sealed record UpdateAnalyticsSettingsRequest(
     string CacheDuration,
     IReadOnlyList<UpdateAnalyticsConnectionRequest> Connections);
 
-public sealed record UpdateAnalyticsConnectionRequest(
-    Guid Key,
-    string DisplayName,
-    string ProjectId,
-    string? Team,
-    MockAnalyticsScenario? MockScenario,
-    IReadOnlyList<string> DocumentRootKeys,
-    bool EnableAllDocumentTypes,
-    IReadOnlyList<string> EnabledDocumentTypeKeys);
+public sealed class UpdateAnalyticsConnectionRequest
+{
+    public required Guid Key { get; init; }
+    public required string DisplayName { get; init; }
+    public required AnalyticsProvider Provider { get; init; }
+    public required string ProjectId { get; init; }
+    public string? Team { get; init; }
+    public required string SiteId { get; init; }
+    public IReadOnlyList<string> EventPropertyNames { get; init; } = [];
+    public MockAnalyticsScenario? MockScenario { get; init; }
+    public required IReadOnlyList<string> DocumentRootKeys { get; init; }
+    public required bool EnableAllDocumentTypes { get; init; }
+    public required IReadOnlyList<string> EnabledDocumentTypeKeys { get; init; }
+}
+
+public sealed record AnalyticsProviderTokenStatus(
+    AnalyticsProvider Provider,
+    bool HasAccessToken);
 
 public sealed record AnalyticsConnectionTestResult(bool Success, string Message);

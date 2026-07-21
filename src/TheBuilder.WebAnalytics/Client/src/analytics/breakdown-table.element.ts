@@ -16,8 +16,8 @@ import { countryDisplayName, countryFlagUrl, normalizeCountryCode } from "./coun
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import { googleFaviconUrl } from "./favicon.js";
 
-@customElement("vercel-analytics-breakdown-table")
-export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-breakdown-table")
+export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElement) {
   @property() headline = "Breakdown";
   @property() unavailable?: string;
   @property() baseUrl?: string;
@@ -58,13 +58,14 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
         <caption>${this.headline}</caption>
         ${this.#renderHeading()}
         <tbody>${rows.map((row, index) => {
-          const href = this.dimension === "ReferrerHostname"
+          const isReferrer = this.dimension === "ReferrerHostname" || this.dimension === "Referrer";
+          const href = isReferrer
             ? referrerExternalHref(row.value)
             : this.linkValues
               ? analyticsRowHref(this.baseUrl, row.value)
               : undefined;
           const countryCode = this.dimension === "Country" ? normalizeCountryCode(row.value) : undefined;
-          const faviconUrl = this.dimension === "ReferrerHostname" && href ? googleFaviconUrl(row.value) : undefined;
+          const faviconUrl = isReferrer && href ? googleFaviconUrl(row.value) : undefined;
           const displayValue = countryCode
             ? countryDisplayName(countryCode, navigator.languages)
             : breakdownDisplayValue(row.value, this.dimension);
@@ -256,6 +257,6 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-breakdown-table": VercelAnalyticsBreakdownTableElement;
+    "web-analytics-breakdown-table": WebAnalyticsBreakdownTableElement;
   }
 }

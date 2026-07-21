@@ -7,18 +7,42 @@ import {
   validateConnection,
   validateEditableSettings,
 } from "./settings-model.js";
+import { providerDescriptor } from "./provider-identity.js";
 
 const settings = (): AnalyticsSettingsResponse => ({
   enabled: true,
-  hasAccessToken: false,
+  providers: [
+    {
+      provider: "Vercel",
+      description: "Projects using Vercel Web Analytics",
+      logoSlug: "vercel",
+      identifier: { key: "projectId", label: "Vercel project ID", description: "Use the project ID from your Vercel project settings.", requiredMessage: "a Vercel project ID" },
+      team: { key: "team", label: "Team ID or slug", description: "Optional team slug or ID for projects owned by a Vercel team." },
+      credential: { label: "access token", description: "Configure a Vercel access token in the server settings.", documentationUrl: "https://vercel.com/docs/rest-api" },
+      eventProperties: null,
+    },
+    {
+      provider: "Plausible",
+      description: "Sites using Plausible Analytics",
+      logoSlug: "plausible",
+      identifier: { key: "siteId", label: "Plausible site ID", description: "Use the domain configured in your Plausible site settings.", requiredMessage: "a Plausible site ID" },
+      team: null,
+      credential: { label: "Stats API key", description: "Configure a Plausible Stats API key in the server settings.", documentationUrl: "https://plausible.io/docs/stats-api" },
+      eventProperties: { label: "event properties", description: "Optional custom event property names configured for this Plausible site.", maximumNames: 20, maximumNameLength: 100 },
+    },
+  ],
+  providerTokens: [{ provider: "Vercel", hasAccessToken: false }, { provider: "Plausible", hasAccessToken: false }],
   canCreateMockConnections: false,
   defaultRangeDays: 30,
   cacheDuration: "00:05:00",
   connections: [{
     key: "11111111-1111-1111-1111-111111111111",
     displayName: "Main",
+    provider: "Vercel",
     projectId: "project",
     team: null,
+    siteId: "",
+    eventPropertyNames: [],
     documentRootKeys: [],
     enableAllDocumentTypes: false,
     enabledDocumentTypeKeys: [],
@@ -33,8 +57,8 @@ describe("analytics settings model", () => {
     const connection = settings().connections[0];
     connection.projectId = "";
 
-    expect(validateConnection(connection)).toEqual({
-      projectId: "Enter the Vercel project ID.",
+    expect(validateConnection(connection, providerDescriptor(settings(), connection.provider))).toEqual({
+      projectId: "Enter a Vercel project ID.",
     });
   });
 
@@ -43,7 +67,7 @@ describe("analytics settings model", () => {
     model.connections[0].projectId = "";
     model.connections[0].mockScenario = "Complete";
 
-    expect(validateConnection(model.connections[0])).toEqual({});
+    expect(validateConnection(model.connections[0], providerDescriptor(model, model.connections[0].provider))).toEqual({});
     expect(createSettingsUpdate(model).connections[0].mockScenario).toBe("Complete");
   });
 
@@ -63,8 +87,8 @@ describe("analytics settings model", () => {
     const model = settings();
     model.connections[0].projectId = "";
 
-    expect(validateConnection(model.connections[0])).toEqual({
-      projectId: "Enter the Vercel project ID.",
+    expect(validateConnection(model.connections[0], providerDescriptor(model, model.connections[0].provider))).toEqual({
+      projectId: "Enter a Vercel project ID.",
     });
   });
 
@@ -93,5 +117,20 @@ describe("analytics settings model", () => {
     const model = settings();
 
     expect(createSettingsUpdate(model).connections[0].key).toBe(model.connections[0].key);
+  });
+
+  it("validates and serializes Plausible event property names", () => {
+    const model = settings();
+    const connection = model.connections[0];
+    connection.provider = "Plausible";
+    connection.projectId = "";
+    connection.siteId = "example.com";
+    connection.eventPropertyNames = ["locale", "title"];
+
+    expect(validateConnection(connection, providerDescriptor(model, connection.provider))).toEqual({});
+    expect(createSettingsUpdate(model).connections[0].eventPropertyNames).toEqual(["locale", "title"]);
+
+    connection.eventPropertyNames = Array.from({ length: 21 }, (_, index) => `property-${index}`);
+    expect(validateConnection(connection, providerDescriptor(model, connection.provider)).eventPropertyNames).toBe("Add no more than 20 event properties.");
   });
 });

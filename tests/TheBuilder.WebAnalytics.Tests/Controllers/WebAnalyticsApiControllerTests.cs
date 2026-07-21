@@ -52,15 +52,15 @@ public sealed class WebAnalyticsApiControllerTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = 0;
         var routes = new Mock<IAnalyticsDocumentRouteService>(MockBehavior.Strict);
-        var projectNames = new Mock<IVercelProjectNameService>(MockBehavior.Strict);
+        var projectNames = new Mock<IAnalyticsConnectionNameService>(MockBehavior.Strict);
         projectNames
             .Setup(service => service.GetDisplayNameAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((VercelAnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
+            .ReturnsAsync((AnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
         routes
             .Setup(service => service.GetConnectionBaseUrlAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
@@ -95,17 +95,17 @@ public sealed class WebAnalyticsApiControllerTests
         authorization.Setup(service => service.HasAnalyticsSectionAccess()).Returns(true);
         var routes = new Mock<IAnalyticsDocumentRouteService>(MockBehavior.Strict);
         routes.Setup(service => service.GetConnectionBaseUrlAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
-        var projectNames = new Mock<IVercelProjectNameService>(MockBehavior.Strict);
+        var projectNames = new Mock<IAnalyticsConnectionNameService>(MockBehavior.Strict);
         projectNames.Setup(service => service.GetDisplayNameAsync(
-                It.IsAny<VercelAnalyticsConnection>(),
+                It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("Demo");
-        var options = Options.Create(new VercelAnalyticsOptions());
-        var store = new VercelAnalyticsSettingsStore(options);
-        store.Save(new VercelAnalyticsSettings
+        var options = Options.Create(new WebAnalyticsOptions());
+        var store = new WebAnalyticsSettingsStore(options);
+        store.Save(new WebAnalyticsSettings
         {
             Enabled = true,
             Connections =
@@ -118,7 +118,7 @@ public sealed class WebAnalyticsApiControllerTests
                 }
             ]
         });
-        var registry = new VercelAnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: true);
+        var registry = new AnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: true);
         var controller = new WebAnalyticsApiController(
             authorization.Object,
             registry,
@@ -170,6 +170,8 @@ public sealed class WebAnalyticsApiControllerTests
             .ReturnsAsync([
                 new AnalyticsDocumentRoute(
                     MainKey,
+                    AnalyticsProvider.Vercel,
+                    AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel).Capabilities,
                     "en-US",
                     "example.com",
                     "/published",
@@ -246,6 +248,22 @@ public sealed class WebAnalyticsApiControllerTests
     }
 
     [Fact]
+    public async Task Breakdown_rejects_selectable_ordering_for_vercel()
+    {
+        var response = await CreateVercelBoundaryController().Breakdown(
+            AnalyticsDimension.Country,
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day,
+            orderBy: AnalyticsTrafficMetric.PageViews);
+
+        AssertInvalidQuery(response.Result);
+        var problem = Assert.IsType<AnalyticsProblemDetails>(Assert.IsType<ObjectResult>(response.Result).Value);
+        Assert.Contains("does not support selecting", problem.Detail);
+    }
+
+    [Fact]
     public async Task Summary_rejects_undefined_numeric_interval_before_dispatch()
     {
         var controller = CreateBoundaryOnlyController();
@@ -267,7 +285,7 @@ public sealed class WebAnalyticsApiControllerTests
     [Fact]
     public async Task Summary_rejects_event_name_filter_in_visit_scope_before_dispatch()
     {
-        var controller = CreateBoundaryOnlyController();
+        var controller = CreateVercelBoundaryController();
 
         var response = await controller.Summary(
             MainKey,
@@ -282,13 +300,66 @@ public sealed class WebAnalyticsApiControllerTests
 
         AssertInvalidQuery(response.Result);
         var problem = Assert.IsType<AnalyticsProblemDetails>(Assert.IsType<ObjectResult>(response.Result).Value);
-        Assert.Contains("only supported by the event list report", problem.Detail);
+        Assert.Contains("does not support event filters for this report", problem.Detail);
+    }
+
+    [Fact]
+    public async Task Summary_rejects_filters_not_supported_by_the_selected_provider()
+    {
+        var authorization = new Mock<IAnalyticsAuthorizationService>(MockBehavior.Strict);
+        authorization.Setup(service => service.HasAnalyticsSectionAccess()).Returns(true);
+        var controller = new WebAnalyticsApiController(
+            authorization.Object,
+            PlausibleRegistry(),
+            null!,
+            null!,
+            null!);
+
+        var response = await controller.Summary(
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day,
+            null,
+            null,
+            null,
+            ["Route:/articles/[slug]"],
+            CancellationToken.None);
+
+        AssertInvalidQuery(response.Result);
+        var problem = Assert.IsType<AnalyticsProblemDetails>(Assert.IsType<ObjectResult>(response.Result).Value);
+        Assert.Contains("does not support Route filters", problem.Detail);
+    }
+
+    [Fact]
+    public async Task Breakdown_rejects_a_dimension_not_supported_by_the_selected_provider()
+    {
+        var response = await CreatePlausibleBoundaryController().Breakdown(
+            AnalyticsDimension.Route,
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day);
+
+        AssertInvalidQuery(response.Result);
+    }
+
+    [Fact]
+    public async Task Flags_rejects_a_provider_without_flag_capabilities()
+    {
+        var response = await CreatePlausibleBoundaryController().Flags(
+            MainKey,
+            UtcDate(2026, 7, 1),
+            UtcDate(2026, 7, 3),
+            AnalyticsInterval.Day);
+
+        AssertInvalidQuery(response.Result);
     }
 
     [Fact]
     public async Task Event_details_rejects_event_name_filter_from_the_shared_query()
     {
-        var controller = CreateBoundaryOnlyController();
+        var controller = CreateVercelBoundaryController();
 
         var response = await controller.EventDetails(
             MainKey,
@@ -304,7 +375,7 @@ public sealed class WebAnalyticsApiControllerTests
     [Fact]
     public async Task Event_property_values_reject_event_name_filter_from_the_shared_query()
     {
-        var controller = CreateBoundaryOnlyController();
+        var controller = CreateVercelBoundaryController();
 
         var response = await controller.EventPropertyValues(
             MainKey,
@@ -321,16 +392,30 @@ public sealed class WebAnalyticsApiControllerTests
     private static WebAnalyticsApiController CreateBoundaryOnlyController() =>
         new(null!, null!, null!, null!, null!);
 
+    private static WebAnalyticsApiController CreateVercelBoundaryController()
+    {
+        var authorization = new Mock<IAnalyticsAuthorizationService>(MockBehavior.Strict);
+        authorization.Setup(service => service.HasAnalyticsSectionAccess()).Returns(true);
+        return new(authorization.Object, EnabledRegistry(), null!, null!, null!);
+    }
+
+    private static WebAnalyticsApiController CreatePlausibleBoundaryController()
+    {
+        var authorization = new Mock<IAnalyticsAuthorizationService>(MockBehavior.Strict);
+        authorization.Setup(service => service.HasAnalyticsSectionAccess()).Returns(true);
+        return new(authorization.Object, PlausibleRegistry(), null!, null!, null!);
+    }
+
     private static DateTimeOffset UtcDate(int year, int month, int day) =>
         new(year, month, day, 0, 0, 0, TimeSpan.Zero);
 
-    private static VercelAnalyticsConnectionRegistry EnabledRegistry(params string[] aliases) =>
-        new(Options.Create(new VercelAnalyticsOptions
+    private static AnalyticsConnectionRegistry EnabledRegistry(params string[] aliases) =>
+        CreateRegistry(new WebAnalyticsOptions
         {
             Enabled = true,
             Providers = { Vercel = { AccessToken = "secret" } },
             Connections = (aliases.Length == 0 ? ["main"] : aliases).Select(
-                alias => new VercelAnalyticsConnectionOptions
+                alias => new AnalyticsConnectionOptions
                 {
                     Key = alias == "secondary" ? SecondaryKey : MainKey,
                     DisplayName = alias,
@@ -338,13 +423,37 @@ public sealed class WebAnalyticsApiControllerTests
                     DocumentRootKeys = [Guid.NewGuid().ToString()],
                     EnableAllDocumentTypes = true
                 }).ToList()
-        }));
+        });
+
+    private static AnalyticsConnectionRegistry PlausibleRegistry() =>
+        CreateRegistry(new WebAnalyticsOptions
+        {
+            Enabled = true,
+            Providers = { Plausible = { AccessToken = "secret" } },
+            Connections =
+            [
+                new()
+                {
+                    Key = MainKey,
+                    Provider = AnalyticsProvider.Plausible,
+                    DisplayName = "Plausible",
+                    SiteId = "example.com",
+                    EnableAllDocumentTypes = true
+                }
+            ]
+        });
+
+    private static AnalyticsConnectionRegistry CreateRegistry(WebAnalyticsOptions options)
+    {
+        var accessor = Options.Create(options);
+        return new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(accessor), accessor);
+    }
 
     private static void AssertInvalidQuery(ActionResult? result)
     {
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);
         var problem = Assert.IsType<AnalyticsProblemDetails>(objectResult.Value);
-        Assert.Equal(VercelAnalyticsProblemCodes.InvalidQuery, problem.Code);
+        Assert.Equal(WebAnalyticsProblemCodes.InvalidQuery, problem.Code);
     }
 }

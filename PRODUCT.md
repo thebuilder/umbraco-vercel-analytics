@@ -14,13 +14,15 @@ The primary users are content editors and marketing staff working in the authent
 
 ## Product Purpose
 
-Web Analytics brings Vercel Web Analytics into the Umbraco backoffice. It helps editors understand site and page traffic where they already manage content, while administrators retain secure control of project connections and server-side credentials.
+Web Analytics brings insights from Vercel Web Analytics and Plausible into the Umbraco editorial workflow. It gives editors clear site-wide and page-level traffic context where they already manage content, while administrators retain secure control of connections and server-side credentials.
 
-Success means that an editor can open Analytics, understand the important traffic signals quickly, and return to their content work without needing to visit Vercel or a separate analytics suite.
+Vercel and Plausible are bundled integrations. Reporting depth adapts to the capabilities and data available from the selected provider, while the editorial experience remains consistent and focused.
+
+Success means that an editor can open Analytics, understand the important traffic signals quickly, and return to their content work without needing to visit a separate analytics suite.
 
 ## Positioning
 
-Vercel traffic insights where editors already work, without exposing credentials or requiring another analytics dashboard.
+Clear site-wide and page-level insight where editors already work, without exposing credentials or requiring another analytics dashboard.
 
 ## Brand Personality
 

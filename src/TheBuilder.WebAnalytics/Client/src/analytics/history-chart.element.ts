@@ -23,8 +23,8 @@ import { formatAnalyticsDate, formatAnalyticsTooltipDate, isAnalyticsPeriodInPro
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip);
 
-@customElement("vercel-analytics-history-chart")
-export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-history-chart")
+export class WebAnalyticsHistoryChartElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) points: Array<{ timestamp: string; visitors: number; pageViews?: number; count?: number }> = [];
   @property() metric: "visitors" | "pageViews" | "count" = "visitors";
   @property() interval: AnalyticsInterval = "Day";
@@ -46,9 +46,9 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
     this.#chart?.destroy();
 
     const style = getComputedStyle(this);
-    const color = style.getPropertyValue("--vercel-analytics-chart-color").trim() || "oklch(51.51% .2399 257.85)";
+    const color = style.getPropertyValue("--web-analytics-chart-color").trim() || "oklch(51.51% .2399 257.85)";
     const lineColor = `color-mix(in srgb, ${color} 72%, transparent)`;
-    const fillColor = style.getPropertyValue("--vercel-analytics-chart-fill").trim() || "oklch(51.51% .2399 257.85 / 0.12)";
+    const fillColor = style.getPropertyValue("--web-analytics-chart-fill").trim() || "oklch(51.51% .2399 257.85 / 0.12)";
     const guideColor = style.getPropertyValue("--uui-color-text").trim() || "#1b264f";
     const mutedColor = style.getPropertyValue("--uui-color-text-alt").trim() || "#5c5c5c";
     const surfaceColor = style.getPropertyValue("--uui-color-surface").trim() || "#ffffff";
@@ -57,10 +57,10 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
     const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
-      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
+      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval, new Date(), this.timeZone)
       : false;
     const hoverGuide: Plugin<"line"> = {
-      id: "vercelAnalyticsHoverGuide",
+      id: "webAnalyticsHoverGuide",
       afterDatasetsDraw: (chart) => {
         const activeElement = chart.tooltip?.getActiveElements()[0];
         if (!activeElement) return;
@@ -119,8 +119,11 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
             callbacks: {
               label: (context) => `${label}  ${this.localize.number(context.parsed.y ?? 0)}`,
               title: (items) => {
-                const point = this.points[items[0]?.dataIndex ?? -1];
-                return point ? formatAnalyticsTooltipDate(point.timestamp, this.interval, locale, this.timeZone) : "";
+                const index = items[0]?.dataIndex ?? -1;
+                const point = this.points[index];
+                if (!point) return "";
+                const title = formatAnalyticsTooltipDate(point.timestamp, this.interval, locale, this.timeZone);
+                return latestPeriodInProgress && index === this.points.length - 1 ? `${title} · Ongoing` : title;
               },
             },
             cornerRadius: 3,
@@ -161,7 +164,7 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
     const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
-      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval)
+      ? isAnalyticsPeriodInProgress(latestPoint.timestamp, this.interval, new Date(), this.timeZone)
       : false;
     const progressDescription = latestPeriodInProgress ? ". The final period is still in progress" : "";
     return html`
@@ -185,6 +188,6 @@ export class VercelAnalyticsHistoryChartElement extends UmbElementMixin(LitEleme
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-history-chart": VercelAnalyticsHistoryChartElement;
+    "web-analytics-history-chart": WebAnalyticsHistoryChartElement;
   }
 }

@@ -37,8 +37,8 @@ const PRESETS: ReadonlyArray<{ value: Exclude<DatePreset, "custom">; label: stri
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-@customElement("vercel-analytics-date-range-picker")
-export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-date-range-picker")
+export class WebAnalyticsDateRangePickerElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) range: AnalyticsDateRange = dateRangeForPreset(30);
   @property({ attribute: false }) preset: DatePreset = 30;
 
@@ -308,6 +308,6 @@ export class VercelAnalyticsDateRangePickerElement extends UmbElementMixin(LitEl
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-date-range-picker": VercelAnalyticsDateRangePickerElement;
+    "web-analytics-date-range-picker": WebAnalyticsDateRangePickerElement;
   }
 }

@@ -13,8 +13,8 @@
     <Title>Web Analytics</Title>
     <Version>0.1.0</Version>
     <Authors>Daniel Schmidt</Authors>
-    <Description>View Vercel Web Analytics directly inside the Umbraco backoffice.</Description>
-    <PackageTags>umbraco;umbraco-marketplace;analytics;web analytics;vercel;vercel analytics;traffic;visitors;referrers;utm;dashboard;reporting;content analytics;page analytics;custom events;multi-site</PackageTags>
+    <Description>View Vercel and Plausible web analytics directly inside the Umbraco backoffice.</Description>
+    <PackageTags>umbraco;umbraco-marketplace;analytics;web analytics;vercel;plausible;traffic;visitors;referrers;utm;dashboard;reporting;content analytics;page analytics;custom events;multi-site</PackageTags>
     <PackageProjectUrl>https://github.com/thebuilder/web-analytics</PackageProjectUrl>
     <RepositoryUrl>https://github.com/thebuilder/web-analytics.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

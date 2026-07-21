@@ -4,14 +4,14 @@ import type { AnalyticsEventRow } from "../api/types.gen.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import { visibleEventRows } from "./event-rows.js";
 
-const EVENTS_SETUP_URL = "https://vercel.com/docs/analytics/custom-events";
-
-@customElement("vercel-analytics-event-table")
-export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-event-table")
+export class WebAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
   @property({ type: Boolean }) loading = false;
   @property({ type: Number }) skeletonRows = 10;
   @property({ attribute: false }) rows: AnalyticsEventRow[] = [];
   @property({ attribute: false }) filters: AnalyticsFilter[] = [];
+  @property({ type: Boolean }) detailsEnabled = true;
+  @property({ type: Boolean }) filteringEnabled = false;
 
   #select(eventName: string): void {
     this.dispatchEvent(new CustomEvent("select-event", {
@@ -28,8 +28,8 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
     return html`
       ${this.loading ? html`<span class="visually-hidden" role="status">Loading events</span>` : ""}
       <table aria-busy=${this.loading ? "true" : "false"}>
-        <caption>Custom events</caption>
-        <thead><tr><th scope="col">Events</th><th scope="col">Visitors</th><th scope="col">Total events</th></tr></thead>
+        <caption>Events and goals</caption>
+        <thead><tr><th scope="col">Events and goals</th><th scope="col">Visitors</th><th scope="col">Total</th></tr></thead>
         <tbody>${this.loading
           ? Array.from({ length: this.skeletonRows }, () => html`
               <tr><th scope="row"><span class="skeleton-line"></span></th><td><span class="skeleton-number"></span></td><td><span class="skeleton-number"></span></td></tr>
@@ -41,10 +41,12 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
               <tr>
                 <th scope="row">
                   <span class="bar" style=${`--bar-width:${(row.count / maximum) * 100}%;--bar-minimum:${row.count > 0 ? "4px" : "0px"}`}></span>
-                  <button class="details-action" type="button" title=${`View details for ${row.eventName}`} @click=${() => this.#select(row.eventName)}>${row.eventName}</button>
+                  ${this.detailsEnabled
+                    ? html`<button class="details-action" type="button" title=${`View details for ${row.eventName}`} @click=${() => this.#select(row.eventName)}>${row.eventName}</button>`
+                    : html`<span class="event-name">${row.eventName}</span>`}
                 </th>
                 <td><span class="metric-cell">
-                  <button
+                  ${this.filteringEnabled ? html`<button
                     class="filter-action"
                     type="button"
                     aria-label=${filterLabel}
@@ -56,7 +58,7 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
                       detail: { dimension: "EventName", value: row.eventName },
                     }))}>
                     <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
-                  </button>
+                  </button>` : ""}
                   <span>${this.localize.number(row.visitors)}</span>
                 </span></td>
                 <td>${this.localize.number(row.count)}</td>
@@ -67,8 +69,7 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
         <div class="empty">
           <span class="empty-icon"><uui-icon name="icon-lightning" aria-hidden="true"></uui-icon></span>
           <strong>No events</strong>
-          <p>Track custom events to understand which actions visitors take.</p>
-          <a href=${EVENTS_SETUP_URL} target="_blank" rel="noopener noreferrer">Set up event tracking <uui-icon name="icon-out" aria-hidden="true"></uui-icon></a>
+          <p>Configure events or goals to understand which actions visitors take.</p>
         </div>
       ` : ""}
     `;
@@ -89,6 +90,7 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
     .details-action { appearance: none; background: transparent; border: 0; color: var(--uui-color-text); cursor: pointer; font: inherit; max-width: 100%; overflow: hidden; padding: 0; position: relative; text-align: left; text-overflow: ellipsis; white-space: nowrap; z-index: 1; }
     .details-action:hover { text-decoration: underline; text-underline-offset: 0.18em; }
     .details-action:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
+    .event-name { position: relative; z-index: 1; }
     .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
     .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
     tbody tr:hover .filter-action, .filter-action:focus-visible, .filter-action[aria-pressed="true"] { opacity: 1; }
@@ -112,6 +114,6 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-event-table": VercelAnalyticsEventTableElement;
+    "web-analytics-event-table": WebAnalyticsEventTableElement;
   }
 }

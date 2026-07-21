@@ -1,15 +1,17 @@
+using TheBuilder.WebAnalytics.Models;
+
 namespace TheBuilder.WebAnalytics.Configuration;
 
-public static class VercelAnalyticsSettingsValidator
+public static class WebAnalyticsSettingsValidator
 {
-    public static IReadOnlyList<string> Validate(VercelAnalyticsSettings settings) =>
-        Validate(settings, VercelAnalyticsValidationMode.PersistedSettings);
+    public static IReadOnlyList<string> Validate(WebAnalyticsSettings settings) =>
+        Validate(settings, WebAnalyticsValidationMode.PersistedSettings);
 
     internal static IReadOnlyList<string> Validate(
-        VercelAnalyticsSettings settings,
-        VercelAnalyticsValidationMode mode)
+        WebAnalyticsSettings settings,
+        WebAnalyticsValidationMode mode)
     {
-        var validateEnabledState = mode == VercelAnalyticsValidationMode.PersistedSettings;
+        var validateEnabledState = mode == WebAnalyticsValidationMode.PersistedSettings;
         var failures = new List<string>();
         if (settings.DefaultRangeDays is < 1 or > 730)
             failures.Add("Default range must be between 1 and 730 days.");
@@ -31,7 +33,7 @@ public static class VercelAnalyticsSettingsValidator
     }
 
     private static void ValidateConnection(
-        VercelAnalyticsConnectionSettings connection,
+        AnalyticsConnectionSettings connection,
         ICollection<string> failures,
         ISet<Guid> keys,
         IDictionary<Guid, Guid> roots,
@@ -43,18 +45,16 @@ public static class VercelAnalyticsSettingsValidator
             failures.Add($"Connection '{connection.Key}' defines an unsupported mock analytics scenario.");
         }
 
-        var label = connection.MockScenario?.ToString() ??
-            (string.IsNullOrWhiteSpace(connection.ProjectId) ? connection.Key.ToString() : connection.ProjectId);
+        var label = connection.MockScenario?.ToString() ?? FirstNonEmpty(connection.SiteId, connection.ProjectId, connection.Key.ToString());
         if (connection.Key == Guid.Empty)
             failures.Add("Every connection requires a valid key.");
         else if (!keys.Add(connection.Key))
             failures.Add($"Connection key '{connection.Key}' is used more than once.");
-        if (requireConnectionMetadata && !hasSupportedMockScenario && string.IsNullOrWhiteSpace(connection.ProjectId))
-            failures.Add($"Connection '{label}' requires a project ID.");
-        if (hasSupportedMockScenario && !string.IsNullOrWhiteSpace(connection.ProjectId))
-            failures.Add($"Mock connection '{label}' cannot define a Vercel project ID.");
-        if (hasSupportedMockScenario && !string.IsNullOrWhiteSpace(connection.Team))
-            failures.Add($"Mock connection '{label}' cannot define a Vercel team.");
+        var hasProvider = AnalyticsProviderCatalog.Default.TryGet(connection.Provider, out var provider);
+        if (!hasProvider)
+            failures.Add($"Connection '{label}' defines an unsupported analytics provider.");
+        if (hasProvider)
+            provider.ValidateConnection(connection, label, requireConnectionMetadata, hasSupportedMockScenario, failures);
         foreach (var value in connection.DocumentRootKeys)
         {
             if (!Guid.TryParse(value, out var key))
@@ -71,9 +71,12 @@ public static class VercelAnalyticsSettingsValidator
                 failures.Add($"Connection '{label}' contains invalid document type key '{value}'.");
         }
     }
+
+    private static string FirstNonEmpty(params string[] values) =>
+        values.First(value => !string.IsNullOrWhiteSpace(value));
 }
 
-internal enum VercelAnalyticsValidationMode
+internal enum WebAnalyticsValidationMode
 {
     PersistedSettings,
     ServerOptions

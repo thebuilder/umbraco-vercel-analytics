@@ -5,8 +5,8 @@ import { UMB_APP_LANGUAGE_CONTEXT } from "@umbraco-cms/backoffice/language";
 import { workspaceAnalyticsCulture } from "../analytics/document-route.js";
 import "../analytics/analytics-dashboard.element.js";
 
-@customElement("vercel-analytics-workspace")
-export class VercelAnalyticsWorkspaceElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-workspace")
+export class WebAnalyticsWorkspaceElement extends UmbElementMixin(LitElement) {
   @state() private _documentId?: string;
   @state() private _variantCulture?: string;
   @state() private _appCulture?: string;
@@ -15,27 +15,27 @@ export class VercelAnalyticsWorkspaceElement extends UmbElementMixin(LitElement)
     super();
     this.consumeContext(UMB_DOCUMENT_WORKSPACE_CONTEXT, (context) => {
       if (!context) return;
-      this.observe(context.unique, (unique) => (this._documentId = unique ?? undefined), "vercelAnalyticsDocumentUnique");
-      this.observe(context.splitView.firstActiveVariantInfo, (variant) => (this._variantCulture = variant?.culture ?? undefined), "vercelAnalyticsCulture");
+      this.observe(context.unique, (unique) => (this._documentId = unique ?? undefined), "webAnalyticsDocumentUnique");
+      this.observe(context.splitView.firstActiveVariantInfo, (variant) => (this._variantCulture = variant?.culture ?? undefined), "webAnalyticsCulture");
     });
     this.consumeContext(UMB_APP_LANGUAGE_CONTEXT, (context) => {
       if (!context) return;
-      this.observe(context.appLanguageCulture, (culture) => (this._appCulture = culture ?? undefined), "vercelAnalyticsAppCulture");
+      this.observe(context.appLanguageCulture, (culture) => (this._appCulture = culture ?? undefined), "webAnalyticsAppCulture");
     });
   }
 
   render() {
     const culture = workspaceAnalyticsCulture(this._variantCulture, this._appCulture);
     return this._documentId
-      ? html`<vercel-analytics-dashboard .documentId=${this._documentId} .culture=${culture}></vercel-analytics-dashboard>`
+      ? html`<web-analytics-dashboard .documentId=${this._documentId} .culture=${culture}></web-analytics-dashboard>`
       : html`<uui-loader-bar aria-label="Loading document analytics"></uui-loader-bar>`;
   }
 }
 
-export default VercelAnalyticsWorkspaceElement;
+export default WebAnalyticsWorkspaceElement;
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-workspace": VercelAnalyticsWorkspaceElement;
+    "web-analytics-workspace": WebAnalyticsWorkspaceElement;
   }
 }

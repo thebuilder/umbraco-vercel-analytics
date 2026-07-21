@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AnalyticsDocumentRoute } from "../api/types.gen.js";
+import type { AnalyticsCapabilities, AnalyticsDocumentRoute } from "../api/types.gen.js";
 import { AnalyticsDashboardController, type DashboardEnvironment } from "./analytics-dashboard.controller.js";
 import type { DashboardApi } from "./dashboard-api.js";
 import { dateRangeForPreset } from "./date-range.js";
+
+const fullCapabilities: AnalyticsCapabilities = {
+  dimensions: ["RequestPath", "Route", "ReferrerHostname", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
+  events: true,
+  eventDetails: true,
+  eventProperties: true,
+  globalEventFiltering: false,
+  flags: true,
+  breakdownOrdering: false,
+};
 
 describe("AnalyticsDashboardController", () => {
   it("uses the first connection when no requested or stored connection is valid", async () => {
@@ -11,8 +21,8 @@ describe("AnalyticsDashboardController", () => {
       enabled: true,
       defaultRangeDays: 30,
       connections: [
-        { key: "11111111-1111-1111-1111-111111111111", displayName: "First", isDefault: true, isConfigured: true, baseUrl: "https://first.example.com", warnings: [] },
-        { key: "22222222-2222-2222-2222-222222222222", displayName: "Second", isDefault: false, isConfigured: true, baseUrl: "https://second.example.com", warnings: [] },
+        { key: "11111111-1111-1111-1111-111111111111", displayName: "First", provider: "Vercel", capabilities: fullCapabilities, isDefault: true, isConfigured: true, baseUrl: "https://first.example.com", warnings: [] },
+        { key: "22222222-2222-2222-2222-222222222222", displayName: "Second", provider: "Vercel", capabilities: fullCapabilities, isDefault: false, isConfigured: true, baseUrl: "https://second.example.com", warnings: [] },
       ],
     }));
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
@@ -29,8 +39,8 @@ describe("AnalyticsDashboardController", () => {
       enabled: true,
       defaultRangeDays: 30,
       connections: [
-        { key: "11111111-1111-1111-1111-111111111111", displayName: "Demo", isDefault: true, isConfigured: true, baseUrl: "https://demo.example.com", warnings: [] },
-        { key: "22222222-2222-2222-2222-222222222222", displayName: "Unconfigured", isDefault: false, isConfigured: false, baseUrl: undefined, warnings: ["No server-side access token is configured for this connection."] },
+        { key: "11111111-1111-1111-1111-111111111111", displayName: "Demo", provider: "Vercel", capabilities: fullCapabilities, isDefault: true, isConfigured: true, baseUrl: "https://demo.example.com", warnings: [] },
+        { key: "22222222-2222-2222-2222-222222222222", displayName: "Unconfigured", provider: "Vercel", capabilities: fullCapabilities, isDefault: false, isConfigured: false, baseUrl: undefined, warnings: ["No server-side access token is configured for this connection."] },
       ],
     }));
     const nextEvents = deferred<Awaited<ReturnType<DashboardApi["events"]>>>();
@@ -72,6 +82,22 @@ describe("AnalyticsDashboardController", () => {
     expect(controller.state.summary.status).toBe("success");
   });
 
+  it("keeps the provider identity for document-scoped event details", async () => {
+    const api = dashboardApi();
+    api.documentRoutes.mockResolvedValue(ok([{
+      ...route("/case", "da-DK"),
+      provider: "Plausible",
+      capabilities: { ...fullCapabilities, flags: false, globalEventFiltering: true, breakdownOrdering: true },
+    }]));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+
+    controller.connect("document-id", "da-DK");
+
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    expect(controller.state.provider).toBe("Plausible");
+    expect(controller.state.connections).toEqual([]);
+  });
+
   it("does not restore a breakdown after its dialog closes during a request", async () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
@@ -104,6 +130,56 @@ describe("AnalyticsDashboardController", () => {
     await selecting;
 
     expect(controller.state.selectedEvent).toBeUndefined();
+  });
+
+  it("reuses property values returned with event details", async () => {
+    const api = dashboardApi();
+    api.eventDetails.mockResolvedValue(ok({
+      eventName: "Signup",
+      totals: { count: 20, visitors: 10 },
+      properties: [{ name: "plan", values: [{ value: "Pro", count: 20, visitors: 10 }] }],
+    }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+
+    await controller.selectEvent("Signup");
+
+    expect(api.eventPropertyValues).not.toHaveBeenCalled();
+    expect(controller.state.selectedEvent?.details.status).toBe("success");
+  });
+
+  it("loads event details without fetching property values when the capability is unavailable", async () => {
+    const api = dashboardApi();
+    api.connections.mockResolvedValue(ok({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [{
+        key: "11111111-1111-1111-1111-111111111111",
+        displayName: "Details only",
+        provider: "Vercel",
+        capabilities: { ...fullCapabilities, eventProperties: false },
+        isDefault: true,
+        isConfigured: true,
+        baseUrl: "https://example.com",
+        warnings: [],
+      }],
+    }));
+    api.eventDetails.mockResolvedValue(ok({
+      eventName: "Signup",
+      totals: { count: 20, visitors: 10 },
+      properties: [{ name: "plan", values: [] }],
+    }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+
+    await controller.selectEvent("Signup");
+    controller.searchEventProperty("plan", "Pro");
+
+    expect(api.eventDetails).toHaveBeenCalledOnce();
+    expect(api.eventPropertyValues).not.toHaveBeenCalled();
+    expect(controller.state.selectedEvent?.details.status).toBe("success");
   });
 
   it("atomically clears document and dialog state when scope changes", async () => {
@@ -203,6 +279,29 @@ describe("AnalyticsDashboardController", () => {
 
     expect(target.currentUrl().searchParams.get("metric")).toBe("pageViews");
     expect(target.currentUrl().searchParams.get("audience")).toBe("BrowserName");
+  });
+
+  it("refreshes only breakdowns when the selected metric changes", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect([
+      controller.state.summary.status,
+      controller.state.events.status,
+      controller.state.flags.status,
+    ]).toEqual(["success", "success", "success"]));
+    api.summary.mockClear();
+    api.events.mockClear();
+    api.flags.mockClear();
+    api.breakdown.mockClear();
+
+    controller.setMetric("pageViews");
+
+    await vi.waitFor(() => expect(api.breakdown).toHaveBeenCalled());
+    expect(api.breakdown.mock.calls[0]?.[0]?.query).not.toHaveProperty("orderBy");
+    expect(api.summary).not.toHaveBeenCalled();
+    expect(api.events).not.toHaveBeenCalled();
+    expect(api.flags).not.toHaveBeenCalled();
   });
 
   it("uses only UTM Source to detect Plus capability", async () => {
@@ -308,6 +407,127 @@ describe("AnalyticsDashboardController", () => {
     expect(api.summary).not.toHaveBeenCalled();
   });
 
+  it("uses Plausible capabilities for event details and global event filtering", async () => {
+    const api = dashboardApi();
+    api.connections.mockResolvedValue(ok({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [{
+        key: "11111111-1111-1111-1111-111111111111",
+        displayName: "Plausible",
+        provider: "Plausible",
+        capabilities: {
+          dimensions: ["RequestPath", "Referrer", "Country", "DeviceType", "BrowserName", "OsName", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent", "EventName"],
+          events: true,
+          eventDetails: true,
+          eventProperties: true,
+          globalEventFiltering: true,
+          flags: false,
+          breakdownOrdering: true,
+        },
+        isDefault: true,
+        isConfigured: true,
+        baseUrl: "https://example.com",
+        warnings: [],
+      }],
+    }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    api.summary.mockClear();
+    controller.toggleFilter("EventName", "Signup");
+    await vi.waitFor(() => expect(api.summary).toHaveBeenCalled());
+    expect(api.summary.mock.calls[0]?.[0]?.query?.filter).toEqual(["EventName:Signup"]);
+    await controller.selectEvent("Signup");
+
+    expect(api.events).toHaveBeenCalled();
+    expect(api.flags).not.toHaveBeenCalled();
+    expect(api.eventDetails).toHaveBeenCalled();
+    expect(api.eventPropertyValues).not.toHaveBeenCalled();
+    expect(controller.cards().some((card) => card.kind === "tabbed-breakdown" && card.id === "utm")).toBe(true);
+  });
+
+  it("does not create a global event filter for providers that do not support it", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    api.summary.mockClear();
+
+    controller.toggleFilter("EventName", "Signup");
+
+    expect(controller.state.filters).toEqual([]);
+    expect(api.summary).not.toHaveBeenCalled();
+  });
+
+  it("removes unsupported filters when switching providers", async () => {
+    const api = dashboardApi();
+    const plausibleCapabilities: AnalyticsCapabilities = {
+      dimensions: fullCapabilities.dimensions
+        .filter((dimension) => dimension !== "Route" && dimension !== "ReferrerHostname")
+        .concat("Referrer"),
+      events: true,
+      eventDetails: true,
+      eventProperties: true,
+      globalEventFiltering: true,
+      flags: false,
+      breakdownOrdering: true,
+    };
+    api.connections.mockResolvedValue(ok({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [
+        { key: "11111111-1111-1111-1111-111111111111", displayName: "Vercel", provider: "Vercel", capabilities: fullCapabilities, isDefault: true, isConfigured: true, baseUrl: "https://vercel.example.com", warnings: [] },
+        { key: "22222222-2222-2222-2222-222222222222", displayName: "Plausible", provider: "Plausible", capabilities: plausibleCapabilities, isDefault: false, isConfigured: true, baseUrl: "https://plausible.example.com", warnings: [] },
+      ],
+    }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    controller.toggleFilter("Route", "/articles/[slug]");
+
+    controller.setConnection("22222222-2222-2222-2222-222222222222");
+
+    expect(controller.state.filters).toEqual([]);
+    await vi.waitFor(() => expect(api.summary).toHaveBeenCalledTimes(3));
+    expect(api.summary.mock.calls[api.summary.mock.calls.length - 1]?.[0]?.query?.filter).toBeUndefined();
+  });
+
+  it("normalizes restored filters after resolving the selected provider", async () => {
+    const api = dashboardApi();
+    api.connections.mockResolvedValue(ok({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [{
+        key: "11111111-1111-1111-1111-111111111111",
+        displayName: "Plausible",
+        provider: "Plausible",
+        capabilities: {
+          ...fullCapabilities,
+          dimensions: fullCapabilities.dimensions
+            .filter((dimension) => dimension !== "Route" && dimension !== "ReferrerHostname")
+            .concat("Referrer"),
+        },
+        isDefault: true,
+        isConfigured: true,
+        baseUrl: "https://example.com",
+        warnings: [],
+      }],
+    }));
+    const controller = new AnalyticsDashboardController(
+      vi.fn(),
+      api,
+      environment("https://cms.example.com/umbraco/section/analytics?connection=11111111-1111-1111-1111-111111111111&filter=Route%3A%2Farticles%2F%5Bslug%5D"),
+    );
+
+    controller.connect();
+
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    expect(controller.state.filters).toEqual([]);
+    expect(api.summary.mock.calls[0]?.[0]?.query?.filter).toBeUndefined();
+  });
+
 });
 
 function dashboardApi() {
@@ -315,7 +535,7 @@ function dashboardApi() {
     connections: vi.fn<DashboardApi["connections"]>(async () => ok({
       enabled: true,
       defaultRangeDays: 30,
-      connections: [{ key: "11111111-1111-1111-1111-111111111111", displayName: "Main", isDefault: true, isConfigured: true, baseUrl: "https://example.com", warnings: [] }],
+      connections: [{ key: "11111111-1111-1111-1111-111111111111", displayName: "Main", provider: "Vercel", capabilities: fullCapabilities, isDefault: true, isConfigured: true, baseUrl: "https://example.com", warnings: [] }],
     })),
     documentRoutes: vi.fn<DashboardApi["documentRoutes"]>(async () => ok([])),
     summary: vi.fn<DashboardApi["summary"]>(async () => ok({ totals: { visitors: 10, pageViews: 20 }, points: [] })),
@@ -328,11 +548,11 @@ function dashboardApi() {
 }
 
 function route(path: string, culture: string): AnalyticsDocumentRoute {
-  return { connection: "11111111-1111-1111-1111-111111111111", culture, hostname: "example.com", path, url: `https://example.com${path}`, isCurrent: true, warnings: [] };
+  return { connection: "11111111-1111-1111-1111-111111111111", provider: "Vercel", capabilities: fullCapabilities, culture, hostname: "example.com", path, url: `https://example.com${path}`, isCurrent: true, warnings: [] };
 }
 
-function environment(): DashboardEnvironment {
-  let url = new URL("https://cms.example.com/umbraco/section/analytics");
+function environment(initialUrl = "https://cms.example.com/umbraco/section/analytics"): DashboardEnvironment {
+  let url = new URL(initialUrl);
   return {
     currentUrl: () => new URL(url),
     replaceUrl: (next) => { url = new URL(next); },

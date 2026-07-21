@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using System.Text.Json;
 using Umbraco.Cms.Api.Common.OpenApi;
 using Umbraco.Cms.Api.Management.OpenApi;
 #endif
@@ -18,7 +19,7 @@ using TheBuilder.WebAnalytics;
 
 namespace TheBuilder.WebAnalytics.Example;
 
-public sealed class VercelAnalyticsOpenApiComposer : IComposer
+public sealed class WebAnalyticsOpenApiComposer : IComposer
 {
     public void Compose(IUmbracoBuilder builder)
     {
@@ -42,7 +43,7 @@ public sealed class VercelAnalyticsOpenApiComposer : IComposer
                         return Task.CompletedTask;
                     })));
 #else
-        builder.Services.AddSingleton<IOperationIdHandler, VercelAnalyticsOperationIdHandler>();
+        builder.Services.AddSingleton<IOperationIdHandler, WebAnalyticsOperationIdHandler>();
         builder.Services.Configure<SwaggerGenOptions>(options =>
         {
             options.SwaggerDoc(
@@ -52,18 +53,41 @@ public sealed class VercelAnalyticsOpenApiComposer : IComposer
                     Title = "Web Analytics Backoffice API",
                     Version = "1.0",
                 });
-            options.OperationFilter<VercelAnalyticsOperationSecurityFilter>();
+            options.OperationFilter<WebAnalyticsOperationSecurityFilter>();
+            options.SchemaFilter<NullableEnumSchemaFilter>();
         });
 #endif
     }
 
 #if !UMBRACO_18_OR_LATER
-    private sealed class VercelAnalyticsOperationSecurityFilter : BackOfficeSecurityRequirementsOperationFilterBase
+    private sealed class WebAnalyticsOperationSecurityFilter : BackOfficeSecurityRequirementsOperationFilterBase
     {
         protected override string ApiName => Constants.ApiName;
     }
 
-    private sealed class VercelAnalyticsOperationIdHandler(IOptions<ApiVersioningOptions> apiVersioningOptions)
+    private sealed class NullableEnumSchemaFilter : ISchemaFilter
+    {
+        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
+        {
+            foreach (var property in context.Type.GetProperties())
+            {
+                if (Nullable.GetUnderlyingType(property.PropertyType)?.IsEnum is not true)
+                    continue;
+
+                var propertyName = JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+                schema.Required?.Remove(propertyName);
+                if (schema.Properties?.TryGetValue(propertyName, out var propertySchema) is true)
+                {
+                    schema.Properties[propertyName] = new OpenApiSchema
+                    {
+                        AnyOf = [propertySchema, new OpenApiSchema { Type = JsonSchemaType.Null }]
+                    };
+                }
+            }
+        }
+    }
+
+    private sealed class WebAnalyticsOperationIdHandler(IOptions<ApiVersioningOptions> apiVersioningOptions)
         : OperationIdHandler(apiVersioningOptions)
     {
         protected override bool CanHandle(

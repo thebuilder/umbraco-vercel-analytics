@@ -5,9 +5,9 @@ using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Services;
 
-public sealed class VercelAnalyticsReportService(
-    VercelAnalyticsConnectionRegistry registry,
-    IVercelAnalyticsClient client,
+public sealed class AnalyticsReportService(
+    AnalyticsConnectionRegistry registry,
+    IAnalyticsProviderClientResolver clients,
     AnalyticsReportCache cache)
 {
     public async Task<AnalyticsSummary?> GetSummaryAsync(
@@ -17,17 +17,16 @@ public sealed class VercelAnalyticsReportService(
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
         if (connection is null || !connection.IsConfigured) return null;
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:summary:{Normalize(query)}";
+        var client = clients.Get(connection);
+        var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:summary:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var count = client.CountAsync(connection, query, operationCancellationToken);
-            var pageViews = client.GetPageViewTotalAsync(connection, query, operationCancellationToken);
+            var totals = client.GetTotalsAsync(connection, query, operationCancellationToken);
             var previousTotals = TryGetPreviousTotalsAsync(connection, query, operationCancellationToken);
             var trend = client.GetTrendAsync(connection, query, operationCancellationToken);
-            await Task.WhenAll(count, pageViews, previousTotals, trend);
+            await Task.WhenAll(totals, previousTotals, trend);
             var points = await trend;
-            var totals = new AnalyticsTotals(await pageViews, (await count).Visitors);
-            return new AnalyticsSummary(totals, await previousTotals, points);
+            return new AnalyticsSummary(await totals, await previousTotals, points);
         }, cancellationToken);
     }
 
@@ -36,16 +35,18 @@ public sealed class VercelAnalyticsReportService(
         AnalyticsDimension dimension,
         int limit,
         string? search,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        AnalyticsTrafficMetric? orderBy = null)
     {
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
-        if (connection is null || !connection.IsConfigured) return null;
+        if (connection is null || !connection.IsConfigured || !connection.Capabilities.Dimensions.Contains(dimension)) return null;
+        var client = clients.Get(connection);
         var normalizedSearch = search?.Trim();
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:breakdown:{dimension}:{limit}:{normalizedSearch}:{Normalize(query)}";
+        var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:breakdown:{dimension}:{orderBy}:{limit}:{normalizedSearch}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, normalizedSearch, operationCancellationToken);
+            var rows = await client.GetBreakdownAsync(connection, query, dimension, limit, normalizedSearch, operationCancellationToken, orderBy);
             return new AnalyticsBreakdown(dimension, rows);
         }, cancellationToken);
     }
@@ -58,9 +59,10 @@ public sealed class VercelAnalyticsReportService(
     {
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
-        if (connection is null || !connection.IsConfigured) return null;
+        if (connection is null || !connection.IsConfigured || !connection.Capabilities.Events) return null;
+        var client = clients.Get<IAnalyticsEventsProviderClient>(connection);
         var normalizedSearch = search?.Trim();
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:events:{limit}:{normalizedSearch}:{Normalize(query)}";
+        var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:events:{limit}:{normalizedSearch}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
             var rows = await client.GetEventsAsync(connection, query, limit, normalizedSearch, operationCancellationToken);
@@ -76,10 +78,11 @@ public sealed class VercelAnalyticsReportService(
     {
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
-        if (connection is null || !connection.IsConfigured) return null;
+        if (connection is null || !connection.IsConfigured || !connection.Capabilities.Flags) return null;
+        var client = clients.Get<IAnalyticsFlagsProviderClient>(connection);
         var normalizedFlagKey = string.IsNullOrWhiteSpace(flagKey) ? null : flagKey.Trim();
         var flagKeyCacheKey = EncodeCachePart(normalizedFlagKey ?? string.Empty);
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:flags:{flagKeyCacheKey}:{limit}:{Normalize(query)}";
+        var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:flags:{flagKeyCacheKey}:{limit}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
             var rows = await client.GetFlagsAsync(connection, query, normalizedFlagKey, limit, operationCancellationToken);
@@ -95,23 +98,67 @@ public sealed class VercelAnalyticsReportService(
     {
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
-        if (connection is null || !connection.IsConfigured) return null;
+        if (connection is null || !connection.IsConfigured || !connection.Capabilities.EventDetails) return null;
+        var propertiesClient = connection.Capabilities.EventProperties
+            ? clients.Get<IAnalyticsEventPropertiesProviderClient>(connection)
+            : null;
+        var client = propertiesClient ?? clients.Get<IAnalyticsEventDetailsProviderClient>(connection);
         var normalizedEventName = eventName.Trim();
         var eventDataCacheKey = eventDataFilter is null
             ? string.Empty
             : $":{EncodeCachePart(eventDataFilter.Property)}:{EncodeCachePart(eventDataFilter.Value)}";
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-details:{EncodeCachePart(normalizedEventName)}{eventDataCacheKey}:{Normalize(query)}";
+        var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:event-details:{EncodeCachePart(normalizedEventName)}{eventDataCacheKey}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
-            var propertyNamesTask = client.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
-            await Task.WhenAll(totals, propertyNamesTask);
-            var propertyNames = await propertyNamesTask;
-            var properties = propertyNames
-                .Select(propertyName => new AnalyticsEventProperty(propertyName, []))
-                .ToArray();
-            return new AnalyticsEventDetails(normalizedEventName, await totals, properties);
+            var totals = eventDataFilter is null
+                ? client.CountEventsAsync(connection, query, normalizedEventName, operationCancellationToken)
+                : propertiesClient?.CountFilteredEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken)
+                    ?? throw new InvalidOperationException($"{connection.Provider} does not support event property filters.");
+            var propertiesTask = GetEventPropertiesAsync(
+                connection,
+                snapshot.Revision,
+                snapshot.Settings.CacheDuration,
+                query,
+                normalizedEventName,
+                propertiesClient,
+                eventDataFilter,
+                operationCancellationToken);
+            await Task.WhenAll(totals, propertiesTask);
+            return new AnalyticsEventDetails(normalizedEventName, await totals, await propertiesTask);
         }, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<AnalyticsEventProperty>> GetEventPropertiesAsync(
+        AnalyticsConnection connection,
+        long revision,
+        TimeSpan cacheDuration,
+        AnalyticsQuery query,
+        string eventName,
+        IAnalyticsEventPropertiesProviderClient? client,
+        AnalyticsEventDataFilter? eventDataFilter,
+        CancellationToken cancellationToken)
+    {
+        if (client is null) return [];
+        if (client is not IAnalyticsEventPropertyDiscoveryProviderClient discoveryClient)
+        {
+            var propertyNames = await client.GetEventPropertyNamesAsync(connection, query, eventName, eventDataFilter, cancellationToken);
+            return propertyNames.Select(propertyName => new AnalyticsEventProperty(propertyName, [])).ToArray();
+        }
+
+        var eventDataCacheKey = eventDataFilter is null
+            ? string.Empty
+            : $":{EncodeCachePart(eventDataFilter.Property)}:{EncodeCachePart(eventDataFilter.Value)}";
+        var cacheKey = $"web-analytics:{connection.Provider}:{revision}:event-property-discovery{eventDataCacheKey}:{Normalize(query)}";
+        var propertiesByEvent = await GetOrCreateAsync(
+            cacheKey,
+            cacheDuration,
+            operationCancellationToken => discoveryClient.DiscoverEventPropertiesAsync(
+                connection,
+                query,
+                eventDataFilter,
+                operationCancellationToken),
+            cancellationToken);
+        return propertiesByEvent.TryGetValue(eventName, out var properties) ? properties : [];
     }
 
     public async Task<AnalyticsEventProperty?> GetEventPropertyValuesAsync(
@@ -125,7 +172,8 @@ public sealed class VercelAnalyticsReportService(
     {
         var snapshot = registry.Capture();
         var connection = snapshot.Get(query.Connection);
-        if (connection is null || !connection.IsConfigured) return null;
+        if (connection is null || !connection.IsConfigured || !connection.Capabilities.EventProperties) return null;
+        var client = clients.Get<IAnalyticsEventPropertiesProviderClient>(connection);
         var normalizedEventName = eventName.Trim();
         var normalizedPropertyName = propertyName.Trim();
         var normalizedSearch = search?.Trim();
@@ -135,7 +183,7 @@ public sealed class VercelAnalyticsReportService(
         var eventNameCacheKey = EncodeCachePart(normalizedEventName);
         var propertyNameCacheKey = EncodeCachePart(normalizedPropertyName);
         var searchCacheKey = EncodeCachePart(normalizedSearch ?? string.Empty);
-        var cacheKey = $"vercel-analytics:{snapshot.Revision}:event-property-values:{eventNameCacheKey}:{propertyNameCacheKey}:{limit}:{searchCacheKey}{eventDataCacheKey}:{Normalize(query)}";
+        var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:event-property-values:{eventNameCacheKey}:{propertyNameCacheKey}:{limit}:{searchCacheKey}{eventDataCacheKey}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
             var values = await client.GetEventPropertyValuesAsync(
@@ -170,7 +218,7 @@ public sealed class VercelAnalyticsReportService(
     }
 
     private async Task<AnalyticsTotals?> TryGetPreviousTotalsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
@@ -187,11 +235,10 @@ public sealed class VercelAnalyticsReportService(
 
         try
         {
-            var count = client.CountAsync(connection, previousQuery, cancellationToken);
-            var pageViews = client.GetPageViewTotalAsync(connection, previousQuery, cancellationToken);
-            comparison = Task.WhenAll(count, pageViews);
+            var totals = clients.Get(connection).GetTotalsAsync(connection, previousQuery, cancellationToken);
+            comparison = totals;
             await comparison;
-            return new AnalyticsTotals(await pageViews, (await count).Visitors);
+            return await totals;
         }
         catch (Exception failure)
         {
@@ -209,5 +256,6 @@ public sealed class VercelAnalyticsReportService(
     }
 
     private static bool IsOptionalComparisonFailure(Exception failure) =>
-        failure is VercelAnalyticsApiException or HttpRequestException or JsonException or OperationCanceledException;
+        failure is AnalyticsProviderApiException or HttpRequestException or JsonException or OperationCanceledException;
+
 }

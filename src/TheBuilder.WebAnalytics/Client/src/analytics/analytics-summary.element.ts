@@ -8,8 +8,8 @@ import type { DashboardMetric } from "./dashboard-url-state.js";
 import { stateData, type AsyncState } from "./async-state.js";
 import "./history-chart.element.js";
 
-@customElement("vercel-analytics-summary")
-export class VercelAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-summary")
+export class WebAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) report: AsyncState<AnalyticsSummary> = { status: "loading" };
   @property({ attribute: false }) range!: AnalyticsDateRange;
   @property() metric: DashboardMetric = "visitors";
@@ -114,7 +114,7 @@ export class VercelAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
             <span class="visually-hidden" role="status">Loading traffic summary and history</span>
             <div class="chart-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
           ` : stateData(this.report)?.points.length
-              ? html`<vercel-analytics-history-chart .points=${stateData(this.report)!.points} .metric=${this.metric} .interval=${this.range.interval} .timeZone=${this.range.timeZone}></vercel-analytics-history-chart>`
+              ? html`<web-analytics-history-chart .points=${stateData(this.report)!.points} .metric=${this.metric} .interval=${this.range.interval} .timeZone=${this.range.timeZone}></web-analytics-history-chart>`
               : html`<umb-empty-state headline="No history"><p>No traffic was recorded in this period.</p></umb-empty-state>`}
         </div>
       </uui-box>
@@ -124,11 +124,11 @@ export class VercelAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
   static styles = [UmbTextStyles, css`
     :host { display: block; inline-size: 100%; min-inline-size: 0; }
     .history, .summary-error { --uui-box-default-padding: 0; margin-bottom: var(--uui-size-layout-1); overflow: hidden; }
-    .history { --vercel-analytics-chart-color: oklch(51.51% .2399 257.85); }
+    .history { --web-analytics-chart-color: oklch(51.51% .2399 257.85); }
     .metric-tabs { background: var(--uui-color-surface-alt); border-bottom: 1px solid var(--uui-color-border); display: flex; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
     .metric-tab { --metric-font-size: clamp(2rem, 3cqi, 3rem); appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; inline-size: max-content; min-block-size: clamp(6.5rem, 10cqi, 7.75rem); min-inline-size: 18rem; padding: clamp(var(--uui-size-space-4), 2cqi, var(--uui-size-space-5)) var(--uui-size-space-5); text-align: left; transition: background-color 160ms ease-out, color 160ms ease-out; }
     .metric-tab:last-child { border-inline-end: 1px solid var(--uui-color-border); }
-    .metric-tab[aria-selected="true"] { background: var(--uui-color-surface); border-bottom-color: var(--vercel-analytics-chart-color); color: var(--uui-color-text); }
+    .metric-tab[aria-selected="true"] { background: var(--uui-color-surface); border-bottom-color: var(--web-analytics-chart-color); color: var(--uui-color-text); }
     .metric-tab[aria-selected="false"]:hover { background: color-mix(in srgb, var(--uui-color-interactive) 7%, var(--uui-color-surface)); }
     .metric-tab[aria-selected="false"]:active { background: color-mix(in srgb, var(--uui-color-interactive) 11%, var(--uui-color-surface)); }
     .metric-tab:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
@@ -163,4 +163,4 @@ export class VercelAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
   `];
 }
 
-declare global { interface HTMLElementTagNameMap { "vercel-analytics-summary": VercelAnalyticsSummaryElement; } }
+declare global { interface HTMLElementTagNameMap { "web-analytics-summary": WebAnalyticsSummaryElement; } }

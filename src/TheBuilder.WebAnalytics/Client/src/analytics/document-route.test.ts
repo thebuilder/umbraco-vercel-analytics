@@ -4,6 +4,8 @@ import { activeDocumentRoute, workspaceAnalyticsCulture } from "./document-route
 
 const route = (culture: string, isCurrent = false): AnalyticsDocumentRoute => ({
   connection: "main",
+  provider: "Vercel",
+  capabilities: { dimensions: ["RequestPath"], events: true, eventDetails: true, eventProperties: true, globalEventFiltering: false, flags: true, breakdownOrdering: false },
   culture,
   hostname: "www.example.com",
   path: `/${culture}`,

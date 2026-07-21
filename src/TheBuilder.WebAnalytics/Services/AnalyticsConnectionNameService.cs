@@ -4,30 +4,35 @@ using TheBuilder.WebAnalytics.Configuration;
 
 namespace TheBuilder.WebAnalytics.Services;
 
-public interface IVercelProjectNameService
+public interface IAnalyticsConnectionNameService
 {
     Task<string> GetDisplayNameAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         CancellationToken cancellationToken);
 }
 
-public sealed class VercelProjectNameService(
-    IVercelAnalyticsClient client,
-    IMemoryCache cache) : IVercelProjectNameService
+public sealed class AnalyticsConnectionNameService(
+    IAnalyticsProviderClientResolver clients,
+    IMemoryCache cache) : IAnalyticsConnectionNameService
 {
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
     public async Task<string> GetDisplayNameAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         CancellationToken cancellationToken)
     {
-        var fallback = FirstNonEmpty(connection.ProjectId, connection.DisplayName, connection.Key.ToString());
+        var fallback = FirstNonEmpty(
+            AnalyticsProviderCatalog.Default.Get(connection.Provider).GetIdentifier(connection),
+            connection.DisplayName,
+            connection.Key.ToString());
         if (!connection.IsConfigured) return fallback;
 
         var cacheKey = string.Join(':',
-            "vercel-project-name",
+            "analytics-connection-name",
             connection.Key,
+            connection.Provider,
             connection.ProjectId,
+            connection.SiteId,
             connection.Team ?? string.Empty);
 
         try
@@ -35,14 +40,14 @@ public sealed class VercelProjectNameService(
             return await cache.GetOrCreateAsync(cacheKey, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-                return await client.GetProjectNameAsync(connection, cancellationToken);
+                return await clients.Get(connection).GetDisplayNameAsync(connection, cancellationToken);
             }) ?? fallback;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return fallback;
         }
-        catch (VercelAnalyticsApiException)
+        catch (AnalyticsProviderApiException)
         {
             return fallback;
         }

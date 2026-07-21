@@ -3,29 +3,24 @@ using TheBuilder.WebAnalytics.Models;
 
 namespace TheBuilder.WebAnalytics.Configuration;
 
-public sealed class VercelAnalyticsConnectionRegistry
+public sealed class AnalyticsConnectionRegistry
 {
-    private readonly VercelAnalyticsSettingsStore _settingsStore;
-    private readonly IOptions<VercelAnalyticsOptions> _serverOptions;
+    private readonly WebAnalyticsSettingsStore _settingsStore;
+    private readonly IOptions<WebAnalyticsOptions> _serverOptions;
     private readonly bool _mockConnectionsEnabled;
     private readonly Lock _snapshotLock = new();
     private RegistrySnapshot? _snapshot;
 
-    public VercelAnalyticsConnectionRegistry(
-        VercelAnalyticsSettingsStore settingsStore,
-        IOptions<VercelAnalyticsOptions> serverOptions)
+    public AnalyticsConnectionRegistry(
+        WebAnalyticsSettingsStore settingsStore,
+        IOptions<WebAnalyticsOptions> serverOptions)
         : this(settingsStore, serverOptions, serverOptions.Value.EnableMockConnections)
     {
     }
 
-    public VercelAnalyticsConnectionRegistry(IOptions<VercelAnalyticsOptions> serverOptions)
-        : this(new VercelAnalyticsSettingsStore(serverOptions), serverOptions, false)
-    {
-    }
-
-    internal VercelAnalyticsConnectionRegistry(
-        VercelAnalyticsSettingsStore settingsStore,
-        IOptions<VercelAnalyticsOptions> serverOptions,
+    internal AnalyticsConnectionRegistry(
+        WebAnalyticsSettingsStore settingsStore,
+        IOptions<WebAnalyticsOptions> serverOptions,
         bool mockConnectionsEnabled)
     {
         _settingsStore = settingsStore;
@@ -35,14 +30,14 @@ public sealed class VercelAnalyticsConnectionRegistry
 
     public bool MockConnectionsEnabled => _mockConnectionsEnabled;
 
-    public VercelAnalyticsSettings Settings => Capture().Settings;
+    public WebAnalyticsSettings Settings => Capture().Settings;
 
-    public IEnumerable<VercelAnalyticsConnection> Connections => Capture().Connections.Values;
+    public IEnumerable<AnalyticsConnection> Connections => Capture().Connections.Values;
 
-    public VercelAnalyticsConnection? Get(Guid key) =>
+    public AnalyticsConnection? Get(Guid key) =>
         Capture().Get(key);
 
-    public VercelAnalyticsConnection? FindNearestRoot(IEnumerable<Guid> ancestorKeys)
+    public AnalyticsConnection? FindNearestRoot(IEnumerable<Guid> ancestorKeys)
     {
         var snapshot = Capture();
         foreach (var key in ancestorKeys)
@@ -71,18 +66,17 @@ public sealed class VercelAnalyticsConnectionRegistry
         }
     }
 
-    private RegistrySnapshot CreateSnapshot(VercelAnalyticsSettingsSnapshot settingsSnapshot)
+    private RegistrySnapshot CreateSnapshot(WebAnalyticsSettingsSnapshot settingsSnapshot)
     {
         var serverConfiguration = _serverOptions.Value;
-        var vercelConfiguration = serverConfiguration.Providers.Vercel;
         var connections = settingsSnapshot.Settings.Connections
             .Where(connection => !connection.IsMock || _mockConnectionsEnabled)
             .ToDictionary(
             connection => connection.Key,
-            connection => VercelAnalyticsConnection.Create(
+            connection => AnalyticsConnection.Create(
                 connection,
                 ResolveAccessToken(
-                    vercelConfiguration.AccessToken,
+                    AnalyticsProviderCatalog.Default.Get(connection.Provider).GetAccessToken(serverConfiguration),
                     serverConfiguration.ConnectionAccessTokens.GetValueOrDefault(connection.Key.ToString()))));
         var roots = connections.Values
             .SelectMany(connection => connection.DocumentRootKeys.Select(rootKey => (rootKey, connection.Key)))
@@ -100,21 +94,24 @@ public sealed class VercelAnalyticsConnectionRegistry
             : sharedAccessToken ?? string.Empty;
 
     internal sealed record RegistrySnapshot(
-        VercelAnalyticsSettings Settings,
+        WebAnalyticsSettings Settings,
         long Revision,
-        IReadOnlyDictionary<Guid, VercelAnalyticsConnection> Connections,
+        IReadOnlyDictionary<Guid, AnalyticsConnection> Connections,
         IReadOnlyDictionary<Guid, Guid> RootOwners)
     {
-        public VercelAnalyticsConnection? Get(Guid key) => Connections.GetValueOrDefault(key);
+        public AnalyticsConnection? Get(Guid key) => Connections.GetValueOrDefault(key);
     }
 }
 
-public sealed record VercelAnalyticsConnection(
+public sealed record AnalyticsConnection(
     Guid Key,
     string DisplayName,
+    AnalyticsProvider Provider,
     string AccessToken,
     string ProjectId,
     string? Team,
+    string SiteId,
+    IReadOnlyList<string> EventPropertyNames,
     IReadOnlyList<Guid> DocumentRootKeys,
     bool EnableAllDocumentTypes,
     IReadOnlySet<Guid> EnabledDocumentTypeKeys,
@@ -125,22 +122,32 @@ public sealed record VercelAnalyticsConnection(
 
     public bool IsMock => MockScenario is not null;
 
-    public bool IsConfigured => IsMock || HasAccessToken && !string.IsNullOrWhiteSpace(ProjectId);
+    public bool IsConfigured => IsMock || HasAccessToken &&
+        !string.IsNullOrWhiteSpace(AnalyticsProviderCatalog.Default.Get(Provider).GetIdentifier(this));
+
+    public AnalyticsCapabilities Capabilities => IsMock
+        ? AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel).Capabilities
+        : AnalyticsProviderCatalog.Default.Get(Provider).Capabilities;
 
     public override string ToString() =>
-        $"{nameof(VercelAnalyticsConnection)} {{ Key = {Key}, DisplayName = {DisplayName}, ProjectId = {ProjectId}, Team = {Team}, AccessToken = [REDACTED] }}";
+        $"{nameof(AnalyticsConnection)} {{ Key = {Key}, DisplayName = {DisplayName}, Provider = {Provider}, ProjectId = {ProjectId}, Team = {Team}, SiteId = {SiteId}, AccessToken = [REDACTED] }}";
 
     public bool IsDocumentTypeEnabled(string documentTypeAlias, Guid documentTypeKey) =>
         EnableAllDocumentTypes || EnabledDocumentTypeKeys.Contains(documentTypeKey) || EnabledDocumentTypes.Contains(documentTypeAlias);
 
-    internal static VercelAnalyticsConnection Create(
-        VercelAnalyticsConnectionSettings settings,
+    internal static AnalyticsConnection Create(
+        AnalyticsConnectionSettings settings,
         string? accessToken) => new(
             settings.Key,
-            string.IsNullOrWhiteSpace(settings.DisplayName) ? settings.ProjectId : settings.DisplayName,
+            string.IsNullOrWhiteSpace(settings.DisplayName)
+                ? AnalyticsProviderCatalog.Default.Get(settings.Provider).GetIdentifier(settings)
+                : settings.DisplayName,
+            settings.Provider,
             accessToken ?? string.Empty,
             settings.ProjectId,
             NullIfWhiteSpace(settings.Team),
+            settings.SiteId,
+            settings.EventPropertyNames,
             ParseGuidValues(settings.DocumentRootKeys),
             settings.EnableAllDocumentTypes,
             ParseGuidValues(settings.EnabledDocumentTypeKeys).ToHashSet(),

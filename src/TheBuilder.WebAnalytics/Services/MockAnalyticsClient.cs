@@ -1,9 +1,13 @@
 using TheBuilder.WebAnalytics.Configuration;
 using TheBuilder.WebAnalytics.Models;
+using TheBuilder.WebAnalytics.Providers;
 
 namespace TheBuilder.WebAnalytics.Services;
 
-public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
+public sealed class MockAnalyticsClient :
+    IAnalyticsProviderClient,
+    IAnalyticsEventPropertiesProviderClient,
+    IAnalyticsFlagsProviderClient
 {
     private const double DemoDailyGrowthRate = 0.0008d;
     private const double DemoGrowthWindowDays = 1825d;
@@ -41,27 +45,28 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
         new("personalised-homepage", 4760, 3010)
     ];
 
-    public Task<string> GetProjectNameAsync(VercelAnalyticsConnection connection, CancellationToken cancellationToken)
+    public AnalyticsProviderDefinition Definition => VercelProvider.Definition;
+
+    public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(connection.DisplayName);
     }
 
-    public Task<AnalyticsTotals> CountAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
+    public Task<AnalyticsTotals> GetTotalsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        CancellationToken cancellationToken) => CountAsync(connection, query, cancellationToken);
+
+    public Task<AnalyticsTotals> CountAsync(AnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var scale = QueryScale(connection, query);
         return Task.FromResult(new AnalyticsTotals(Scale(29430, scale), Scale(17260, scale)));
     }
 
-    public Task<long> GetPageViewTotalAsync(VercelAnalyticsConnection connection, AnalyticsQuery query, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(Scale(29430, QueryScale(connection, query)));
-    }
-
     public Task<IReadOnlyList<AnalyticsPoint>> GetTrendAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         CancellationToken cancellationToken)
     {
@@ -86,12 +91,13 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     public Task<IReadOnlyList<AnalyticsBreakdownRow>> GetBreakdownAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         AnalyticsDimension dimension,
         int limit,
         string? search,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        AnalyticsTrafficMetric? orderBy = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var scenario = Scenario(connection);
@@ -109,7 +115,22 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     public Task<AnalyticsEventTotals> CountEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        CancellationToken cancellationToken) =>
+        CountEventsAsync(connection, query, eventName, null, cancellationToken);
+
+    public Task<AnalyticsEventTotals> CountFilteredEventsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        AnalyticsEventDataFilter eventDataFilter,
+        CancellationToken cancellationToken) =>
+        CountEventsAsync(connection, query, eventName, eventDataFilter, cancellationToken);
+
+    private Task<AnalyticsEventTotals> CountEventsAsync(
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
@@ -126,7 +147,7 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     public Task<IReadOnlyList<AnalyticsEventRow>> GetEventsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         int limit,
         string? search,
@@ -144,7 +165,7 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     public Task<IReadOnlyList<AnalyticsFlagRow>> GetFlagsAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string? flagKey,
         int limit,
@@ -167,7 +188,7 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     public Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
@@ -185,7 +206,7 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     public Task<IReadOnlyList<AnalyticsEventPropertyValue>> GetEventPropertyValuesAsync(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
         string propertyName,
@@ -207,13 +228,13 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
         return Task.FromResult<IReadOnlyList<AnalyticsEventPropertyValue>>(Filter(rows, search, limit, row => row.Value));
     }
 
-    private static bool HasEvents(VercelAnalyticsConnection connection) =>
+    private static bool HasEvents(AnalyticsConnection connection) =>
         Scenario(connection) is MockAnalyticsScenario.Complete or MockAnalyticsScenario.Events;
 
-    private static bool HasFlags(VercelAnalyticsConnection connection) =>
+    private static bool HasFlags(AnalyticsConnection connection) =>
         Scenario(connection) is MockAnalyticsScenario.Complete or MockAnalyticsScenario.Flags;
 
-    private static MockAnalyticsScenario Scenario(VercelAnalyticsConnection connection) =>
+    private static MockAnalyticsScenario Scenario(AnalyticsConnection connection) =>
         connection.MockScenario ?? throw new InvalidOperationException("A mock analytics client requires a mock connection.");
 
     private static T[] Filter<T>(IEnumerable<T> rows, string? search, int limit, Func<T, string> value)
@@ -237,7 +258,7 @@ public sealed class MockVercelAnalyticsClient : IVercelAnalyticsClient
     }
 
     private static double QueryScale(
-        VercelAnalyticsConnection connection,
+        AnalyticsConnection connection,
         AnalyticsQuery query,
         AnalyticsDimension? excludedDimension = null)
     {

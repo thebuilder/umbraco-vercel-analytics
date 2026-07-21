@@ -1,6 +1,6 @@
 ---
 name: Web Analytics
-description: A native editorial instrument for clear Vercel traffic insight inside Umbraco.
+description: A native editorial instrument for clear web analytics insight inside Umbraco.
 colors:
   backoffice-ink: "#060606"
   backoffice-ink-muted: "#2e2b29"
@@ -88,9 +88,9 @@ components:
 
 **Creative North Star: "The Editorial Instrument"**
 
-Web Analytics is a precise but approachable instrument inside the editorial workspace. It should reveal the traffic signal an editor needs, then get out of the way. The visual language is friendly and conversational, but its structure is disciplined: familiar Umbraco controls, clear hierarchy, compact reporting, and feedback close to the action that caused it.
+Web Analytics is a precise but approachable instrument inside the editorial workspace. It should reveal the site-wide or page-level traffic signal an editor needs, then get out of the way. The visual language is friendly and conversational, but its structure is disciplined: familiar Umbraco controls, clear hierarchy, compact reporting, capability-aware depth, and feedback close to the action that caused it.
 
-The extension belongs to the backoffice rather than merely living inside it. It inherits Umbraco UI Library semantics, Lato typography, spacing, focus treatment, and surface hierarchy. Custom analytics patterns may borrow the clarity of Vercel Analytics, but they must be translated into Umbraco's interaction language.
+The extension belongs to the backoffice rather than merely living inside it. It inherits Umbraco UI Library semantics, Lato typography, spacing, focus treatment, and surface hierarchy. Custom analytics patterns may borrow the clarity of Vercel Analytics, but Umbraco owns the interaction language: provider capabilities change the available depth, not the identity or basic behavior of the interface.
 
 The system explicitly rejects the density, configuration burden, and specialist terminology of an overly dense enterprise analytics platform. It is not Google Analytics, and it must never feel like a separate third-party dashboard embedded in Umbraco.
 

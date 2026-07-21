@@ -11,7 +11,7 @@ import type {
   FlagsData,
 } from "../api/types.gen.js";
 
-type ApiResponse<T> = Promise<{ data?: T; error?: unknown; response: Response }>;
+type ApiResponse<T> = Promise<{ data?: T; error?: unknown; response?: Response }>;
 type FlagsOptions = { query?: FlagsData["query"]; signal?: AbortSignal };
 
 export type DashboardApi = {

@@ -3,6 +3,7 @@ using Moq;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Services;
 using TheBuilder.WebAnalytics.Configuration;
+using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Tests.Services;
@@ -137,6 +138,42 @@ public sealed class AnalyticsDocumentRouteServiceTests
         Assert.Equal("https://root.example", baseUrl);
     }
 
+    [Fact]
+    public async Task Plausible_site_id_provides_base_url_without_a_document_root()
+    {
+        var connection = Connection("plausible");
+        connection.Provider = AnalyticsProvider.Plausible;
+        connection.ProjectId = string.Empty;
+        connection.SiteId = "charlietango.dk";
+        var registry = CreateRegistry(connection);
+        var service = new AnalyticsDocumentRouteService(
+            Mock.Of<IContentService>(),
+            Mock.Of<IAnalyticsPublishedContentAccessor>(),
+            registry);
+
+        var baseUrl = await service.GetConnectionBaseUrlAsync(
+            registry.Get(SiteConnectionKey)!,
+            CancellationToken.None);
+
+        Assert.Equal("https://charlietango.dk", baseUrl);
+    }
+
+    [Fact]
+    public async Task Provider_without_a_fallback_and_document_root_has_no_base_url()
+    {
+        var registry = CreateRegistry(Connection("site"));
+        var service = new AnalyticsDocumentRouteService(
+            Mock.Of<IContentService>(),
+            Mock.Of<IAnalyticsPublishedContentAccessor>(),
+            registry);
+
+        var baseUrl = await service.GetConnectionBaseUrlAsync(
+            registry.Get(SiteConnectionKey)!,
+            CancellationToken.None);
+
+        Assert.Null(baseUrl);
+    }
+
     private static Mock<IContentService> CreateContentTree(Guid rootKey, Guid documentKey)
     {
         var root = new Mock<IContent>();
@@ -161,7 +198,7 @@ public sealed class AnalyticsDocumentRouteServiceTests
         Guid.NewGuid(),
         [new AnalyticsPublishedRoute(culture, hostname, path, $"https://{hostname}{path}")]);
 
-    private static VercelAnalyticsConnectionOptions Connection(
+    private static AnalyticsConnectionOptions Connection(
         string alias,
         IReadOnlyList<Guid>? roots = null,
         IReadOnlyList<string>? documentTypes = null) => new()
@@ -173,13 +210,20 @@ public sealed class AnalyticsDocumentRouteServiceTests
             EnabledDocumentTypes = documentTypes?.ToArray() ?? ["articlePage"]
         };
 
-    private static VercelAnalyticsConnectionRegistry CreateRegistry(
-        params VercelAnalyticsConnectionOptions[] connections) => new(Options.Create(new VercelAnalyticsOptions
+    private static AnalyticsConnectionRegistry CreateRegistry(params AnalyticsConnectionOptions[] connections)
+    {
+        var options = Options.Create(new WebAnalyticsOptions
         {
             Enabled = true,
-            Providers = { Vercel = { AccessToken = "secret" } },
+            Providers =
+            {
+                Vercel = { AccessToken = "secret" },
+                Plausible = { AccessToken = "plausible-secret" }
+            },
             Connections = connections.ToList()
-        }));
+        });
+        return new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(options), options);
+    }
 
     private static Guid KeyFor(string alias) => alias == "root" ? RootConnectionKey : SiteConnectionKey;
 }

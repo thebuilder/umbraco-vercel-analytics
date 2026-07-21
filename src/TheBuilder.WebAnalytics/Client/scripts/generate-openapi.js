@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import chalk from 'chalk';
 import { createClient, defaultPlugins } from '@hey-api/openapi-ts';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 const getSwaggerUrl = (argumentsToParse) => argumentsToParse.find((argument) => argument !== '--');
@@ -24,10 +25,23 @@ const printGenerationError = (error, message) => {
   error('Review the generator error and the client configuration in generate-openapi.js.');
 };
 
+export async function normalizeGeneratedClient(output = 'src/api') {
+  const files = await readdir(output);
+  await Promise.all(files
+    .filter((file) => file.endsWith('.ts'))
+    .map(async (file) => {
+      const path = `${output}/${file}`;
+      const source = await readFile(path, 'utf8');
+      const normalized = source.replace(/[\t ]+(?=\r?$)/gm, '');
+      if (normalized !== source) await writeFile(path, normalized);
+    }));
+}
+
 export async function generateOpenApiClient({
   swaggerUrl = getSwaggerUrl(process.argv.slice(2)),
   fetchImplementation = fetch,
   createClientImplementation = createClient,
+  normalizeGeneratedOutput = normalizeGeneratedClient,
   log = console.log,
   error = console.error,
 } = {}) {
@@ -61,8 +75,9 @@ export async function generateOpenApiClient({
 
   log(`Calling ${chalk.yellow('hey-api')} to generate TypeScript client`);
   try {
+    const openApiDocument = await response.json();
     await createClientImplementation({
-      input: swaggerUrl,
+      input: openApiDocument,
       output: 'src/api',
       plugins: [
         ...defaultPlugins,
@@ -70,10 +85,11 @@ export async function generateOpenApiClient({
         {
           name: '@hey-api/sdk',
           asClass: true,
-          classNameBuilder: '{{name}}Service',
+          classNameBuilder: 'WebAnalyticsService',
         },
       ],
     });
+    await normalizeGeneratedOutput();
     log('OpenAPI client generated successfully');
     return true;
   } catch (exception) {

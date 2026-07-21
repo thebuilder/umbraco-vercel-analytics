@@ -7,8 +7,8 @@ import type { AnalyticsDateRange, DatePreset } from "./date-range.js";
 import { googleFaviconUrl } from "./favicon.js";
 import "./date-range-picker.element.js";
 
-@customElement("vercel-analytics-dashboard-header")
-export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-dashboard-header")
+export class WebAnalyticsDashboardHeaderElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) connections: AnalyticsConnectionSummary[] = [];
   @property() connection?: string;
   @property({ attribute: false }) route?: AnalyticsDocumentRoute;
@@ -83,9 +83,9 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
         </div>
         <div class="controls">
           ${!this.documentScoped && this.connections.length > 1 ? html`
-            <uui-select class="project-select" label="Vercel project" .options=${this.#selectOptions()} @change=${this.#onConnectionChange}></uui-select>
+            <uui-select class="project-select" label="Analytics connection" .options=${this.#selectOptions()} @change=${this.#onConnectionChange}></uui-select>
           ` : ""}
-          <vercel-analytics-date-range-picker .preset=${this.preset} .range=${this.range}></vercel-analytics-date-range-picker>
+          <web-analytics-date-range-picker .preset=${this.preset} .range=${this.range}></web-analytics-date-range-picker>
         </div>
       </header>
       <div class="warnings">
@@ -132,9 +132,9 @@ export class VercelAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEl
       header { align-items: stretch; }
       .site-context { flex: 1 1 100%; }
       .controls { align-items: stretch; inline-size: 100%; margin-inline-start: 0; }
-      .project-select, vercel-analytics-date-range-picker { box-sizing: border-box; flex: 1 1 100%; inline-size: 100%; max-inline-size: none; }
+      .project-select, web-analytics-date-range-picker { box-sizing: border-box; flex: 1 1 100%; inline-size: 100%; max-inline-size: none; }
     }
   `];
 }
 
-declare global { interface HTMLElementTagNameMap { "vercel-analytics-dashboard-header": VercelAnalyticsDashboardHeaderElement; } }
+declare global { interface HTMLElementTagNameMap { "web-analytics-dashboard-header": WebAnalyticsDashboardHeaderElement; } }

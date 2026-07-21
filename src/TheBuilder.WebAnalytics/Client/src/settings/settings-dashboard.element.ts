@@ -11,21 +11,23 @@ import type { UUIInputElement, UUIToggleElement } from "@umbraco-cms/backoffice/
 import { WebAnalyticsService } from "../api/sdk.gen.js";
 import type {
   AnalyticsConnectionSettingsResponse,
+  AnalyticsProviderDescriptor,
   AnalyticsSettingsResponse,
   UpdateAnalyticsSettingsRequest,
 } from "../api/types.gen.js";
 import "./connection-editor.element.js";
-import type { ConnectionActionStatus, VercelAnalyticsConnectionEditorElement } from "./connection-editor.element.js";
+import type { ConnectionActionStatus, AnalyticsConnectionEditorElement } from "./connection-editor.element.js";
 import { createSettingsUpdate, validateConnection, validateEditableSettings } from "./settings-model.js";
 import { announceAnalyticsAvailability } from "../section/analytics-availability.js";
 import { MOCK_SCENARIOS, type MockScenarioDefinition } from "./mock-scenarios.js";
+import { identifierField, providerDescriptor, providerLogo } from "./provider-identity.js";
 
 type NewConnection =
-  | { kind: "vercel"; hasAccessToken: boolean }
+  | { kind: "provider"; descriptor: AnalyticsProviderDescriptor; hasAccessToken: boolean }
   | { kind: "mock"; scenario: MockScenarioDefinition };
 
-@customElement("vercel-analytics-settings-dashboard")
-export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-settings-dashboard")
+export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitElement) {
   @state() private _settings?: AnalyticsSettingsResponse;
   @state() private _loading = true;
   @state() private _saving = false;
@@ -34,7 +36,7 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   @state() private _testingKey?: string;
   @state() private _status?: { type: "success" | "error"; message: string };
   @state() private _connectionStatuses: Record<string, ConnectionActionStatus> = {};
-  @state() private _tokenKeyCopied = false;
+  @state() private _showProviderPicker = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -72,11 +74,26 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   #updateConnection(index: number, connection: AnalyticsConnectionSettingsResponse): void {
     if (!this._settings) return;
     const connections = this._settings.connections.map((item, itemIndex) => itemIndex === index ? connection : item);
+    const { [connection.key]: _discardedStatus, ...remainingStatuses } = this._connectionStatuses;
+    this._connectionStatuses = remainingStatuses;
     this.#patch({ connections });
   }
 
-  #addConnection(): void {
-    this.#appendConnection({ kind: "vercel", hasAccessToken: this._settings?.hasAccessToken ?? false });
+  #addConnection(descriptor: AnalyticsProviderDescriptor): void {
+    const hasAccessToken = this._settings?.providerTokens.some((item) => item.provider === descriptor.provider && item.hasAccessToken) ?? false;
+    this.#appendConnection({ kind: "provider", descriptor, hasAccessToken });
+    this._showProviderPicker = false;
+  }
+
+  #toggleProviderPicker(): void {
+    this._showProviderPicker = !this._showProviderPicker;
+    void this.updateComplete.then(() => {
+      if (this._showProviderPicker) {
+        this.shadowRoot?.querySelector<HTMLElement>(".provider-choice")?.focus();
+      } else {
+        this.shadowRoot?.querySelector<HTMLElement>('[label="Add analytics connection"], [label="Choose analytics provider"]')?.focus();
+      }
+    });
   }
 
   #addMockConnection(scenario: MockScenarioDefinition): void {
@@ -86,12 +103,17 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   #appendConnection(details: NewConnection): void {
     if (!this._settings) return;
     const isMock = details.kind === "mock";
+    const provider = isMock ? "Vercel" : details.descriptor.provider;
+    const descriptor = isMock ? providerDescriptor(this._settings, provider) : details.descriptor;
     const key = crypto.randomUUID();
     const connection: AnalyticsConnectionSettingsResponse = {
       key,
       displayName: isMock ? details.scenario.displayName : "",
+      provider,
       projectId: "",
       team: null,
+      siteId: "",
+      eventPropertyNames: [],
       documentRootKeys: [],
       enableAllDocumentTypes: false,
       enabledDocumentTypeKeys: [],
@@ -101,26 +123,27 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     };
     const connections = [...this._settings.connections, connection];
     this.#patch({ connections });
-    this.updateComplete.then(() => {
+    void this.updateComplete.then(async () => {
       const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-      this.shadowRoot?.querySelector<HTMLElement>("vercel-analytics-connection-editor:last-of-type")?.scrollIntoView({
+      const editor = this.shadowRoot?.querySelector<AnalyticsConnectionEditorElement>("web-analytics-connection-editor:last-of-type");
+      editor?.scrollIntoView({
         behavior: reducedMotion ? "auto" : "smooth",
         block: "start",
       });
+      await editor?.updateComplete;
+      const fieldName = descriptor && identifierField(descriptor);
+      if (fieldName) editor?.shadowRoot?.querySelector<HTMLElement>(`[name="${fieldName}"]`)?.focus();
     });
-  }
-
-  async #copyTokenKey(): Promise<void> {
-    await navigator.clipboard.writeText("WebAnalytics__Providers__Vercel__AccessToken");
-    this._tokenKeyCopied = true;
-    window.setTimeout(() => { this._tokenKeyCopied = false; }, 2000);
   }
 
   #removeConnection(index: number): void {
     if (!this._settings) return;
     const connection = this._settings.connections[index];
-    if (!window.confirm(`Remove “${connection.displayName || connection.projectId || "this connection"}”? This takes effect when settings are saved.`)) return;
+    if (!connection) return;
+    if (!window.confirm(`Delete “${connection.displayName || connection.siteId || connection.projectId || "this connection"}” from Web Analytics? The connection is removed when you save settings.`)) return;
     const connections = this._settings.connections.filter((_, itemIndex) => itemIndex !== index);
+    const { [connection.key]: _discardedStatus, ...remainingStatuses } = this._connectionStatuses;
+    this._connectionStatuses = remainingStatuses;
     this.#patch({ connections });
   }
 
@@ -189,10 +212,114 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
   }
 
   #focusFirstInvalid(): void {
-    const editors = this.shadowRoot?.querySelectorAll<VercelAnalyticsConnectionEditorElement>("vercel-analytics-connection-editor") ?? [];
+    const editors = this.shadowRoot?.querySelectorAll<AnalyticsConnectionEditorElement>("web-analytics-connection-editor") ?? [];
     for (const editor of editors) {
       if (editor.focusFirstInvalid()) return;
     }
+  }
+
+  #renderProviderPicker() {
+    if (!this._showProviderPicker) return "";
+    return html`
+      <div id="provider-picker" class="provider-picker" role="group" aria-labelledby="provider-picker-heading">
+        <div class="provider-picker-heading">
+          <div>
+            <h3 id="provider-picker-heading">Choose an analytics provider</h3>
+            <p>The provider cannot be changed after this connection is created.</p>
+          </div>
+          <uui-button type="button" compact look="secondary" label="Close provider choices" @click=${this.#toggleProviderPicker}>Close</uui-button>
+        </div>
+        <div class="provider-choices">
+          ${this._settings?.providers.map((item) => {
+            const credential = this._settings?.providerTokens.find((token) => token.provider === item.provider);
+            return html`
+              <button class="provider-choice" type="button" aria-label=${`Add ${item.provider} connection`} @click=${() => this.#addConnection(item)}>
+                <span class="provider-mark">${providerLogo(item)}</span>
+                <span class="provider-choice-copy">
+                  <strong>${item.provider}</strong>
+                  <span>${item.description} · Requires ${item.identifier.label}</span>
+                </span>
+                <span class=${`provider-choice-status ${credential?.hasAccessToken ? "configured" : "missing"}`}>
+                  <uui-icon name=${credential?.hasAccessToken ? "icon-check" : "icon-alert"} aria-hidden="true"></uui-icon>
+                  ${credential?.hasAccessToken ? "Shared credential detected" : "No shared credential detected"}
+                </span>
+              </button>
+            `;
+          })}
+        </div>
+      </div>
+    `;
+  }
+
+  #renderGeneralSettings() {
+    if (!this._settings) return "";
+    return html`
+      <uui-box headline="General settings" class="general">
+        <div class="general-grid">
+          <uui-form-layout-item class="package-status">
+            <uui-label slot="label">Package status</uui-label>
+            <uui-toggle
+              label="Enable Web Analytics"
+              ?checked=${this._settings.enabled}
+              @change=${(event: Event) => this.#patch({ enabled: (event.target as UUIToggleElement).checked })}>
+              Enable Web Analytics
+            </uui-toggle>
+          </uui-form-layout-item>
+          <uui-form-layout-item>
+            <uui-label slot="label" for="default-range">Default reporting range</uui-label>
+            <div class="field-with-help">
+              <uui-input
+                id="default-range"
+                type="number"
+                min="1"
+                max="730"
+                label="Default reporting range in days"
+                aria-describedby="default-range-help"
+                .value=${String(this._settings.defaultRangeDays)}
+                @input=${(event: Event) => this.#patch({ defaultRangeDays: Number((event.target as UUIInputElement).value) })}></uui-input>
+              <span id="default-range-help" class="field-help">Days shown when editors first open Analytics.</span>
+            </div>
+          </uui-form-layout-item>
+          <uui-form-layout-item>
+            <uui-label slot="label" for="cache-duration">Cache duration</uui-label>
+            <div class="field-with-help">
+              <uui-input
+                id="cache-duration"
+                label="Cache duration"
+                aria-describedby="cache-duration-help"
+                .value=${this._settings.cacheDuration}
+                @input=${(event: Event) => this.#patch({ cacheDuration: String((event.target as UUIInputElement).value) })}></uui-input>
+              <span id="cache-duration-help" class="field-help">How long reports stay cached before fresh data is requested. Use <code>hh:mm:ss</code>, for example <code>00:05:00</code>.</span>
+            </div>
+          </uui-form-layout-item>
+        </div>
+      </uui-box>
+    `;
+  }
+
+  #renderDevelopmentData() {
+    if (!this._settings?.canCreateMockConnections) return "";
+    return html`
+      <uui-box headline="Development data" class="mock-settings">
+        <p class="mock-intro">Create deterministic local connections to check dashboard states without contacting an analytics provider. Mock connections are available only in Development.</p>
+        <div class="mock-scenarios">
+          ${MOCK_SCENARIOS.map((scenario) => {
+            const added = this._settings?.connections.some((connection) => connection.mockScenario === scenario.id) ?? false;
+            return html`
+              <div class="mock-scenario">
+                <span><strong>${scenario.name}</strong><small>${scenario.description}</small></span>
+                <uui-button
+                  type="button"
+                  look="secondary"
+                  label=${added ? `${scenario.name} mock connection added` : `Add ${scenario.name} mock connection`}
+                  ?disabled=${added}
+                  @click=${() => this.#addMockConnection(scenario)}>${added ? "Added" : "Add mock"}</uui-button>
+              </div>
+            `;
+          })}
+        </div>
+      </uui-box>
+    `;
   }
 
   render() {
@@ -201,168 +328,120 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
       <umb-empty-state headline="Settings unavailable"><p>${this._status?.message}</p><uui-button look="secondary" label="Retry loading settings" @click=${this.#load}>Retry</uui-button></umb-empty-state>
     `;
 
-    const hasConnections = this._settings.connections.length > 0;
-    const mockConnectionsEnabled = this._settings.canCreateMockConnections;
+    const settings = this._settings;
+    const hasConnections = settings.connections.length > 0;
+    const mockConnectionsEnabled = settings.canCreateMockConnections;
 
     return html`
       <form @submit=${this.#save} novalidate>
-        <header>
-          <div class="page-heading"><h1>Web Analytics</h1><p>Connect Vercel projects and choose where page analytics appears.</p></div>
-        </header>
-
         ${this._dirty ? html`
-          <div class="save-bar" aria-label="Unsaved Web Analytics settings">
-            <span class="unsaved-indicator" role="status" aria-live="polite">Unsaved changes</span>
+          <div class="settings-actions" aria-label="Web Analytics settings actions">
+            <span class="save-status" role="status" aria-live="polite">
+              <uui-icon name="icon-alert" aria-hidden="true"></uui-icon>
+              Unsaved changes
+            </span>
             <uui-button type="submit" look="primary" label="Save Web Analytics settings" .state=${this._saving ? "waiting" : undefined} ?disabled=${this._saving}>Save settings</uui-button>
           </div>
         ` : ""}
 
         ${this._status ? html`<div class=${`status ${this._status.type}`} role=${this._status.type === "error" ? "alert" : "status"} aria-live="polite"><uui-icon name=${this._status.type === "success" ? "icon-check" : "icon-alert"}></uui-icon><span>${this._status.message}</span></div>` : ""}
 
-        <uui-box headline="Defaults" class="general">
-          <div class="general-grid">
-            <uui-form-layout-item class="package-status">
-              <uui-label slot="label">Package status</uui-label>
-              <uui-toggle
-                label="Enable Web Analytics"
-                ?checked=${this._settings.enabled}
-                @change=${(event: Event) => this.#patch({ enabled: (event.target as UUIToggleElement).checked })}>
-                Enable Web Analytics
-              </uui-toggle>
-            </uui-form-layout-item>
-            <uui-form-layout-item>
-              <uui-label slot="label" for="default-range">Default range in days</uui-label>
-              <uui-input
-                id="default-range"
-                type="number"
-                min="1"
-                max="730"
-                label="Default range in days"
-                .value=${String(this._settings.defaultRangeDays)}
-                @input=${(event: Event) => this.#patch({ defaultRangeDays: Number((event.target as UUIInputElement).value) })}></uui-input>
-            </uui-form-layout-item>
-            <uui-form-layout-item>
-              <uui-label slot="label" for="cache-duration">Cache duration</uui-label>
-              <div class="field-with-help">
-                <uui-input
-                  id="cache-duration"
-                  label="Cache duration"
-                  aria-describedby="cache-duration-help"
-                  .value=${this._settings.cacheDuration}
-                  @input=${(event: Event) => this.#patch({ cacheDuration: String((event.target as UUIInputElement).value) })}></uui-input>
-                <span id="cache-duration-help" class="field-help">Use <code>hh:mm:ss</code>, for example <code>00:05:00</code>.</span>
-              </div>
-            </uui-form-layout-item>
-            <section class="shared-token" aria-labelledby="shared-token-heading">
-              <div class="shared-token-summary">
-                <strong id="shared-token-heading">Access token</strong>
-                ${this._settings.hasAccessToken
-                  ? html`<span class="shared-token-status configured"><uui-icon name="icon-check" aria-hidden="true"></uui-icon>Configured</span>`
-                  : html`<uui-tag class="shared-token-status" color="warning">Not configured</uui-tag>`}
-              </div>
-              ${this._settings.hasAccessToken ? "" : html`
-                <div class="shared-token-setup">
-                  <div class="shared-token-guidance">
-                    <p class="shared-token-help">Set this server environment variable to a Vercel access token.</p>
-                    <a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener noreferrer" aria-label="Create a Vercel access token (opens in a new tab)">Create token<uui-icon name="icon-out" aria-hidden="true"></uui-icon></a>
-                  </div>
-                  <div class="shared-token-key">
-                    <code>WebAnalytics__Providers__Vercel__AccessToken</code>
-                    <uui-button compact look="secondary" label="Copy shared access token setting name" @click=${this.#copyTokenKey}>${this._tokenKeyCopied ? "Copied" : "Copy"}</uui-button>
-                  </div>
-                </div>
-              `}
-            </section>
-          </div>
-        </uui-box>
-
-        ${this._settings.canCreateMockConnections ? html`
-          <uui-box headline="Development data" class="mock-settings">
-            <p class="mock-intro">Create deterministic local connections to verify dashboard states without calling Vercel. Mock connections are only active while the server runs in Development.</p>
-            <div class="mock-scenarios">
-              ${MOCK_SCENARIOS.map((scenario) => {
-                const added = this._settings?.connections.some((connection) => connection.mockScenario === scenario.id) ?? false;
-                return html`
-                  <div class="mock-scenario">
-                    <span><strong>${scenario.name}</strong><small>${scenario.description}</small></span>
-                    <uui-button
-                      type="button"
-                      look="secondary"
-                      label=${added ? `${scenario.name} mock connection added` : `Add ${scenario.name} mock connection`}
-                      ?disabled=${added}
-                      @click=${() => this.#addMockConnection(scenario)}>${added ? "Added" : "Add mock"}</uui-button>
-                  </div>
-                `;
-              })}
-            </div>
-          </uui-box>
-        ` : ""}
-
-        <section aria-labelledby="connections-heading">
+        <section class="connections-section" aria-labelledby="connections-heading">
           <div class="section-heading">
-            <div><h2 id="connections-heading">Connections</h2><p>Add each Vercel project that editors should be able to view.</p></div>
-            ${hasConnections ? html`
-              <uui-button type="button" look="secondary" label="Add Vercel connection" @click=${this.#addConnection}>Add connection</uui-button>
-            ` : ""}
+            <div><h2 id="connections-heading">Connections</h2><p>Add each analytics site or project that editors should be able to view.</p></div>
+            ${hasConnections ? html`<uui-button type="button" look="primary" label="Add analytics connection" aria-expanded=${this._showProviderPicker ? "true" : "false"} aria-controls="provider-picker" @click=${this.#toggleProviderPicker}>Add connection</uui-button>` : ""}
           </div>
+          ${this.#renderProviderPicker()}
           <div class="connections">
-            ${this._settings.connections.map((connection, index) => html`
-              <vercel-analytics-connection-editor
+            ${settings.connections.map((connection, index) => html`
+              <web-analytics-connection-editor
                 .connection=${connection}
-                .errors=${this._showValidation ? validateConnection(connection) : {}}
+                .descriptor=${providerDescriptor(settings, connection.provider)}
+                .errors=${this._showValidation ? validateConnection(connection, providerDescriptor(settings, connection.provider)) : {}}
                 .status=${this._connectionStatuses[connection.key]}
                 ?mockConnectionsEnabled=${mockConnectionsEnabled}
                 ?dirty=${this._dirty}
                 ?testing=${this._testingKey === connection.key}
                 @connection-change=${(event: CustomEvent<AnalyticsConnectionSettingsResponse>) => this.#updateConnection(index, event.detail)}
                 @remove-connection=${() => this.#removeConnection(index)}
-                @test-connection=${() => this.#testConnection(connection.key)}></vercel-analytics-connection-editor>
+                @test-connection=${() => this.#testConnection(connection.key)}></web-analytics-connection-editor>
             `)}
-            ${!hasConnections ? html`
+            ${!hasConnections && !this._showProviderPicker ? html`
               <div class="connection-empty-state">
                 <uui-icon name="icon-globe" aria-hidden="true"></uui-icon>
                 <div>
-                  <h3>Connect your first Vercel project</h3>
-                  <p>Add a Vercel project ID. The shared server-side access token above will be used automatically.</p>
+                  <h3>Connect your first analytics provider</h3>
+                  <p>Add the project or site that editors should be able to view. Credentials stay in your server configuration.</p>
                 </div>
-                <uui-button type="button" look="primary" label="Add your first Vercel connection" @click=${this.#addConnection}>Add connection</uui-button>
+                <uui-button type="button" look="primary" label="Choose analytics provider" aria-expanded=${this._showProviderPicker ? "true" : "false"} aria-controls="provider-picker" @click=${this.#toggleProviderPicker}>Add connection</uui-button>
               </div>
             ` : ""}
           </div>
         </section>
+
+        ${this.#renderGeneralSettings()}
+        ${this.#renderDevelopmentData()}
 
       </form>
     `;
   }
 
   static styles = [UmbTextStyles, css`
-    :host { --analytics-z-sticky-action: 10; display: block; }
-    form { max-width: 76rem; margin-inline: auto; padding: var(--uui-size-layout-1); }
-    header, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-layout-1); }
-    .page-heading, .section-heading > div { min-inline-size: 0; }
-    .save-bar {
+    :host {
+      --analytics-z-sticky-action: 10;
+      --settings-actions-inline-inset: var(--uui-size-space-4);
+      --settings-column-max: 76rem;
+      --settings-inline-gutter: var(--uui-size-layout-1);
+      container-type: inline-size;
+      display: block;
+    }
+    form { max-width: var(--settings-column-max); margin-inline: auto; padding: var(--uui-size-layout-1) var(--settings-inline-gutter) calc(var(--uui-size-layout-1) + var(--uui-size-14) + var(--uui-size-space-4)); }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-layout-1); }
+    .section-heading > div { min-inline-size: 0; }
+    .settings-actions {
       align-items: center;
-      background: var(--uui-color-surface);
-      border: 1px solid var(--uui-color-border);
+      background: var(--uui-color-surface-alt);
+      border-radius: var(--uui-border-radius);
+      box-shadow: var(--uui-shadow-depth-3);
+      box-sizing: border-box;
       display: flex;
       flex-wrap: wrap;
       gap: var(--uui-size-space-4);
       justify-content: flex-end;
-      margin-block-start: var(--uui-size-space-5);
+      inset-block-end: var(--uui-size-layout-1);
+      inset-inline-end: calc(var(--settings-inline-gutter) + var(--settings-actions-inline-inset));
+      max-inline-size: calc(100vw - 2 * var(--settings-inline-gutter) - 2 * var(--settings-actions-inline-inset));
+      min-block-size: var(--uui-size-14);
       padding: var(--uui-size-space-3) var(--uui-size-space-4);
-      position: sticky;
-      top: var(--uui-size-space-4);
+      position: fixed;
+      width: min(
+        calc(var(--settings-column-max) - 2 * var(--settings-actions-inline-inset)),
+        calc(100vw - 2 * var(--settings-inline-gutter) - 2 * var(--settings-actions-inline-inset))
+      );
       z-index: var(--analytics-z-sticky-action);
     }
-    .unsaved-indicator { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); white-space: nowrap; }
-    .unsaved-indicator::before { background: var(--uui-color-warning-standalone); border-radius: 50%; block-size: var(--uui-size-space-3); content: ""; flex: 0 0 auto; inline-size: var(--uui-size-space-3); }
-    h1, h2 { margin: 0; }
-    header p, .section-heading p { color: var(--uui-color-text-alt); margin-block: var(--uui-size-space-2) 0; text-wrap: pretty; }
+    @supports (width: 1cqi) {
+      .settings-actions {
+        inset-inline-end: max(
+          calc(var(--settings-inline-gutter) + var(--settings-actions-inline-inset)),
+          calc((100cqi - var(--settings-column-max)) / 2 + var(--settings-actions-inline-inset))
+        );
+        width: min(
+          calc(var(--settings-column-max) - 2 * var(--settings-actions-inline-inset)),
+          calc(100cqi - 2 * var(--settings-inline-gutter) - 2 * var(--settings-actions-inline-inset))
+        );
+      }
+    }
+    .save-status { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); white-space: nowrap; }
+    .save-status uui-icon { color: var(--uui-color-warning-standalone); }
+    h2 { margin: 0; }
+    .section-heading p { color: var(--uui-color-text-alt); margin-block: var(--uui-size-space-2) 0; text-wrap: pretty; }
     .status { align-items: flex-start; border: 1px solid var(--uui-color-border); display: flex; gap: var(--uui-size-space-2); margin-block: var(--uui-size-space-5); overflow-wrap: anywhere; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
     .status.success { background: color-mix(in srgb, var(--uui-color-positive) 8%, var(--uui-color-surface)); border-color: color-mix(in srgb, var(--uui-color-positive) 35%, var(--uui-color-border)); }
     .status.error { background: color-mix(in srgb, var(--uui-color-danger) 7%, var(--uui-color-surface)); border-color: color-mix(in srgb, var(--uui-color-danger) 35%, var(--uui-color-border)); }
-    .general { container-type: inline-size; margin-block: var(--uui-size-space-6) var(--uui-size-layout-2); }
-    .mock-settings { margin-block-end: var(--uui-size-layout-2); }
+    .connections-section { margin-block-start: 0; }
+    .general, .mock-settings { margin-block-start: var(--uui-size-layout-2); }
+    .general { container-type: inline-size; }
     .mock-intro { color: var(--uui-color-text-alt); margin: 0 0 var(--uui-size-space-5); max-inline-size: 72ch; text-wrap: pretty; }
     .mock-scenarios { display: grid; gap: var(--uui-size-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .mock-scenario { align-items: center; border: 1px solid var(--uui-color-border); display: grid; gap: var(--uui-size-space-4); grid-template-columns: minmax(0, 1fr) max-content; min-inline-size: 0; padding: var(--uui-size-space-4); }
@@ -374,19 +453,26 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     .field-with-help { display: grid; gap: var(--uui-size-space-1); }
     .field-help { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
     .package-status { min-inline-size: 0; }
-    .shared-token { align-items: start; border-top: 1px solid var(--uui-color-border); display: grid; gap: var(--uui-size-space-3); grid-column: 1 / -1; min-inline-size: 0; padding-block-start: var(--uui-size-space-4); }
-    .shared-token-summary { align-items: center; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-2); }
-    .shared-token-setup { display: grid; gap: var(--uui-size-space-4); max-inline-size: 42rem; min-inline-size: 0; }
-    .shared-token-guidance { display: grid; gap: var(--uui-size-space-2); justify-items: start; }
-    .shared-token-help { color: var(--uui-color-text-alt); margin: 0; max-inline-size: 48ch; text-wrap: pretty; }
-    .shared-token-status.configured { align-items: center; color: var(--uui-color-positive); display: inline-flex; gap: var(--uui-size-space-1); }
-    .shared-token-key { align-items: center; background: var(--uui-color-surface-alt); display: flex; gap: var(--uui-size-space-2); max-inline-size: 100%; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
-    .shared-token-key code { min-inline-size: 0; overflow-wrap: anywhere; }
-    .shared-token-guidance > a { align-items: center; color: var(--uui-color-interactive); display: inline-flex; gap: var(--uui-size-space-1); white-space: nowrap; }
-    .shared-token-guidance > a uui-icon { font-size: 0.875em; }
     .visually-hidden { block-size: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); inline-size: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
     .section-heading { margin-bottom: var(--uui-size-space-4); }
-    .connections { display: grid; gap: var(--uui-size-layout-1); }
+    .provider-picker { background: var(--uui-color-surface-alt); border-block: 1px solid var(--uui-color-border); margin-block-end: var(--uui-size-space-5); padding: var(--uui-size-space-4) var(--uui-size-space-5) var(--uui-size-space-5); }
+    .provider-picker-heading { align-items: flex-start; display: flex; gap: var(--uui-size-space-4); justify-content: space-between; margin-block-end: var(--uui-size-space-4); }
+    .provider-picker-heading h3 { font-size: var(--uui-type-h5-size); margin: 0; text-wrap: balance; }
+    .provider-picker-heading p { color: var(--uui-color-text-alt); margin: var(--uui-size-space-1) 0 0; text-wrap: pretty; }
+    .provider-choices { display: grid; gap: var(--uui-size-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .provider-choice { align-items: start; appearance: none; background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); color: inherit; cursor: pointer; display: grid; font: inherit; gap: var(--uui-size-space-2) var(--uui-size-space-4); grid-template-columns: auto minmax(0, 1fr); inline-size: 100%; padding: var(--uui-size-space-4); text-align: start; }
+    .provider-choice:hover { background: color-mix(in srgb, var(--uui-color-interactive) 4%, var(--uui-color-surface)); }
+    .provider-choice:active { background: color-mix(in srgb, var(--uui-color-interactive) 7%, var(--uui-color-surface)); }
+    .provider-choice:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
+    .provider-mark { align-items: center; background: var(--uui-color-surface-alt); block-size: var(--uui-size-8); color: var(--uui-color-text); display: inline-flex; inline-size: var(--uui-size-8); justify-content: center; }
+    .provider-logo { block-size: var(--uui-size-5); display: block; inline-size: var(--uui-size-5); }
+    .provider-choice-copy { display: grid; gap: var(--uui-size-space-1); min-inline-size: 0; }
+    .provider-choice-copy strong { font-size: var(--uui-type-h5-size); }
+    .provider-choice-copy > span { color: var(--uui-color-text-alt); overflow-wrap: anywhere; }
+    .provider-choice-status { align-items: center; display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-1); grid-column: 2; white-space: normal; }
+    .provider-choice-status.configured { color: var(--uui-color-positive-standalone); }
+    .provider-choice-status.missing { color: var(--uui-color-text-alt); }
+    .connections { display: grid; gap: var(--uui-size-space-5); }
     .connection-empty-state {
       align-items: center;
       background: color-mix(in srgb, var(--uui-color-interactive) 5%, var(--uui-color-surface));
@@ -407,26 +493,26 @@ export class VercelAnalyticsSettingsDashboardElement extends UmbElementMixin(Lit
     @container (max-width: 34rem) {
       .general-grid { grid-template-columns: 1fr; }
       .package-status { grid-column: auto; }
-      .shared-token { grid-column: auto; }
-      .shared-token-key { justify-content: space-between; }
     }
     @media (max-width: 800px) {
-      header, .section-heading { align-items: stretch; flex-direction: column; }
+      .section-heading { align-items: stretch; flex-direction: column; }
       .mock-scenarios { grid-template-columns: 1fr; }
-      .save-bar { top: var(--uui-size-space-2); }
+      .settings-actions { inset-block-end: var(--uui-size-space-4); }
       .connection-empty-state { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
       .connection-empty-state uui-button { grid-column: 1 / -1; justify-self: start; }
+      .provider-choices { grid-template-columns: 1fr; }
+      .provider-picker-heading { align-items: stretch; flex-direction: column; }
     }
     @media (forced-colors: active) {
-      .unsaved-indicator::before { background: Highlight; }
+      .save-status uui-icon { color: Highlight; }
     }
   `];
 }
 
-export default VercelAnalyticsSettingsDashboardElement;
+export default WebAnalyticsSettingsDashboardElement;
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-settings-dashboard": VercelAnalyticsSettingsDashboardElement;
+    "web-analytics-settings-dashboard": WebAnalyticsSettingsDashboardElement;
   }
 }

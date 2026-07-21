@@ -25,7 +25,7 @@ The connection and reporting workflow is provider-neutral. Availability of indiv
 | Provider | Connection identifier | Credential | Provider-specific capabilities |
 | --- | --- | --- | --- |
 | [Vercel Web Analytics](https://vercel.com/docs/analytics) | Project ID (`prj_...`) and optional team | [Scoped access token](https://vercel.com/kb/guide/how-do-i-use-a-vercel-api-access-token) | Custom-event property exploration and feature flags |
-| [Plausible](https://plausible.io/docs/stats-api) | Site ID, normally the registered domain | [Stats API key](https://plausible.io/docs/stats-api#authentication) | Goal and custom-event totals and drill-downs |
+| [Plausible](https://plausible.io/docs/stats-api) | Site ID, normally the registered domain | [Stats API key](https://plausible.io/docs/stats-api#authentication) | Goal and custom-event totals, filtering, and property drill-downs |
 
 Plausible's Stats API requires a Business plan. Self-hosted Plausible is not currently supported.
 
@@ -156,7 +156,7 @@ The backoffice settings screen is the normal configuration path. A deployment ca
 }
 ```
 
-For Plausible, use `"Provider": "Plausible"` and set `SiteId` instead of `ProjectId` and `Team`.
+For Plausible, use `"Provider": "Plausible"` and set `SiteId` instead of `ProjectId` and `Team`. Add `EventPropertyNames` when the site records custom event properties beyond Plausible's built-in `url` property for outbound-link and file-download goals and `path` property for 404 goals.
 
 ### Configuration reference
 
@@ -164,7 +164,7 @@ Package settings use the `WebAnalytics` section.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `Enabled` | `false` | Enables the Analytics section and configured document workspace views. |
+| `Enabled` | `true` | Enables the Analytics section and configured document workspace views. |
 | `DefaultRangeDays` | `30` | Initial report range in days. Valid values are 1–730. |
 | `CacheDuration` | `00:05:00` | Per-instance in-memory cache duration. Valid values are zero to one hour. |
 | `Connections` | `[]` | Provider connection definitions. The first connection becomes the initial default. |
@@ -189,6 +189,7 @@ Each entry under `Connections` supports:
 | `ProjectId` | Vercel only | Vercel project ID beginning with `prj_`. |
 | `Team` | Empty | Optional team ID (`team_...`) or team slug. Leave empty for a personal project. |
 | `SiteId` | Plausible only | Plausible site ID, normally the registered domain. |
+| `EventPropertyNames` | `[]` | Plausible-only custom event property names to include in event-property discovery and drill-downs. Up to 20 names, each at most 100 characters. Plausible's `url` property is built in for outbound-link and file-download goals, and `path` is built in for 404 goals. |
 | `DocumentRootKeys` | `[]` | Umbraco document-root GUIDs that map document analytics to this connection. |
 | `EnableAllDocumentTypes` | `false` | Shows document analytics for every document type beneath a mapped root. |
 | `EnabledDocumentTypeKeys` | `[]` | Document-type GUIDs that show document analytics when all types are not enabled. |
@@ -212,7 +213,7 @@ After deployment:
 4. If document analytics is enabled, open a mapped published document and select its **Analytics** workspace view.
 5. Grant the Analytics section to any non-administrator user groups that need global reports.
 
-The available reporting window and dimensions depend on the provider, plan, and recorded data. Unsupported panels are hidden rather than treated as connection failures. Plausible supports goal/custom-event lists but not Vercel feature flags or event-property drilldowns.
+The available reporting window and dimensions depend on the provider, plan, and recorded data. Unsupported panels are hidden rather than treated as connection failures. Plausible supports goal and custom-event lists, filtering, and event-property drill-downs, but not Vercel feature flags. Add custom property names to the Plausible connection when needed; `url` is built in for outbound-link and file-download goals, and `path` for 404 goals.
 
 ## Troubleshooting
 

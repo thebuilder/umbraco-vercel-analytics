@@ -1,5 +1,4 @@
 using System.Net;
-using Microsoft.Extensions.DependencyInjection;
 using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Providers;
 
@@ -13,13 +12,16 @@ public sealed class AnalyticsProviderCatalog
 
     private AnalyticsProviderCatalog()
     {
-        Definitions =
+        Registrations =
         [
-            VercelProvider.Definition,
-            PlausibleProvider.Definition
+            VercelProvider.Registration,
+            PlausibleProvider.Registration
         ];
+        Definitions = Registrations.Select(registration => registration.Definition).ToArray();
         _definitions = Definitions.ToDictionary(definition => definition.Provider);
     }
+
+    internal IReadOnlyList<AnalyticsProviderRegistration> Registrations { get; }
 
     public IReadOnlyList<AnalyticsProviderDefinition> Definitions { get; }
 
@@ -35,11 +37,11 @@ public sealed class AnalyticsProviderCatalog
 public sealed class AnalyticsProviderDefinition(
     AnalyticsProvider provider,
     AnalyticsCapabilities capabilities,
-    AnalyticsConnectionIdentifier identifier,
+    AnalyticsIdentifierDefinition identifier,
     AnalyticsProviderSettingsDescriptor settings,
     Func<WebAnalyticsOptions, string> accessToken,
-    Action<IServiceCollection, AnalyticsProviderDefinition>? registerClient = null,
-    IReadOnlySet<HttpStatusCode>? invalidQueryStatuses = null)
+    IReadOnlySet<HttpStatusCode>? invalidQueryStatuses = null,
+    Func<AnalyticsConnection, string?>? fallbackBaseUrl = null)
 {
     private readonly IReadOnlySet<HttpStatusCode> _invalidQueryStatuses =
         invalidQueryStatuses ?? new HashSet<HttpStatusCode> { HttpStatusCode.BadRequest };
@@ -48,7 +50,7 @@ public sealed class AnalyticsProviderDefinition(
 
     public AnalyticsCapabilities Capabilities { get; } = capabilities;
 
-    public AnalyticsConnectionIdentifier Identifier { get; } = identifier;
+    public AnalyticsIdentifierDefinition Identifier { get; } = identifier;
 
     public bool SupportsTeam => Settings.Team is not null;
 
@@ -60,29 +62,22 @@ public sealed class AnalyticsProviderDefinition(
         Provider,
         Settings.Description,
         Settings.LogoSlug,
-        Settings.Identifier,
+        Identifier.ToDescriptor(),
         Settings.Team,
         Settings.Credential,
         Settings.EventProperties);
 
-    public string GetIdentifier(AnalyticsConnectionSettings connection) => Identifier switch
-    {
-        AnalyticsConnectionIdentifier.ProjectId => connection.ProjectId,
-        AnalyticsConnectionIdentifier.SiteId => connection.SiteId,
-        _ => string.Empty
-    };
+    public string GetIdentifier(AnalyticsConnectionSettings connection) => Identifier.GetValue(connection);
 
-    public string GetIdentifier(AnalyticsConnection connection) => Identifier switch
-    {
-        AnalyticsConnectionIdentifier.ProjectId => connection.ProjectId,
-        AnalyticsConnectionIdentifier.SiteId => connection.SiteId,
-        _ => string.Empty
-    };
+    public string GetIdentifier(AnalyticsConnection connection) => Identifier.GetValue(connection);
+
+    public string? GetFallbackBaseUrl(AnalyticsConnection connection) =>
+        fallbackBaseUrl?.Invoke(connection);
 
     public AnalyticsProviderFields Normalize(AnalyticsConnectionSettings connection) => new(
-        !connection.IsMock && Identifier == AnalyticsConnectionIdentifier.ProjectId ? connection.ProjectId.Trim() : string.Empty,
+        !connection.IsMock && Identifier.Field == AnalyticsConnectionIdentifier.ProjectId ? connection.ProjectId.Trim() : string.Empty,
         !connection.IsMock && Settings.Team is not null ? NullIfWhiteSpace(connection.Team) : null,
-        !connection.IsMock && Identifier == AnalyticsConnectionIdentifier.SiteId ? connection.SiteId.Trim() : string.Empty,
+        !connection.IsMock && Identifier.Field == AnalyticsConnectionIdentifier.SiteId ? connection.SiteId.Trim() : string.Empty,
         !connection.IsMock && Settings.EventProperties is not null
             ? NormalizeNames(connection.EventPropertyNames ?? [])
             : []);
@@ -95,15 +90,15 @@ public sealed class AnalyticsProviderDefinition(
         ICollection<string> failures)
     {
         if (requireConnectionMetadata && !isSupportedMockScenario && string.IsNullOrWhiteSpace(GetIdentifier(connection)))
-            failures.Add($"Connection '{label}' requires {Settings.Identifier.RequiredMessage}.");
+            failures.Add($"Connection '{label}' requires {Identifier.RequiredMessage}.");
 
         if (!string.IsNullOrWhiteSpace(connection.ProjectId) &&
-            (isSupportedMockScenario || Identifier != AnalyticsConnectionIdentifier.ProjectId))
+            (isSupportedMockScenario || Identifier.Field != AnalyticsConnectionIdentifier.ProjectId))
             failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.ProjectId.Label}.");
         if (!string.IsNullOrWhiteSpace(connection.Team) && (isSupportedMockScenario || !SupportsTeam))
             failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.Team.Label}.");
         if (!string.IsNullOrWhiteSpace(connection.SiteId) &&
-            (isSupportedMockScenario || Identifier != AnalyticsConnectionIdentifier.SiteId))
+            (isSupportedMockScenario || Identifier.Field != AnalyticsConnectionIdentifier.SiteId))
             failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.SiteId.Label}.");
 
         var eventPropertyNames = connection.EventPropertyNames ?? [];
@@ -121,13 +116,6 @@ public sealed class AnalyticsProviderDefinition(
     }
 
     public bool IsInvalidQuery(HttpStatusCode statusCode) => _invalidQueryStatuses.Contains(statusCode);
-
-    internal void RegisterClient(IServiceCollection services)
-    {
-        if (registerClient is null)
-            throw new InvalidOperationException($"No analytics client registration is configured for {Provider}.");
-        registerClient(services, this);
-    }
 
     public string ConnectionTestFailure(HttpStatusCode statusCode) => statusCode switch
     {
@@ -155,10 +143,33 @@ public sealed class AnalyticsProviderDefinition(
 public sealed record AnalyticsProviderSettingsDescriptor(
     string Description,
     string LogoSlug,
-    AnalyticsIdentifierFieldDescriptor Identifier,
     AnalyticsOptionalFieldDescriptor? Team,
     AnalyticsCredentialDescriptor Credential,
     AnalyticsEventPropertyDescriptor? EventProperties);
+
+public sealed record AnalyticsIdentifierDefinition(
+    AnalyticsConnectionIdentifier Field,
+    string Label,
+    string Description,
+    string RequiredMessage)
+{
+    internal AnalyticsIdentifierFieldDescriptor ToDescriptor() =>
+        new(Field.ToFieldName(), Label, Description, RequiredMessage);
+
+    internal string GetValue(AnalyticsConnectionSettings connection) => Field switch
+    {
+        AnalyticsConnectionIdentifier.ProjectId => connection.ProjectId,
+        AnalyticsConnectionIdentifier.SiteId => connection.SiteId,
+        _ => throw new ArgumentOutOfRangeException(nameof(Field), Field, "Unsupported analytics connection identifier.")
+    };
+
+    internal string GetValue(AnalyticsConnection connection) => Field switch
+    {
+        AnalyticsConnectionIdentifier.ProjectId => connection.ProjectId,
+        AnalyticsConnectionIdentifier.SiteId => connection.SiteId,
+        _ => throw new ArgumentOutOfRangeException(nameof(Field), Field, "Unsupported analytics connection identifier.")
+    };
+}
 
 public sealed record AnalyticsIdentifierFieldDescriptor(
     string Key,
@@ -201,4 +212,14 @@ public enum AnalyticsConnectionIdentifier
 {
     ProjectId,
     SiteId
+}
+
+internal static class AnalyticsConnectionIdentifierExtensions
+{
+    internal static string ToFieldName(this AnalyticsConnectionIdentifier identifier) => identifier switch
+    {
+        AnalyticsConnectionIdentifier.ProjectId => "projectId",
+        AnalyticsConnectionIdentifier.SiteId => "siteId",
+        _ => throw new ArgumentOutOfRangeException(nameof(identifier), identifier, "Unsupported analytics connection identifier.")
+    };
 }

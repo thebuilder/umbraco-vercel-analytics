@@ -31,15 +31,20 @@ internal static class PlausibleProvider
             GlobalEventFiltering: true,
             Flags: false,
             BreakdownOrdering: true),
-        AnalyticsConnectionIdentifier.SiteId,
+        new(
+            AnalyticsConnectionIdentifier.SiteId,
+            "Plausible site ID",
+            "Use the domain configured in your Plausible site settings.",
+            "a Plausible site ID"),
         new(
             "Sites using Plausible Analytics",
             "plausible",
-            new("siteId", "Plausible site ID", "Use the domain configured in your Plausible site settings.", "a Plausible site ID"),
             null,
             new("Stats API key", "Configure a Plausible Stats API key in the server settings.", "https://plausible.io/docs/stats-api"),
             new("event properties", "Optional custom event property names configured for this Plausible site.", 20, 100)),
         options => options.Providers.Plausible.AccessToken,
-        static (services, definition) => services.AddAnalyticsProvider<PlausibleAnalyticsClient>(definition, new Uri("https://plausible.io/")),
         invalidQueryStatuses: new HashSet<HttpStatusCode> { HttpStatusCode.BadRequest, HttpStatusCode.NotFound });
+
+    internal static AnalyticsProviderRegistration Registration { get; } =
+        AnalyticsProviderRegistration.Create<PlausibleAnalyticsClient>(Definition, new Uri("https://plausible.io/"));
 }

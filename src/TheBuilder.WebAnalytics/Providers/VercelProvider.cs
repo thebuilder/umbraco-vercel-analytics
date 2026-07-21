@@ -31,14 +31,19 @@ internal static class VercelProvider
             GlobalEventFiltering: false,
             Flags: true,
             BreakdownOrdering: false),
-        AnalyticsConnectionIdentifier.ProjectId,
+        new(
+            AnalyticsConnectionIdentifier.ProjectId,
+            "Vercel project ID",
+            "Use the project ID from your Vercel project settings.",
+            "a Vercel project ID"),
         new(
             "Projects using Vercel Web Analytics",
             "vercel",
-            new("projectId", "Vercel project ID", "Use the project ID from your Vercel project settings.", "a Vercel project ID"),
             new("team", "Team ID or slug", "Optional team slug or ID for projects owned by a Vercel team."),
             new("access token", "Configure a Vercel access token in the server settings.", "https://vercel.com/docs/rest-api"),
             null),
-        options => options.Providers.Vercel.AccessToken,
-        static (services, definition) => services.AddAnalyticsProvider<VercelAnalyticsClient>(definition, new Uri("https://api.vercel.com/")));
+        options => options.Providers.Vercel.AccessToken);
+
+    internal static AnalyticsProviderRegistration Registration { get; } =
+        AnalyticsProviderRegistration.Create<VercelAnalyticsClient>(Definition, new Uri("https://api.vercel.com/"));
 }

@@ -11,8 +11,8 @@ import "./event-table.element.js";
 import "./flag-card.element.js";
 import { stateData, type AsyncState } from "./async-state.js";
 
-@customElement("vercel-analytics-breakdown-grid")
-export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-breakdown-grid")
+export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) cards: ReadonlyArray<DashboardCard> = [];
   @property({ attribute: false }) breakdowns: Partial<Record<AnalyticsDimension, AsyncState<AnalyticsBreakdown>>> = {};
   @property({ attribute: false }) events: AsyncState<AnalyticsEventsReport> = { status: "loading" };
@@ -115,7 +115,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     return html`
       <uui-box class=${`breakdown-card ${card.span === "wide" ? "wide" : ""}`}>
         <div class="breakdown-card-layout">
-          <vercel-analytics-breakdown-table
+          <web-analytics-breakdown-table
             .headline=${selected.headline}
             .dimension=${selected.dimension}
             .metric=${this.metric}
@@ -127,7 +127,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
             .linkValues=${linkValues}
             .unavailable=${unavailable}>
             ${card.kind === "tabbed-breakdown" ? this.#renderTabs(card) : ""}
-          </vercel-analytics-breakdown-table>
+          </web-analytics-breakdown-table>
           ${planLimited && unavailable ? html`<p class="hint breakdown-hint">UTM reporting availability depends on your analytics plan and reporting window.</p>` : ""}
           <footer class="breakdown-footer">
             ${!loading && !unavailable && rows.length ? html`
@@ -157,7 +157,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     return html`
       <uui-box class="breakdown-card wide">
         <div class="breakdown-card-layout">
-          <vercel-analytics-breakdown-table
+          <web-analytics-breakdown-table
             .headline=${selected.headline}
             .dimension=${selected.dimension}
             .metric=${this.metric}
@@ -170,7 +170,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
             .unavailable=${unavailable}>
             ${this.#renderAcquisitionTabs(utmAvailable)}
             ${showingUtm ? this.#renderUtmTabs(utmCard) : ""}
-          </vercel-analytics-breakdown-table>
+          </web-analytics-breakdown-table>
           <footer class="breakdown-footer">
             ${!loading && !unavailable && rows.length ? html`
               <uui-button look="secondary" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", selected)}>View all</uui-button>
@@ -190,7 +190,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
     return html`
       <uui-box class="breakdown-card wide">
         <div class=${`breakdown-card-layout${empty ? " empty-card-layout" : ""}`}>
-          <vercel-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading} .detailsEnabled=${this.supportsEventDetails}></vercel-analytics-event-table>
+          <web-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading} .detailsEnabled=${this.supportsEventDetails}></web-analytics-event-table>
           ${empty ? "" : html`<footer class="breakdown-footer">
             ${!loading && rows.length ? html`<uui-button look="secondary" label="View all events" @click=${() => this.#dispatch("view-events")}>View all</uui-button>` : ""}
           </footer>`}
@@ -213,7 +213,7 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
         ${this.supportsEvents ? this.#renderEvents() : ""}
         ${cardsAfterEvents.map(renderCard)}
         ${this.supportsFlags ? html`<uui-box class=${`breakdown-card flags-card${documentScoped ? " document-flags-card" : " wide"}`}>
-          <vercel-analytics-flag-card .report=${this.flags} .selected=${this.selectedFlag}></vercel-analytics-flag-card>
+          <web-analytics-flag-card .report=${this.flags} .selected=${this.selectedFlag}></web-analytics-flag-card>
         </uui-box>` : ""}
       </section>
     `;
@@ -252,4 +252,4 @@ export class VercelAnalyticsBreakdownGridElement extends UmbElementMixin(LitElem
   `];
 }
 
-declare global { interface HTMLElementTagNameMap { "vercel-analytics-breakdown-grid": VercelAnalyticsBreakdownGridElement; } }
+declare global { interface HTMLElementTagNameMap { "web-analytics-breakdown-grid": WebAnalyticsBreakdownGridElement; } }

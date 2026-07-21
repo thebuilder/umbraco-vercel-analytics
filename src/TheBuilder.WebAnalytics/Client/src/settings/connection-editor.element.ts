@@ -22,7 +22,7 @@ export type ConnectionActionStatus = { type: "success" | "error" | "info"; messa
 const credentialName = (provider: AnalyticsConnectionSettingsResponse["provider"]): string =>
   provider === "Plausible" ? "Stats API key" : "access token";
 
-@customElement("vercel-analytics-connection-editor")
+@customElement("web-analytics-connection-editor")
 export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) connection!: EditableAnalyticsConnection;
   @property({ attribute: false }) errors: ConnectionValidationErrors = {};
@@ -376,6 +376,6 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-connection-editor": AnalyticsConnectionEditorElement;
+    "web-analytics-connection-editor": AnalyticsConnectionEditorElement;
   }
 }

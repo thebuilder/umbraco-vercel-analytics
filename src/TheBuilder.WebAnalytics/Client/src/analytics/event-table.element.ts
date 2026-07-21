@@ -4,8 +4,8 @@ import type { AnalyticsEventRow } from "../api/types.gen.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import { visibleEventRows } from "./event-rows.js";
 
-@customElement("vercel-analytics-event-table")
-export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-event-table")
+export class WebAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
   @property({ type: Boolean }) loading = false;
   @property({ type: Number }) skeletonRows = 10;
   @property({ attribute: false }) rows: AnalyticsEventRow[] = [];
@@ -113,6 +113,6 @@ export class VercelAnalyticsEventTableElement extends UmbElementMixin(LitElement
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-event-table": VercelAnalyticsEventTableElement;
+    "web-analytics-event-table": WebAnalyticsEventTableElement;
   }
 }

@@ -1,4 +1,4 @@
-export const ANALYTICS_AVAILABILITY_CHANGED_EVENT = "vercel-analytics-availability-changed";
+export const ANALYTICS_AVAILABILITY_CHANGED_EVENT = "web-analytics-availability-changed";
 
 export type AnalyticsAvailabilityChangedDetail = {
   enabled: boolean;

@@ -2,17 +2,17 @@ import { LitElement, customElement, html } from "@umbraco-cms/backoffice/externa
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import "../analytics/analytics-dashboard.element.js";
 
-@customElement("vercel-analytics-section")
-export class VercelAnalyticsSectionElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-section")
+export class WebAnalyticsSectionElement extends UmbElementMixin(LitElement) {
   render() {
-    return html`<vercel-analytics-dashboard></vercel-analytics-dashboard>`;
+    return html`<web-analytics-dashboard></web-analytics-dashboard>`;
   }
 }
 
-export default VercelAnalyticsSectionElement;
+export default WebAnalyticsSectionElement;
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-section": VercelAnalyticsSectionElement;
+    "web-analytics-section": WebAnalyticsSectionElement;
   }
 }

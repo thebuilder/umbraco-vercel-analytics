@@ -26,7 +26,7 @@ type NewConnection =
   | { kind: "provider"; provider: AnalyticsProvider; hasAccessToken: boolean }
   | { kind: "mock"; scenario: MockScenarioDefinition };
 
-@customElement("vercel-analytics-settings-dashboard")
+@customElement("web-analytics-settings-dashboard")
 export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitElement) {
   @state() private _settings?: AnalyticsSettingsResponse;
   @state() private _loading = true;
@@ -123,7 +123,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     this.#patch({ connections });
     void this.updateComplete.then(async () => {
       const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-      const editor = this.shadowRoot?.querySelector<AnalyticsConnectionEditorElement>("vercel-analytics-connection-editor:last-of-type");
+      const editor = this.shadowRoot?.querySelector<AnalyticsConnectionEditorElement>("web-analytics-connection-editor:last-of-type");
       editor?.scrollIntoView({
         behavior: reducedMotion ? "auto" : "smooth",
         block: "start",
@@ -210,7 +210,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   }
 
   #focusFirstInvalid(): void {
-    const editors = this.shadowRoot?.querySelectorAll<AnalyticsConnectionEditorElement>("vercel-analytics-connection-editor") ?? [];
+    const editors = this.shadowRoot?.querySelectorAll<AnalyticsConnectionEditorElement>("web-analytics-connection-editor") ?? [];
     for (const editor of editors) {
       if (editor.focusFirstInvalid()) return;
     }
@@ -383,7 +383,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
           ${this.#renderProviderPicker()}
           <div class="connections">
             ${this._settings.connections.map((connection, index) => html`
-              <vercel-analytics-connection-editor
+              <web-analytics-connection-editor
                 .connection=${connection}
                 .errors=${this._showValidation ? validateConnection(connection) : {}}
                 .status=${this._connectionStatuses[connection.key]}
@@ -392,7 +392,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
                 ?testing=${this._testingKey === connection.key}
                 @connection-change=${(event: CustomEvent<AnalyticsConnectionSettingsResponse>) => this.#updateConnection(index, event.detail)}
                 @remove-connection=${() => this.#removeConnection(index)}
-                @test-connection=${() => this.#testConnection(connection.key)}></vercel-analytics-connection-editor>
+                @test-connection=${() => this.#testConnection(connection.key)}></web-analytics-connection-editor>
             `)}
             ${!hasConnections && !this._showProviderPicker ? html`
               <div class="connection-empty-state">
@@ -539,6 +539,6 @@ export default WebAnalyticsSettingsDashboardElement;
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-settings-dashboard": WebAnalyticsSettingsDashboardElement;
+    "web-analytics-settings-dashboard": WebAnalyticsSettingsDashboardElement;
   }
 }

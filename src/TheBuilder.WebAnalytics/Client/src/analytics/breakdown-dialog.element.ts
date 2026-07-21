@@ -14,8 +14,8 @@ import { breakdownMetricTotal, type TrafficMetric } from "./breakdown-rows.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import "./breakdown-table.element.js";
 
-@customElement("vercel-analytics-breakdown-dialog")
-export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-breakdown-dialog")
+export class WebAnalyticsBreakdownDialogElement extends UmbElementMixin(LitElement) {
   @property() headline = "Breakdown";
   @property() loading = false;
   @property() unavailable?: string;
@@ -72,7 +72,7 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
               ? html`<umb-empty-state headline="No matching results"><p>Try a different search.</p></umb-empty-state>`
               : ""}
             ${(this.loading || (!this.unavailable && (!this._search || this.rows.length > 0))) ? html`
-              <vercel-analytics-breakdown-table
+              <web-analytics-breakdown-table
                 .headline=${this.headline}
                 .dimension=${this.dimension}
                 .metric=${this.metric}
@@ -81,7 +81,7 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
                 .loading=${this.loading}
                 .baseUrl=${this.baseUrl}
                 .filters=${this.filters}
-                .linkValues=${this.linkValues}></vercel-analytics-breakdown-table>
+                .linkValues=${this.linkValues}></web-analytics-breakdown-table>
             ` : ""}
           </div>
           <uui-button slot="actions" look="secondary" label="Close breakdown" @click=${this.#close}>Close</uui-button>
@@ -119,6 +119,6 @@ export class VercelAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEl
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-breakdown-dialog": VercelAnalyticsBreakdownDialogElement;
+    "web-analytics-breakdown-dialog": WebAnalyticsBreakdownDialogElement;
   }
 }

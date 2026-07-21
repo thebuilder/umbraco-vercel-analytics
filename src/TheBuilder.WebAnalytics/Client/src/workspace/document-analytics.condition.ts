@@ -11,8 +11,8 @@ export class DocumentAnalyticsCondition extends UmbConditionBase<UmbConditionCon
     this.permitted = false;
     this.consumeContext(UMB_DOCUMENT_WORKSPACE_CONTEXT, (context) => {
       if (!context) return;
-      this.observe(context.unique, (unique) => void this.#evaluate(unique ?? undefined), "vercelAnalyticsConditionUnique");
-      this.observe(context.splitView.firstActiveVariantInfo, () => void this.#evaluate(context.getUnique() ?? undefined), "vercelAnalyticsConditionCulture");
+      this.observe(context.unique, (unique) => void this.#evaluate(unique ?? undefined), "webAnalyticsConditionUnique");
+      this.observe(context.splitView.firstActiveVariantInfo, () => void this.#evaluate(context.getUnique() ?? undefined), "webAnalyticsConditionCulture");
     });
   }
 

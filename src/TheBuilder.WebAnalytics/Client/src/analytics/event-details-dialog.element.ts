@@ -4,8 +4,8 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventDetails, AnalyticsEventProperty } from "../api/types.gen.js";
 
-@customElement("vercel-analytics-event-details-dialog")
-export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-event-details-dialog")
+export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitElement) {
   @property() eventName = "Event";
   @property({ type: Boolean }) loading = false;
   @property() unavailable?: string;
@@ -248,4 +248,4 @@ export class VercelAnalyticsEventDetailsDialogElement extends UmbElementMixin(Li
   `];
 }
 
-declare global { interface HTMLElementTagNameMap { "vercel-analytics-event-details-dialog": VercelAnalyticsEventDetailsDialogElement; } }
+declare global { interface HTMLElementTagNameMap { "web-analytics-event-details-dialog": WebAnalyticsEventDetailsDialogElement; } }

@@ -16,8 +16,8 @@ import { countryDisplayName, countryFlagUrl, normalizeCountryCode } from "./coun
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import { googleFaviconUrl } from "./favicon.js";
 
-@customElement("vercel-analytics-breakdown-table")
-export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-breakdown-table")
+export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElement) {
   @property() headline = "Breakdown";
   @property() unavailable?: string;
   @property() baseUrl?: string;
@@ -256,6 +256,6 @@ export class VercelAnalyticsBreakdownTableElement extends UmbElementMixin(LitEle
 
 declare global {
   interface HTMLElementTagNameMap {
-    "vercel-analytics-breakdown-table": VercelAnalyticsBreakdownTableElement;
+    "web-analytics-breakdown-table": WebAnalyticsBreakdownTableElement;
   }
 }

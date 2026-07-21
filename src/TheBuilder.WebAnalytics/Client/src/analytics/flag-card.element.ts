@@ -6,8 +6,8 @@ import { stateData, type AsyncState } from "./async-state.js";
 
 const FLAGS_SETUP_URL = "https://vercel.com/docs/flags/observability/web-analytics";
 
-@customElement("vercel-analytics-flag-card")
-export class VercelAnalyticsFlagCardElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-flag-card")
+export class WebAnalyticsFlagCardElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) report: AsyncState<AnalyticsFlagsReport> = { status: "loading" };
   @property({ attribute: false }) selected?: AsyncState<AnalyticsFlagsReport>;
 
@@ -107,4 +107,4 @@ export class VercelAnalyticsFlagCardElement extends UmbElementMixin(LitElement) 
   `];
 }
 
-declare global { interface HTMLElementTagNameMap { "vercel-analytics-flag-card": VercelAnalyticsFlagCardElement; } }
+declare global { interface HTMLElementTagNameMap { "web-analytics-flag-card": WebAnalyticsFlagCardElement; } }

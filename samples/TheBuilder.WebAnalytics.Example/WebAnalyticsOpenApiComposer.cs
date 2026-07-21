@@ -19,7 +19,7 @@ using TheBuilder.WebAnalytics;
 
 namespace TheBuilder.WebAnalytics.Example;
 
-public sealed class VercelAnalyticsOpenApiComposer : IComposer
+public sealed class WebAnalyticsOpenApiComposer : IComposer
 {
     public void Compose(IUmbracoBuilder builder)
     {
@@ -43,7 +43,7 @@ public sealed class VercelAnalyticsOpenApiComposer : IComposer
                         return Task.CompletedTask;
                     })));
 #else
-        builder.Services.AddSingleton<IOperationIdHandler, VercelAnalyticsOperationIdHandler>();
+        builder.Services.AddSingleton<IOperationIdHandler, WebAnalyticsOperationIdHandler>();
         builder.Services.Configure<SwaggerGenOptions>(options =>
         {
             options.SwaggerDoc(
@@ -53,14 +53,14 @@ public sealed class VercelAnalyticsOpenApiComposer : IComposer
                     Title = "Web Analytics Backoffice API",
                     Version = "1.0",
                 });
-            options.OperationFilter<VercelAnalyticsOperationSecurityFilter>();
+            options.OperationFilter<WebAnalyticsOperationSecurityFilter>();
             options.SchemaFilter<NullableEnumSchemaFilter>();
         });
 #endif
     }
 
 #if !UMBRACO_18_OR_LATER
-    private sealed class VercelAnalyticsOperationSecurityFilter : BackOfficeSecurityRequirementsOperationFilterBase
+    private sealed class WebAnalyticsOperationSecurityFilter : BackOfficeSecurityRequirementsOperationFilterBase
     {
         protected override string ApiName => Constants.ApiName;
     }
@@ -87,7 +87,7 @@ public sealed class VercelAnalyticsOpenApiComposer : IComposer
         }
     }
 
-    private sealed class VercelAnalyticsOperationIdHandler(IOptions<ApiVersioningOptions> apiVersioningOptions)
+    private sealed class WebAnalyticsOperationIdHandler(IOptions<ApiVersioningOptions> apiVersioningOptions)
         : OperationIdHandler(apiVersioningOptions)
     {
         protected override bool CanHandle(

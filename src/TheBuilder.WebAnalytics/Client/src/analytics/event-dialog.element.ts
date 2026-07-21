@@ -6,8 +6,8 @@ import type { AnalyticsEventRow } from "../api/types.gen.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import "./event-table.element.js";
 
-@customElement("vercel-analytics-event-dialog")
-export class VercelAnalyticsEventDialogElement extends UmbElementMixin(LitElement) {
+@customElement("web-analytics-event-dialog")
+export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) {
   @property({ type: Boolean }) loading = false;
   @property() unavailable?: string;
   @property({ attribute: false }) rows: AnalyticsEventRow[] = [];
@@ -35,7 +35,7 @@ export class VercelAnalyticsEventDialogElement extends UmbElementMixin(LitElemen
             ${!this.loading && this.unavailable ? html`<umb-empty-state headline="Events unavailable"><p>${this.unavailable}</p></umb-empty-state>` : ""}
             ${!this.loading && !this.unavailable && this._search && this.rows.length === 0 ? html`<umb-empty-state headline="No matching events"><p>Try a different search.</p></umb-empty-state>` : ""}
             ${this.loading || (!this.unavailable && (!this._search || this.rows.length > 0)) ? html`
-              <vercel-analytics-event-table .rows=${this.rows} .filters=${this.filters} .loading=${this.loading} .detailsEnabled=${this.detailsEnabled}></vercel-analytics-event-table>
+              <web-analytics-event-table .rows=${this.rows} .filters=${this.filters} .loading=${this.loading} .detailsEnabled=${this.detailsEnabled}></web-analytics-event-table>
             ` : ""}
           </div>
           <uui-button slot="actions" look="secondary" label="Close events" @click=${this.#close}>Close</uui-button>
@@ -54,4 +54,4 @@ export class VercelAnalyticsEventDialogElement extends UmbElementMixin(LitElemen
   `];
 }
 
-declare global { interface HTMLElementTagNameMap { "vercel-analytics-event-dialog": VercelAnalyticsEventDialogElement; } }
+declare global { interface HTMLElementTagNameMap { "web-analytics-event-dialog": WebAnalyticsEventDialogElement; } }

@@ -26,7 +26,7 @@ export const manifests: Array<UmbExtensionManifest> = [
     name: "Web Analytics Settings Dashboard",
     js: () => import("./settings/settings-dashboard.element.js"),
     weight: 25,
-    meta: { label: "Web Analytics", pathname: "vercel-analytics" },
+    meta: { label: "Web Analytics", pathname: "web-analytics" },
     conditions: [
       { alias: "Umb.Condition.SectionAlias", match: "Umb.Section.Settings" },
       { alias: "Umb.Condition.CurrentUser.IsAdmin" },

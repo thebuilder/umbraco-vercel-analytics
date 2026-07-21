@@ -11,7 +11,7 @@ import type { UUIInputElement, UUIToggleElement } from "@umbraco-cms/backoffice/
 import { WebAnalyticsService } from "../api/sdk.gen.js";
 import type {
   AnalyticsConnectionSettingsResponse,
-  AnalyticsProvider,
+  AnalyticsProviderDescriptor,
   AnalyticsSettingsResponse,
   UpdateAnalyticsSettingsRequest,
 } from "../api/types.gen.js";
@@ -20,10 +20,10 @@ import type { ConnectionActionStatus, AnalyticsConnectionEditorElement } from ".
 import { createSettingsUpdate, validateConnection, validateEditableSettings } from "./settings-model.js";
 import { announceAnalyticsAvailability } from "../section/analytics-availability.js";
 import { MOCK_SCENARIOS, type MockScenarioDefinition } from "./mock-scenarios.js";
-import { ANALYTICS_PROVIDERS, providerLogo } from "./provider-identity.js";
+import { identifierField, providerDescriptor, providerLogo } from "./provider-identity.js";
 
 type NewConnection =
-  | { kind: "provider"; provider: AnalyticsProvider; hasAccessToken: boolean }
+  | { kind: "provider"; descriptor: AnalyticsProviderDescriptor; hasAccessToken: boolean }
   | { kind: "mock"; scenario: MockScenarioDefinition };
 
 @customElement("web-analytics-settings-dashboard")
@@ -79,9 +79,9 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     this.#patch({ connections });
   }
 
-  #addConnection(provider: AnalyticsProvider): void {
-    const hasAccessToken = this._settings?.providerTokens.some((item) => item.provider === provider && item.hasAccessToken) ?? false;
-    this.#appendConnection({ kind: "provider", provider, hasAccessToken });
+  #addConnection(descriptor: AnalyticsProviderDescriptor): void {
+    const hasAccessToken = this._settings?.providerTokens.some((item) => item.provider === descriptor.provider && item.hasAccessToken) ?? false;
+    this.#appendConnection({ kind: "provider", descriptor, hasAccessToken });
     this._showProviderPicker = false;
   }
 
@@ -103,7 +103,8 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   #appendConnection(details: NewConnection): void {
     if (!this._settings) return;
     const isMock = details.kind === "mock";
-    const provider = isMock ? "Vercel" : details.provider;
+    const provider = isMock ? "Vercel" : details.descriptor.provider;
+    const descriptor = isMock ? providerDescriptor(this._settings, provider) : details.descriptor;
     const key = crypto.randomUUID();
     const connection: AnalyticsConnectionSettingsResponse = {
       key,
@@ -130,8 +131,8 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
         block: "start",
       });
       await editor?.updateComplete;
-      const fieldName = provider === "Plausible" ? "siteId" : "projectId";
-      editor?.shadowRoot?.querySelector<HTMLElement>(`[name="${fieldName}"]`)?.focus();
+      const fieldName = descriptor && identifierField(descriptor);
+      if (fieldName) editor?.shadowRoot?.querySelector<HTMLElement>(`[name="${fieldName}"]`)?.focus();
     });
   }
 
@@ -229,14 +230,14 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
           <uui-button type="button" compact look="secondary" label="Close provider choices" @click=${this.#toggleProviderPicker}>Close</uui-button>
         </div>
         <div class="provider-choices">
-          ${ANALYTICS_PROVIDERS.map((item) => {
+          ${this._settings?.providers.map((item) => {
             const credential = this._settings?.providerTokens.find((token) => token.provider === item.provider);
             return html`
-              <button class="provider-choice" type="button" aria-label=${`Add ${item.provider} connection`} @click=${() => this.#addConnection(item.provider)}>
-                <span class="provider-mark">${providerLogo(item.provider)}</span>
+              <button class="provider-choice" type="button" aria-label=${`Add ${item.provider} connection`} @click=${() => this.#addConnection(item)}>
+                <span class="provider-mark">${providerLogo(item)}</span>
                 <span class="provider-choice-copy">
                   <strong>${item.provider}</strong>
-                  <span>${item.description} · Requires ${item.identifier}</span>
+                  <span>${item.description} · Requires ${item.identifier.label}</span>
                 </span>
                 <span class=${`provider-choice-status ${credential?.hasAccessToken ? "configured" : "missing"}`}>
                   <uui-icon name=${credential?.hasAccessToken ? "icon-check" : "icon-alert"} aria-hidden="true"></uui-icon>
@@ -256,7 +257,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       <uui-box headline="Providers" class="providers">
         <p class="providers-intro">Web Analytics reads credentials from your server configuration. Detection confirms presence only; test each saved connection to verify access.</p>
         <div class="provider-list">
-          ${ANALYTICS_PROVIDERS.map((item) => {
+          ${this._settings.providers.map((item) => {
             const token = this._settings?.providerTokens.find((candidate) => candidate.provider === item.provider);
             const connections = this._settings?.connections.filter((connection) => connection.mockScenario == null && connection.provider === item.provider) ?? [];
             const overrideCount = connections.filter((connection) => connection.hasAccessTokenOverride).length;
@@ -264,10 +265,10 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
               ? { kind: "configured", label: "Shared credential detected", help: "Connections can use the credential from server configuration." }
               : overrideCount > 0
                 ? { kind: "configured", label: `${overrideCount} connection override${overrideCount === 1 ? "" : "s"}`, help: "Connection-specific credentials can be tested after saving." }
-                : { kind: "missing", label: "No shared credential", help: `Configure the ${item.provider} ${item.credential} in server settings, then restart Umbraco.` };
+                : { kind: "missing", label: "No shared credential", help: `${item.credential.description} Then restart Umbraco.` };
             return html`
               <section class="provider-row" aria-labelledby=${`provider-${item.provider}`}>
-                <span class="provider-mark">${providerLogo(item.provider)}</span>
+                <span class="provider-mark">${providerLogo(item)}</span>
                 <span class="provider-row-copy">
                   <strong id=${`provider-${item.provider}`}>${item.provider}</strong>
                   <span>${connections.length} connection${connections.length === 1 ? "" : "s"}</span>
@@ -361,8 +362,9 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       <umb-empty-state headline="Settings unavailable"><p>${this._status?.message}</p><uui-button look="secondary" label="Retry loading settings" @click=${this.#load}>Retry</uui-button></umb-empty-state>
     `;
 
-    const hasConnections = this._settings.connections.length > 0;
-    const mockConnectionsEnabled = this._settings.canCreateMockConnections;
+    const settings = this._settings;
+    const hasConnections = settings.connections.length > 0;
+    const mockConnectionsEnabled = settings.canCreateMockConnections;
 
     return html`
       <form @submit=${this.#save} novalidate>
@@ -385,10 +387,11 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
           </div>
           ${this.#renderProviderPicker()}
           <div class="connections">
-            ${this._settings.connections.map((connection, index) => html`
+            ${settings.connections.map((connection, index) => html`
               <web-analytics-connection-editor
                 .connection=${connection}
-                .errors=${this._showValidation ? validateConnection(connection) : {}}
+                .descriptor=${providerDescriptor(settings, connection.provider)}
+                .errors=${this._showValidation ? validateConnection(connection, providerDescriptor(settings, connection.provider)) : {}}
                 .status=${this._connectionStatuses[connection.key]}
                 ?mockConnectionsEnabled=${mockConnectionsEnabled}
                 ?dirty=${this._dirty}

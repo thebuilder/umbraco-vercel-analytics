@@ -9,22 +9,20 @@ import {
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement, UUIToggleElement } from "@umbraco-cms/backoffice/external/uui";
-import type { AnalyticsConnectionSettingsResponse } from "../api/types.gen.js";
+import type { AnalyticsConnectionSettingsResponse, AnalyticsProviderDescriptor } from "../api/types.gen.js";
 import type { ConnectionValidationErrors } from "./settings-model.js";
 import { parseTeamReference, teamReference } from "./settings-model.js";
 import { getMockScenario } from "./mock-scenarios.js";
-import { providerLogo } from "./provider-identity.js";
+import { identifierField, identifierValue, providerLogo } from "./provider-identity.js";
 import "@umbraco-cms/backoffice/document";
 
 export type EditableAnalyticsConnection = AnalyticsConnectionSettingsResponse;
 export type ConnectionActionStatus = { type: "success" | "error" | "info"; message: string };
 
-const credentialName = (provider: AnalyticsConnectionSettingsResponse["provider"]): string =>
-  provider === "Plausible" ? "Stats API key" : "access token";
-
 @customElement("web-analytics-connection-editor")
 export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement) {
   @property({ attribute: false }) connection!: EditableAnalyticsConnection;
+  @property({ attribute: false }) descriptor?: AnalyticsProviderDescriptor;
   @property({ attribute: false }) errors: ConnectionValidationErrors = {};
   @property({ attribute: false }) status?: ConnectionActionStatus;
   @property({ type: Boolean }) mockConnectionsEnabled = false;
@@ -39,7 +37,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
   }
 
   protected firstUpdated(): void {
-    if (!(this.connection.provider === "Plausible" ? this.connection.siteId : this.connection.projectId)) {
+    if (!this.descriptor || !identifierValue(this.connection, this.descriptor)) {
       this.shadowRoot?.querySelector<HTMLDetailsElement>(".connection-shell")?.setAttribute("open", "");
     }
   }
@@ -119,15 +117,19 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
 
   render() {
     const connection = this.connection;
+    const descriptor = this.descriptor;
+    if (!descriptor) return this.#renderUnsupportedProvider();
+    const field = identifierField(descriptor);
+    const identifier = identifierValue(connection, descriptor);
+    if (!field || identifier === undefined) return this.#renderUnsupportedProvider();
     const isMock = connection.mockScenario != null;
-    const identifier = connection.provider === "Plausible" ? connection.siteId : connection.projectId;
     const mockScenario = getMockScenario(connection.mockScenario);
     const testHint = this.dirty
       ? "Save changes before testing this connection."
       : isMock && !this.mockConnectionsEnabled
         ? "Mock connections are only active in Development."
         : !identifier
-          ? `Enter the ${connection.provider === "Plausible" ? "site ID" : "project ID"} before testing.`
+          ? `Enter the ${descriptor.identifier.label} before testing.`
           : !connection.hasAccessToken
             ? "Add a server-side credential before testing this connection."
         : "Test the saved connection.";
@@ -158,7 +160,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
       <uui-box class="connection-card">
         <details class="connection-shell">
           <summary class="connection-summary">
-            <span class="provider-mark">${isMock ? html`<uui-icon name="icon-lab" aria-hidden="true"></uui-icon>` : providerLogo(connection.provider)}</span>
+            <span class="provider-mark">${isMock ? html`<uui-icon name="icon-lab" aria-hidden="true"></uui-icon>` : providerLogo(descriptor)}</span>
             <span class="summary-copy">
               <strong>${connection.displayName || identifier || "New connection"}</strong>
               <span>${isMock ? "Mock scenario" : `${connection.provider} · ${identifier || "Identifier required"}`} · ${this.#mappingSummary()}</span>
@@ -196,9 +198,8 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
                 <p class="section-intro mock-description">${mockScenario?.description ?? "Deterministic analytics data."} This connection never contacts an analytics provider.</p>
               ` : html`
                 <div class="fields two-columns">
-                  ${connection.provider === "Plausible"
-                    ? this.#field("Plausible site ID", "siteId", connection.siteId, "Use the domain exactly as registered in Plausible.", this.errors.siteId)
-                    : html`${this.#field("Vercel project ID", "projectId", connection.projectId, undefined, this.errors.projectId)}${this.#teamReferenceField(teamReference(connection), this.errors.team)}`}
+                  ${this.#field(descriptor.identifier.label, field, identifier, descriptor.identifier.description, this.errors[field])}
+                  ${descriptor.team ? this.#teamReferenceField(descriptor.team, teamReference(connection), this.errors.team) : ""}
                 </div>
               `}
             </section>
@@ -208,10 +209,10 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
               <div class="config-content token-content">
                 <p>
                   ${connection.hasAccessToken
-                    ? `Set a connection-specific credential only when this connection cannot use the shared ${connection.provider} credential.`
-                    : `No shared ${connection.provider} credential was detected. Add a connection-specific credential before testing this connection.`}
-                  <a href=${connection.provider === "Plausible" ? "https://plausible.io/settings/api-keys" : "https://vercel.com/account/settings/tokens"} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} ${credentialName(connection.provider)} (opens in a new tab)`}>
-                    Create a ${connection.provider} ${credentialName(connection.provider)}<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
+                    ? `Set a connection-specific credential only when this connection cannot use the shared ${connection.provider} ${descriptor.credential.label}.`
+                    : `No shared ${connection.provider} ${descriptor.credential.label} was detected. Add a connection-specific credential before testing this connection.`}
+                  <a href=${descriptor.credential.documentationUrl} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} ${descriptor.credential.label} (opens in a new tab)`}>
+                    Create a ${connection.provider} ${descriptor.credential.label}<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
                   </a>
                 </p>
                 <div class="token-key">
@@ -224,11 +225,11 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
               </div>
             </details>`}
 
-            ${!isMock && connection.provider === "Plausible" ? html`
+            ${!isMock && descriptor.eventProperties ? html`
               <details class="config-section">
                 <summary><span>Event properties</span><small>${this.#eventPropertySummary()}</small></summary>
                 <div class="config-content event-properties-content">
-                  <p class="section-intro">Optional. Add custom property names configured for this Plausible site, one per line. The standard <code>url</code> and <code>path</code> properties are included automatically for matching events.</p>
+                  <p class="section-intro">${descriptor.eventProperties.description} Add one name per line. The standard <code>url</code> and <code>path</code> properties are included automatically for matching events.</p>
                   <uui-form-layout-item>
                     <uui-label slot="label" for=${`${connection.key}-event-properties`}>Custom property names</uui-label>
                     <div class="field-control">
@@ -241,7 +242,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
                         aria-describedby=${`${connection.key}-event-properties-${this.errors.eventPropertyNames ? "error" : "description"}`}
                         @input=${this.#eventPropertyNames}></uui-textarea>
                       <span id=${`${connection.key}-event-properties-${this.errors.eventPropertyNames ? "error" : "description"}`} class=${this.errors.eventPropertyNames ? "field-error" : "field-description"}>
-                        ${this.errors.eventPropertyNames ? html`<uui-icon name="icon-alert" aria-hidden="true"></uui-icon>${this.errors.eventPropertyNames}` : "Up to 20 names. Properties are queried only when an editor opens an event."}
+                        ${this.errors.eventPropertyNames ? html`<uui-icon name="icon-alert" aria-hidden="true"></uui-icon>${this.errors.eventPropertyNames}` : `Up to ${descriptor.eventProperties.maximumNames} names. Properties are queried only when an editor opens an event.`}
                       </span>
                     </div>
                   </uui-form-layout-item>
@@ -303,23 +304,29 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     `;
   }
 
-  #teamReferenceField(value: string, error?: string) {
+  #renderUnsupportedProvider() {
+    return html`<uui-box class="connection-card unsupported-provider" role="alert">
+      <p>Unsupported analytics provider: ${this.connection.provider}. This connection cannot be saved or tested until the server returns a supported provider descriptor.</p>
+    </uui-box>`;
+  }
+
+  #teamReferenceField(descriptor: NonNullable<AnalyticsProviderDescriptor["team"]>, value: string, error?: string) {
     const id = `${this.connection.key}-team-reference`;
     return html`
       <uui-form-layout-item>
-        <uui-label slot="label" for=${id}>Team ID or slug</uui-label>
+        <uui-label slot="label" for=${id}>${descriptor.label}</uui-label>
         <div class="field-control">
           <uui-input
             id=${id}
             name="teamReference"
-            label="Team ID or slug"
+            label=${descriptor.label}
             .value=${value}
             maxlength="200"
             aria-invalid=${error ? "true" : "false"}
             aria-describedby=${`${id}-${error ? "error" : "description"}`}
             @input=${this.#teamReference}></uui-input>
           <span id=${`${id}-${error ? "error" : "description"}`} class=${error ? "field-error" : "field-description"}>
-            ${error ? html`<uui-icon name="icon-alert" aria-hidden="true"></uui-icon>${error}` : "Leave empty for a personal project."}
+            ${error ? html`<uui-icon name="icon-alert" aria-hidden="true"></uui-icon>${error}` : descriptor.description}
           </span>
         </div>
       </uui-form-layout-item>

@@ -139,8 +139,30 @@ function settings(overrides: Partial<AnalyticsSettingsResponse> = {}): Analytics
     cacheDuration: "00:05:00",
     connections: [],
     ...overrides,
+    providers: overrides.providers ?? PROVIDERS,
   };
 }
+
+const PROVIDERS: AnalyticsSettingsResponse["providers"] = [
+  {
+    provider: "Vercel",
+    description: "Projects using Vercel Web Analytics",
+    logoSlug: "vercel",
+    identifier: { key: "projectId", label: "Vercel project ID", description: "Use the project ID from your Vercel project settings.", requiredMessage: "a Vercel project ID" },
+    team: { key: "team", label: "Team ID or slug", description: "Optional team slug or ID for projects owned by a Vercel team." },
+    credential: { label: "access token", description: "Configure a Vercel access token in the server settings.", documentationUrl: "https://vercel.com/docs/rest-api" },
+    eventProperties: null,
+  },
+  {
+    provider: "Plausible",
+    description: "Sites using Plausible Analytics",
+    logoSlug: "plausible",
+    identifier: { key: "siteId", label: "Plausible site ID", description: "Use the domain configured in your Plausible site settings.", requiredMessage: "a Plausible site ID" },
+    team: null,
+    credential: { label: "Stats API key", description: "Configure a Plausible Stats API key in the server settings.", documentationUrl: "https://plausible.io/docs/stats-api" },
+    eventProperties: { label: "event properties", description: "Optional custom event property names configured for this Plausible site.", maximumNames: 20, maximumNameLength: 100 },
+  },
+];
 
 function connection(): AnalyticsConnectionSettingsResponse {
   return {
@@ -161,6 +183,19 @@ function connection(): AnalyticsConnectionSettingsResponse {
 }
 
 describe("analytics settings onboarding", () => {
+  it("shows an unsupported connection and blocks saving when its descriptor is missing", async () => {
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ providers: [], connections: [connection()] })));
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("web-analytics-connection-editor")?.shadowRoot?.querySelector(".unsupported-provider") ?? null).not.toBeNull());
+
+    const editor = dashboard.shadowRoot?.querySelector("web-analytics-connection-editor") as AnalyticsConnectionEditorElement;
+    expect(editor.shadowRoot?.textContent ?? "").toContain("Unsupported analytics provider: Vercel.");
+    dashboard.shadowRoot?.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".status")?.textContent).toContain("Unsupported analytics provider: Vercel."));
+    expect(sdk.saveSettings).not.toHaveBeenCalled();
+  });
+
   it("guides the first connection without rendering an empty default selector", async () => {
     const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
     document.body.append(dashboard);
@@ -222,8 +257,8 @@ describe("analytics settings onboarding", () => {
     const providers = dashboard.shadowRoot?.querySelectorAll(".provider-row");
     expect(providers).toHaveLength(2);
     expect(providers?.[0].textContent).toContain("No shared credential");
-    expect(providers?.[0].textContent).toContain("Configure the Vercel access token in server settings");
-    expect(providers?.[1].textContent).toContain("Configure the Plausible Stats API key in server settings");
+    expect(providers?.[0].textContent).toContain("Configure a Vercel access token in the server settings");
+    expect(providers?.[1].textContent).toContain("Configure a Plausible Stats API key in the server settings");
     expect(dashboard.shadowRoot?.textContent).not.toContain("WebAnalytics__Providers__");
     expect(dashboard.shadowRoot?.querySelector(".providers code")).toBeNull();
   });
@@ -231,6 +266,7 @@ describe("analytics settings onboarding", () => {
   it("marks new connections as using the configured shared token", async () => {
     sdk.settings.mockResolvedValue(apiOk({
       enabled: true,
+      providers: PROVIDERS,
       providerTokens: [{ provider: "Vercel", hasAccessToken: true }, { provider: "Plausible", hasAccessToken: false }],
       canCreateMockConnections: false,
       defaultRangeDays: 30,
@@ -287,6 +323,7 @@ describe("analytics settings onboarding", () => {
   it("adds development mock scenarios as deterministic connections", async () => {
     sdk.settings.mockResolvedValue(apiOk({
       enabled: true,
+      providers: PROVIDERS,
       providerTokens: [{ provider: "Vercel", hasAccessToken: false }, { provider: "Plausible", hasAccessToken: false }],
       canCreateMockConnections: true,
       defaultRangeDays: 30,

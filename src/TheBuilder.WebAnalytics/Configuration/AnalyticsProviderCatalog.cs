@@ -94,12 +94,12 @@ public sealed class AnalyticsProviderDefinition(
 
         if (!string.IsNullOrWhiteSpace(connection.ProjectId) &&
             (isSupportedMockScenario || Identifier.Field != AnalyticsConnectionIdentifier.ProjectId))
-            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.ProjectId.Label}.");
+            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionIdentifier.ProjectId.ToLabel()}.");
         if (!string.IsNullOrWhiteSpace(connection.Team) && (isSupportedMockScenario || !SupportsTeam))
-            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.Team.Label}.");
+            failures.Add($"Connection '{label}' cannot define a Vercel team.");
         if (!string.IsNullOrWhiteSpace(connection.SiteId) &&
             (isSupportedMockScenario || Identifier.Field != AnalyticsConnectionIdentifier.SiteId))
-            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.SiteId.Label}.");
+            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionIdentifier.SiteId.ToLabel()}.");
 
         var eventPropertyNames = connection.EventPropertyNames ?? [];
         if (Settings.EventProperties is { } eventProperties)
@@ -149,10 +149,11 @@ public sealed record AnalyticsProviderSettingsDescriptor(
 
 public sealed record AnalyticsIdentifierDefinition(
     AnalyticsConnectionIdentifier Field,
-    string Label,
     string Description,
     string RequiredMessage)
 {
+    public string Label => Field.ToLabel();
+
     internal AnalyticsIdentifierFieldDescriptor ToDescriptor() =>
         new(Field.ToFieldName(), Label, Description, RequiredMessage);
 
@@ -199,15 +200,6 @@ public sealed record AnalyticsProviderFields(
     string SiteId,
     string[] EventPropertyNames);
 
-internal static class AnalyticsConnectionFields
-{
-    internal static AnalyticsFlatConnectionField ProjectId { get; } = new("projectId", "Vercel project ID");
-    internal static AnalyticsFlatConnectionField Team { get; } = new("team", "Vercel team");
-    internal static AnalyticsFlatConnectionField SiteId { get; } = new("siteId", "Plausible site ID");
-}
-
-internal sealed record AnalyticsFlatConnectionField(string Key, string Label);
-
 public enum AnalyticsConnectionIdentifier
 {
     ProjectId,
@@ -220,6 +212,13 @@ internal static class AnalyticsConnectionIdentifierExtensions
     {
         AnalyticsConnectionIdentifier.ProjectId => "projectId",
         AnalyticsConnectionIdentifier.SiteId => "siteId",
+        _ => throw new ArgumentOutOfRangeException(nameof(identifier), identifier, "Unsupported analytics connection identifier.")
+    };
+
+    internal static string ToLabel(this AnalyticsConnectionIdentifier identifier) => identifier switch
+    {
+        AnalyticsConnectionIdentifier.ProjectId => "Vercel project ID",
+        AnalyticsConnectionIdentifier.SiteId => "Plausible site ID",
         _ => throw new ArgumentOutOfRangeException(nameof(identifier), identifier, "Unsupported analytics connection identifier.")
     };
 }

@@ -28,7 +28,6 @@ internal static class PlausibleProvider
             breakdownOrdering: true),
         new(
             AnalyticsConnectionIdentifier.SiteId,
-            "Plausible site ID",
             "Use the domain configured in your Plausible site settings.",
             "a Plausible site ID"),
         new(

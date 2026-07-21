@@ -28,7 +28,6 @@ internal static class VercelProvider
             breakdownOrdering: false),
         new(
             AnalyticsConnectionIdentifier.ProjectId,
-            "Vercel project ID",
             "Use the project ID from your Vercel project settings.",
             "a Vercel project ID"),
         new(

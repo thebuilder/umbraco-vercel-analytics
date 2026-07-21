@@ -276,7 +276,6 @@ public sealed class MockAnalyticsClientTests
             breakdownOrdering: false),
         new(
             AnalyticsConnectionIdentifier.ProjectId,
-            "project ID",
             "Test project identifier.",
             "a project ID"),
         new(

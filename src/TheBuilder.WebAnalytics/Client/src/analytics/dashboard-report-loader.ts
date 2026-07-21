@@ -23,6 +23,23 @@ export type LoadedDashboardBreakdown = {
   responseStatus?: number;
 };
 
+export async function loadDashboardBreakdowns(
+  query: DashboardReportQuery,
+  dimensions: ReadonlyArray<AnalyticsDimension>,
+  signal: AbortSignal,
+  onUpdate: (update: Extract<DashboardReportUpdate, { panel: "breakdown" }>) => void,
+  api: BreakdownApi = dashboardApi,
+  metric: DashboardMetric = "visitors",
+): Promise<void> {
+  const publish = (update: Extract<DashboardReportUpdate, { panel: "breakdown" }>) => {
+    if (!signal.aborted) onUpdate(update);
+  };
+  await runWithConcurrency(
+    createBreakdownTasks(query, dimensions, signal, api, metric, ({ update }) => publish(update)),
+    maximumConcurrentDashboardReports,
+  );
+}
+
 export async function loadDashboardReports(
   visitQuery: DashboardReportQuery,
   eventQuery: DashboardReportQuery,
@@ -50,9 +67,8 @@ export async function loadDashboardReports(
     ...(capabilities.flags ? [() => settleRequest(api.flags({ query: { ...visitQuery, limit: 10 }, signal })).then((result) => {
       publish({ panel: "flags", ...toLoadedReport<AnalyticsFlagsReport>(result) });
     })] : []),
-    ...dimensions.map((dimension) => async () => {
-      const { update, responseStatus } = await loadDashboardBreakdown(visitQuery, dimension, signal, api, metric);
-      if (isUtmDimension(dimension)) {
+    ...createBreakdownTasks(visitQuery, dimensions, signal, api, metric, ({ update, responseStatus }) => {
+      if (isUtmDimension(update.dimension)) {
         if (update.status === "success") utmSucceeded = true;
         else if (responseStatus !== undefined) utmStatuses.push(responseStatus);
       } else if (update.status === "success") baselineSucceeded = true;
@@ -62,6 +78,19 @@ export async function loadDashboardReports(
 
   await runWithConcurrency(reports, maximumConcurrentDashboardReports);
   return { baselineSucceeded, utmSucceeded, utmStatuses };
+}
+
+function createBreakdownTasks(
+  query: DashboardReportQuery,
+  dimensions: ReadonlyArray<AnalyticsDimension>,
+  signal: AbortSignal,
+  api: BreakdownApi,
+  metric: DashboardMetric,
+  onLoaded: (loaded: LoadedDashboardBreakdown) => void,
+): ReadonlyArray<() => Promise<void>> {
+  return dimensions.map((dimension) => async () => {
+    onLoaded(await loadDashboardBreakdown(query, dimension, signal, api, metric));
+  });
 }
 
 export async function loadDashboardBreakdown(

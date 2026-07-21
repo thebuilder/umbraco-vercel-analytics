@@ -213,6 +213,31 @@ describe("AnalyticsDashboardController", () => {
     expect(target.currentUrl().searchParams.get("audience")).toBe("BrowserName");
   });
 
+  it("refreshes only breakdowns when the selected metric changes", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect([
+      controller.state.summary.status,
+      controller.state.events.status,
+      controller.state.flags.status,
+    ]).toEqual(["success", "success", "success"]));
+    api.summary.mockClear();
+    api.events.mockClear();
+    api.flags.mockClear();
+    api.breakdown.mockClear();
+
+    controller.setMetric("pageViews");
+
+    await vi.waitFor(() => expect(api.breakdown).toHaveBeenCalled());
+    expect(api.breakdown).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({ orderBy: "PageViews" }),
+    }));
+    expect(api.summary).not.toHaveBeenCalled();
+    expect(api.events).not.toHaveBeenCalled();
+    expect(api.flags).not.toHaveBeenCalled();
+  });
+
   it("uses only UTM Source to detect Plus capability", async () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());

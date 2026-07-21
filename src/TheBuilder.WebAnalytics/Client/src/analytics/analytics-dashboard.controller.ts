@@ -25,7 +25,7 @@ import {
   type DashboardMetric,
   type UtmDimension,
 } from "./dashboard-url-state.js";
-import { loadDashboardBreakdown, loadDashboardReports, type DashboardReportQuery, type DashboardReportUpdate } from "./dashboard-report-loader.js";
+import { loadDashboardBreakdown, loadDashboardBreakdowns, loadDashboardReports, type DashboardReportQuery, type DashboardReportUpdate } from "./dashboard-report-loader.js";
 import { visibleEventRows } from "./event-rows.js";
 import { reportErrorMessage } from "./report-error.js";
 import { DebouncedRequest, RequestCoordinator } from "./request-coordinator.js";
@@ -268,7 +268,11 @@ export class AnalyticsDashboardController {
     if (this.state.metric === metric) return;
     this.#set({ metric });
     this.#syncUrlState();
-    void this.loadReports();
+    const capabilities = this.#capabilities();
+    const nonBreakdownReportPending = this.state.summary.status === "loading"
+      || (capabilities.events && this.state.events.status === "loading")
+      || (capabilities.flags && this.state.flags.status === "loading");
+    void (nonBreakdownReportPending ? this.loadReports() : this.#loadBreakdowns());
   }
   setAudienceDimension(audienceDimension: AudienceDimension): void { this.#set({ audienceDimension }); this.#syncUrlState(); }
   setAcquisitionView(acquisitionView: AcquisitionView): void {
@@ -472,11 +476,37 @@ export class AnalyticsDashboardController {
     }
   }
 
+  async #loadBreakdowns(): Promise<void> {
+    const connection = this.state.connection;
+    if (!connection) return;
+    this.#closeDialogs();
+    this.#utmRequest.cancel();
+    const { dimensions } = this.#dashboardReportPlan();
+    this.#set({
+      breakdowns: Object.fromEntries(dimensions.map((dimension) => [dimension, loadingState(this.state.breakdowns[dimension])])),
+    });
+    const result = await this.#reportRequest.run((signal) => loadDashboardBreakdowns(
+      this.#reportQuery(connection, this.#visitFilterQuery()),
+      dimensions,
+      signal,
+      (update) => this.#applyReportUpdate(update),
+      this.#api,
+      this.state.metric,
+    ));
+    if (result.status === "error") this.#failLoadingBreakdowns(reportErrorMessage(result.error), dimensions);
+  }
+
   #failLoadingReports(message: string, dimensions: ReadonlyArray<AnalyticsDimension>): void {
     this.#set({
       summary: errorState(message, this.state.summary),
       events: errorState(message, this.state.events),
       flags: errorState(message, this.state.flags),
+      breakdowns: Object.fromEntries(dimensions.map((dimension) => [dimension, errorState(message, this.state.breakdowns[dimension])])),
+    });
+  }
+
+  #failLoadingBreakdowns(message: string, dimensions: ReadonlyArray<AnalyticsDimension>): void {
+    this.#set({
       breakdowns: Object.fromEntries(dimensions.map((dimension) => [dimension, errorState(message, this.state.breakdowns[dimension])])),
     });
   }

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const sdk = vi.hoisted(() => ({ summary: vi.fn(), events: vi.fn(), flags: vi.fn(), breakdown: vi.fn() }));
 vi.mock("../api/sdk.gen.js", () => ({ WebAnalyticsService: sdk }));
 
-import { loadDashboardReports, type DashboardReportQuery, type DashboardReportUpdate } from "./dashboard-report-loader.js";
+import { loadDashboardBreakdowns, loadDashboardReports, type DashboardReportQuery, type DashboardReportUpdate } from "./dashboard-report-loader.js";
 
 const query = { connection: "main", from: "2026-06-01", to: "2026-06-30", interval: "Day" } as DashboardReportQuery;
 
@@ -106,6 +106,27 @@ describe("loadDashboardReports", () => {
     expect(sdk.breakdown).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining({ orderBy: "PageViews" }),
     }));
+  });
+
+  it("loads only breakdown reports for a metric refresh", async () => {
+    sdk.breakdown.mockResolvedValue(ok({ rows: [] }));
+
+    await loadDashboardBreakdowns(
+      query,
+      ["RequestPath", "Country"],
+      new AbortController().signal,
+      () => undefined,
+      sdk,
+      "pageViews",
+    );
+
+    expect(sdk.breakdown).toHaveBeenCalledTimes(2);
+    expect(sdk.breakdown).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({ orderBy: "PageViews" }),
+    }));
+    expect(sdk.summary).not.toHaveBeenCalled();
+    expect(sdk.events).not.toHaveBeenCalled();
+    expect(sdk.flags).not.toHaveBeenCalled();
   });
 
   it("preserves stable upstream problem codes when adding HTTP status", async () => {

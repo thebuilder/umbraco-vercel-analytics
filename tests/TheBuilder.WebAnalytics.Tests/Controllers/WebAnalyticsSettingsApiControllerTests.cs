@@ -41,7 +41,7 @@ public sealed class WebAnalyticsSettingsApiControllerTests
             store,
             registry,
             options,
-            Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict),
+            new TestAnalyticsProviderClientResolver(Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict)),
             Mock.Of<IAnalyticsConnectionNameService>(MockBehavior.Strict));
 
         var result = await controller.Settings(CancellationToken.None);
@@ -62,7 +62,7 @@ public sealed class WebAnalyticsSettingsApiControllerTests
             store,
             new AnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: true),
             options,
-            Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict),
+            new TestAnalyticsProviderClientResolver(Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict)),
             Mock.Of<IAnalyticsConnectionNameService>(MockBehavior.Strict));
         var request = new UpdateAnalyticsSettingsRequest(
             true,
@@ -102,7 +102,7 @@ public sealed class WebAnalyticsSettingsApiControllerTests
             store,
             new AnalyticsConnectionRegistry(store, options, mockConnectionsEnabled: false),
             options,
-            Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict),
+            new TestAnalyticsProviderClientResolver(Mock.Of<IAnalyticsProviderClient>(MockBehavior.Strict)),
             Mock.Of<IAnalyticsConnectionNameService>(MockBehavior.Strict));
         var request = new UpdateAnalyticsSettingsRequest(
             true,

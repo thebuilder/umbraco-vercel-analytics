@@ -15,7 +15,7 @@ public sealed class AnalyticsConnectionNameServiceTests
         var connection = CreateConnection();
         client.Setup(item => item.GetDisplayNameAsync(connection, It.IsAny<CancellationToken>()))
             .ReturnsAsync("health-platform");
-        var service = new AnalyticsConnectionNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
+        var service = CreateService(client.Object);
 
         var first = await service.GetDisplayNameAsync(connection, CancellationToken.None);
         var second = await service.GetDisplayNameAsync(connection, CancellationToken.None);
@@ -32,7 +32,7 @@ public sealed class AnalyticsConnectionNameServiceTests
         var connection = CreateConnection();
         client.Setup(item => item.GetDisplayNameAsync(connection, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new AnalyticsProviderApiException(System.Net.HttpStatusCode.Forbidden, AnalyticsProvider.Vercel));
-        var service = new AnalyticsConnectionNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
+        var service = CreateService(client.Object);
 
         var result = await service.GetDisplayNameAsync(connection, CancellationToken.None);
 
@@ -47,7 +47,7 @@ public sealed class AnalyticsConnectionNameServiceTests
                 It.IsAny<AnalyticsConnection>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((AnalyticsConnection connection, CancellationToken _) => connection.DisplayName);
-        var service = new AnalyticsConnectionNameService(client.Object, new MemoryCache(new MemoryCacheOptions()));
+        var service = CreateService(client.Object);
         var flags = CreateConnection() with
         {
             Key = Guid.Parse("22222222-2222-2222-2222-222222222220"),
@@ -84,4 +84,7 @@ public sealed class AnalyticsConnectionNameServiceTests
         true,
         new HashSet<Guid>(),
         new HashSet<string>());
+
+    private static AnalyticsConnectionNameService CreateService(IAnalyticsProviderClient client) =>
+        new(new TestAnalyticsProviderClientResolver(client), new MemoryCache(new MemoryCacheOptions()));
 }

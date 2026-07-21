@@ -45,7 +45,7 @@ public sealed class MockAnalyticsClient :
         new("personalised-homepage", 4760, 3010)
     ];
 
-    public AnalyticsProvider Provider => AnalyticsProvider.Vercel;
+    public AnalyticsProviderDefinition Definition => VercelAnalyticsClient.ProviderDefinition;
 
     public Task<string> GetDisplayNameAsync(AnalyticsConnection connection, CancellationToken cancellationToken)
     {

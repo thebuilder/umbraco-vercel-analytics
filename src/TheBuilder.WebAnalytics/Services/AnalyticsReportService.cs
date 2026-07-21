@@ -10,14 +10,6 @@ public sealed class AnalyticsReportService(
     IAnalyticsProviderClientResolver clients,
     AnalyticsReportCache cache)
 {
-    internal AnalyticsReportService(
-        AnalyticsConnectionRegistry registry,
-        IAnalyticsProviderClient client,
-        AnalyticsReportCache cache)
-        : this(registry, new SingleAnalyticsProviderClientResolver(client), cache)
-    {
-    }
-
     public async Task<AnalyticsSummary?> GetSummaryAsync(
         AnalyticsQuery query,
         CancellationToken cancellationToken)
@@ -233,9 +225,4 @@ public sealed class AnalyticsReportService(
     private static bool IsOptionalComparisonFailure(Exception failure) =>
         failure is AnalyticsProviderApiException or HttpRequestException or JsonException or OperationCanceledException;
 
-}
-
-internal sealed class SingleAnalyticsProviderClientResolver(IAnalyticsProviderClient client) : IAnalyticsProviderClientResolver
-{
-    public IAnalyticsProviderClient Get(AnalyticsConnection connection) => client;
 }

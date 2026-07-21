@@ -15,11 +15,6 @@ public sealed class AnalyticsConnectionNameService(
     IAnalyticsProviderClientResolver clients,
     IMemoryCache cache) : IAnalyticsConnectionNameService
 {
-    internal AnalyticsConnectionNameService(IAnalyticsProviderClient client, IMemoryCache cache)
-        : this(new SingleAnalyticsProviderClientResolver(client), cache)
-    {
-    }
-
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
     public async Task<string> GetDisplayNameAsync(

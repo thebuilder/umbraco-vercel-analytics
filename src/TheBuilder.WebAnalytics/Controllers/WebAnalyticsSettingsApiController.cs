@@ -20,23 +20,6 @@ public sealed class WebAnalyticsSettingsApiController(
     IAnalyticsProviderClientResolver providerClients,
     IAnalyticsConnectionNameService projectNames) : WebAnalyticsApiControllerBase
 {
-    internal WebAnalyticsSettingsApiController(
-        IBackOfficeSecurityAccessor backOfficeSecurityAccessor,
-        WebAnalyticsSettingsStore settingsStore,
-        AnalyticsConnectionRegistry registry,
-        IOptions<WebAnalyticsOptions> serverOptions,
-        IAnalyticsProviderClient providerClient,
-        IAnalyticsConnectionNameService projectNames)
-        : this(
-            backOfficeSecurityAccessor,
-            settingsStore,
-            registry,
-            serverOptions,
-            new SingleAnalyticsProviderClientResolver(providerClient),
-            projectNames)
-    {
-    }
-
     [HttpGet("settings")]
     [ProducesResponseType<AnalyticsSettingsResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AnalyticsSettingsResponse>> Settings(CancellationToken cancellationToken)

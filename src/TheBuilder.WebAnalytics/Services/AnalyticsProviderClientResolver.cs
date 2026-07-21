@@ -21,33 +21,16 @@ public sealed class AnalyticsProviderClientResolver(
         IEnumerable<IAnalyticsProviderClient> clients)
     {
         var clientList = clients.ToArray();
-        var duplicates = clientList.GroupBy(client => client.Provider).FirstOrDefault(group => group.Count() > 1);
+        var duplicates = clientList.GroupBy(client => client.Definition.Provider).FirstOrDefault(group => group.Count() > 1);
         if (duplicates is not null)
             throw new InvalidOperationException($"Multiple analytics clients are registered for {duplicates.Key}.");
 
-        var byProvider = clientList.ToDictionary(client => client.Provider);
+        var byProvider = clientList.ToDictionary(client => client.Definition.Provider);
         foreach (var definition in AnalyticsProviderCatalog.Default.Definitions)
         {
-            if (!byProvider.TryGetValue(definition.Provider, out var client))
+            if (!byProvider.ContainsKey(definition.Provider))
                 throw new InvalidOperationException($"No analytics client is registered for {definition.Provider}.");
-            ValidateOptionalCapabilities(definition, client);
         }
         return byProvider;
-    }
-
-    private static void ValidateOptionalCapabilities(
-        AnalyticsProviderDefinition definition,
-        IAnalyticsProviderClient client)
-    {
-        Validate(definition.Capabilities.Events, client is IAnalyticsEventsProviderClient, "events");
-        Validate(definition.Capabilities.EventDetails, client is IAnalyticsEventDetailsProviderClient, "event details");
-        Validate(definition.Capabilities.EventProperties, client is IAnalyticsEventPropertiesProviderClient, "event properties");
-        Validate(definition.Capabilities.Flags, client is IAnalyticsFlagsProviderClient, "flags");
-
-        void Validate(bool advertised, bool implemented, string capability)
-        {
-            if (advertised != implemented)
-                throw new InvalidOperationException($"{definition.Provider} client and catalog disagree about {capability} support.");
-        }
     }
 }

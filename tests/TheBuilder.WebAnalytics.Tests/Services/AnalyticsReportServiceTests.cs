@@ -14,7 +14,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
         var query = CreateQuery();
 
         var first = await service.GetSummaryAsync(query, CancellationToken.None);
@@ -31,7 +31,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(
+        var service = CreateService(
             CreateRegistry(cacheDuration: TimeSpan.Zero),
             client,
             cache);
@@ -49,7 +49,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
 
@@ -65,7 +65,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient { FailPreviousCount = true };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
 
@@ -89,7 +89,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient { PreviousCountException = createException() };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         var summary = await service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
 
@@ -109,7 +109,7 @@ public sealed class AnalyticsReportServiceTests
             BeforePreviousCountFailure = cancellation.Cancel
         };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             service.GetSummaryAsync(CreateQuery(), cancellation.Token));
@@ -128,7 +128,7 @@ public sealed class AnalyticsReportServiceTests
             PreviousCountRelease = releasePreviousCount
         };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         var first = service.GetSummaryAsync(CreateQuery(), firstCancellation.Token);
         await previousCountStarted.Task;
@@ -151,7 +151,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient { CurrentCountException = new System.Text.Json.JsonException() };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAsync<System.Text.Json.JsonException>(() =>
             service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
@@ -162,7 +162,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient { PreviousCountException = new InvalidOperationException() };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.GetSummaryAsync(CreateQuery(), CancellationToken.None));
@@ -173,7 +173,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
         var minimumDate = DateTimeOffset.MinValue;
 
         var summary = await service.GetSummaryAsync(
@@ -191,7 +191,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.Country, 10, null, CancellationToken.None);
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.DeviceType, 10, null, CancellationToken.None);
@@ -204,7 +204,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.RequestPath, 100, "news", CancellationToken.None);
         await service.GetBreakdownAsync(CreateQuery(), AnalyticsDimension.RequestPath, 100, "about", CancellationToken.None);
@@ -217,7 +217,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         await service.GetSummaryAsync(CreateQuery() with
         {
@@ -237,7 +237,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
         var query = CreateQuery() with { RequestPath = "/news" };
 
         await service.GetEventsAsync(query, 100, "signup", CancellationToken.None);
@@ -252,7 +252,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         var first = await service.GetEventDetailsAsync(CreateQuery(), "Signup", null, CancellationToken.None);
         var second = await service.GetEventDetailsAsync(CreateQuery(), "Signup", null, CancellationToken.None);
@@ -273,7 +273,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
         var filter = new AnalyticsEventDataFilter("plan", "Enterprise");
 
         await service.GetEventDetailsAsync(CreateQuery(), "Signup", filter, CancellationToken.None);
@@ -289,7 +289,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
         var filter = new AnalyticsEventDataFilter("plan", "Pro");
 
         await service.GetEventDetailsAsync(CreateQuery(), "Signup:cGxhbg==:UHJv", null, CancellationToken.None);
@@ -306,7 +306,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         var first = await service.GetEventPropertyValuesAsync(CreateQuery(), "Signup", "plan", 100, "enterprise", null, CancellationToken.None);
         var second = await service.GetEventPropertyValuesAsync(CreateQuery(), "Signup", "plan", 100, "enterprise", null, CancellationToken.None);
@@ -324,7 +324,7 @@ public sealed class AnalyticsReportServiceTests
     {
         var client = new CountingClient();
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -342,7 +342,7 @@ public sealed class AnalyticsReportServiceTests
         var releaseCounts = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var client = new CountingClient { CountStarted = countStarted, CountRelease = releaseCounts };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
 
         var first = service.GetSummaryAsync(CreateQuery(), CancellationToken.None);
         await countStarted.Task;
@@ -364,7 +364,7 @@ public sealed class AnalyticsReportServiceTests
         var releaseCounts = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var client = new CountingClient { CountStarted = countStarted, CountRelease = releaseCounts };
         using var cache = new AnalyticsReportCache();
-        var service = new AnalyticsReportService(CreateRegistry(), client, cache);
+        var service = CreateService(CreateRegistry(), client, cache);
         using var firstCancellation = new CancellationTokenSource();
 
         var first = service.GetSummaryAsync(CreateQuery(), firstCancellation.Token);
@@ -385,6 +385,12 @@ public sealed class AnalyticsReportServiceTests
         new DateOnly(2026, 7, 1),
         new DateOnly(2026, 7, 15),
         AnalyticsInterval.Day);
+
+    private static AnalyticsReportService CreateService(
+        AnalyticsConnectionRegistry registry,
+        IAnalyticsProviderClient client,
+        AnalyticsReportCache cache) =>
+        new(registry, new TestAnalyticsProviderClientResolver(client), cache);
 
     private static AnalyticsConnectionRegistry CreateRegistry(TimeSpan? cacheDuration = null) => new(Options.Create(new WebAnalyticsOptions
     {
@@ -410,7 +416,7 @@ public sealed class AnalyticsReportServiceTests
         IAnalyticsEventPropertiesProviderClient,
         IAnalyticsFlagsProviderClient
     {
-        public AnalyticsProvider Provider => AnalyticsProvider.Vercel;
+        public AnalyticsProviderDefinition Definition => AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel);
 
         public int CountCalls { get; private set; }
         public int TrendCalls { get; private set; }
@@ -459,7 +465,7 @@ public sealed class AnalyticsReportServiceTests
             }
             if (FailPreviousCount && query.To <= new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero))
             {
-                throw new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired, Provider);
+                throw new AnalyticsProviderApiException(System.Net.HttpStatusCode.PaymentRequired, Definition.Provider);
             }
 
             CountStarted?.TrySetResult();

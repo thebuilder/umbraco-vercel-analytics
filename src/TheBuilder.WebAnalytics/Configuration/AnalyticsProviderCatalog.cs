@@ -1,42 +1,11 @@
 using System.Net;
 using TheBuilder.WebAnalytics.Models;
+using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Configuration;
 
 public sealed class AnalyticsProviderCatalog
 {
-    private static readonly AnalyticsDimension[] VercelDimensions =
-    [
-        AnalyticsDimension.RequestPath,
-        AnalyticsDimension.Route,
-        AnalyticsDimension.ReferrerHostname,
-        AnalyticsDimension.Country,
-        AnalyticsDimension.DeviceType,
-        AnalyticsDimension.BrowserName,
-        AnalyticsDimension.OsName,
-        AnalyticsDimension.UtmSource,
-        AnalyticsDimension.UtmMedium,
-        AnalyticsDimension.UtmCampaign,
-        AnalyticsDimension.UtmTerm,
-        AnalyticsDimension.UtmContent,
-        AnalyticsDimension.EventName
-    ];
-    private static readonly AnalyticsDimension[] PlausibleDimensions =
-    [
-        AnalyticsDimension.RequestPath,
-        AnalyticsDimension.Referrer,
-        AnalyticsDimension.Country,
-        AnalyticsDimension.DeviceType,
-        AnalyticsDimension.BrowserName,
-        AnalyticsDimension.OsName,
-        AnalyticsDimension.UtmSource,
-        AnalyticsDimension.UtmMedium,
-        AnalyticsDimension.UtmCampaign,
-        AnalyticsDimension.UtmTerm,
-        AnalyticsDimension.UtmContent,
-        AnalyticsDimension.EventName
-    ];
-
     public static AnalyticsProviderCatalog Default { get; } = new();
 
     private readonly IReadOnlyDictionary<AnalyticsProvider, AnalyticsProviderDefinition> _definitions;
@@ -45,19 +14,8 @@ public sealed class AnalyticsProviderCatalog
     {
         Definitions =
         [
-            new(
-                AnalyticsProvider.Vercel,
-                new(VercelDimensions, Events: true, EventDetails: true, EventProperties: true, Flags: true),
-                AnalyticsConnectionIdentifier.ProjectId,
-                supportsTeam: true,
-                options => options.Providers.Vercel.AccessToken),
-            new(
-                AnalyticsProvider.Plausible,
-                new(PlausibleDimensions, Events: true, EventDetails: true, EventProperties: false, Flags: false),
-                AnalyticsConnectionIdentifier.SiteId,
-                supportsTeam: false,
-                options => options.Providers.Plausible.AccessToken,
-                invalidQueryStatuses: new HashSet<HttpStatusCode> { HttpStatusCode.BadRequest, HttpStatusCode.NotFound })
+            VercelAnalyticsClient.ProviderDefinition,
+            PlausibleAnalyticsClient.ProviderDefinition
         ];
         _definitions = Definitions.ToDictionary(definition => definition.Provider);
     }

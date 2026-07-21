@@ -5,7 +5,7 @@ namespace TheBuilder.WebAnalytics.Services;
 
 public interface IAnalyticsProviderClient
 {
-    AnalyticsProvider Provider { get; }
+    AnalyticsProviderDefinition Definition { get; }
 
     Task<string> GetDisplayNameAsync(
         AnalyticsConnection connection,

@@ -51,6 +51,7 @@ public sealed class WebAnalyticsSettingsApiControllerTests
         var result = await controller.Settings(CancellationToken.None);
 
         var response = Assert.IsType<AnalyticsSettingsResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("0.1.0", response.PackageVersion);
         var connection = Assert.Single(response.Connections);
         Assert.Equal(MockAnalyticsScenario.Flags, connection.MockScenario);
         Assert.Equal(mockConnectionsEnabled, response.CanCreateMockConnections);

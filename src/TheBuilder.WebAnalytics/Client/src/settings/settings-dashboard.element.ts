@@ -21,6 +21,7 @@ import { createSettingsUpdate, validateConnection, validateEditableSettings } fr
 import { announceAnalyticsAvailability } from "../section/analytics-availability.js";
 import { MOCK_SCENARIOS, type MockScenarioDefinition } from "./mock-scenarios.js";
 import { identifierField, providerDescriptor, providerLogo } from "./provider-identity.js";
+import { settingsError, type SettingsError } from "./settings-error.js";
 
 type NewConnection =
   | { kind: "provider"; descriptor: AnalyticsProviderDescriptor; hasAccessToken: boolean }
@@ -35,6 +36,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   @state() private _showValidation = false;
   @state() private _testingKey?: string;
   @state() private _status?: { type: "success" | "error"; message: string };
+  @state() private _loadError?: SettingsError;
   @state() private _connectionStatuses: Record<string, ConnectionActionStatus> = {};
   @state() private _showProviderPicker = false;
 
@@ -46,17 +48,18 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   async #load(): Promise<void> {
     this._loading = true;
     try {
-      const { data, error } = await WebAnalyticsService.settings();
+      const { data, error, response } = await WebAnalyticsService.settings();
       if (error || !data) {
-        this._status = { type: "error", message: "Analytics settings could not be loaded. Administrator access is required." };
+        this._loadError = settingsError("load", error, response?.status);
         return;
       }
       this._settings = data;
       this._dirty = false;
       this._showValidation = false;
       this._status = undefined;
-    } catch {
-      this._status = { type: "error", message: "Analytics settings could not be loaded. Administrator access is required." };
+      this._loadError = undefined;
+    } catch (error) {
+      this._loadError = settingsError("load", error);
     } finally {
       this._loading = false;
     }
@@ -155,17 +158,17 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     this._testingKey = key;
     this._connectionStatuses = { ...this._connectionStatuses, [key]: { type: "info", message: "Testing the saved connection…" } };
     try {
-      const { data, error } = await WebAnalyticsService.testConnection({ path: { key } });
+      const { data, error, response } = await WebAnalyticsService.testConnection({ path: { key } });
       this._connectionStatuses = {
         ...this._connectionStatuses,
         [key]: error || !data
-          ? { type: "error", message: "The connection test could not be completed." }
+          ? { type: "error", message: settingsError("test", error, response?.status).message }
           : { type: data.success ? "success" : "error", message: data.message },
       };
-    } catch {
+    } catch (error) {
       this._connectionStatuses = {
         ...this._connectionStatuses,
-        [key]: { type: "error", message: "The connection test could not be completed." },
+        [key]: { type: "error", message: settingsError("test", error).message },
       };
     } finally {
       this._testingKey = undefined;
@@ -192,9 +195,9 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     this._status = undefined;
     const body: UpdateAnalyticsSettingsRequest = createSettingsUpdate(this._settings);
     try {
-      const { data, error } = await WebAnalyticsService.saveSettings({ body });
+      const { data, error, response } = await WebAnalyticsService.saveSettings({ body });
       if (error || !data) {
-        this._status = { type: "error", message: "Settings were not saved. Check the connection fields and mapping values." };
+        this._status = { type: "error", message: settingsError("save", error, response?.status).message };
         return false;
       }
       this._settings = data;
@@ -203,8 +206,8 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       announceAnalyticsAvailability(data.enabled);
       if (successMessage) this._status = { type: "success", message: successMessage };
       return true;
-    } catch {
-      this._status = { type: "error", message: "Settings were not saved. Check the connection fields and mapping values." };
+    } catch (error) {
+      this._status = { type: "error", message: settingsError("save", error).message };
       return false;
     } finally {
       this._saving = false;
@@ -325,7 +328,15 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   render() {
     if (this._loading) return html`<uui-loader-bar aria-label="Loading analytics settings"></uui-loader-bar>`;
     if (!this._settings) return html`
-      <umb-empty-state headline="Settings unavailable"><p>${this._status?.message}</p><uui-button look="secondary" label="Retry loading settings" @click=${this.#load}>Retry</uui-button></umb-empty-state>
+      <div class="load-error" role="alert" aria-live="assertive">
+        <uui-box headline=${this._loadError?.headline ?? "Settings unavailable"}>
+          <div class="load-error-content">
+            <uui-icon name="icon-alert" aria-hidden="true"></uui-icon>
+            <p>${this._loadError?.message ?? "Web Analytics settings could not be loaded."}</p>
+          </div>
+          <uui-button look="secondary" label="Retry loading settings" @click=${this.#load}>Retry</uui-button>
+        </uui-box>
+      </div>
     `;
 
     const settings = this._settings;
@@ -382,6 +393,8 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
         ${this.#renderGeneralSettings()}
         ${this.#renderDevelopmentData()}
 
+        <footer class="package-version">Current installed version of Web Analytics: ${settings.packageVersion}</footer>
+
       </form>
     `;
   }
@@ -396,6 +409,10 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       display: block;
     }
     form { max-width: var(--settings-column-max); margin-inline: auto; padding: var(--uui-size-layout-1) var(--settings-inline-gutter) calc(var(--uui-size-layout-1) + var(--uui-size-14) + var(--uui-size-space-4)); }
+    .load-error { box-sizing: border-box; margin-inline: auto; max-width: var(--settings-column-max); padding: var(--uui-size-layout-1) var(--settings-inline-gutter); }
+    .load-error-content { align-items: flex-start; display: flex; gap: var(--uui-size-space-3); margin-block-end: var(--uui-size-space-5); max-inline-size: 70ch; }
+    .load-error-content uui-icon { color: var(--uui-color-danger-standalone); flex: 0 0 auto; font-size: var(--uui-size-6); }
+    .load-error-content p { margin: 0; overflow-wrap: anywhere; text-wrap: pretty; }
     .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-layout-1); }
     .section-heading > div { min-inline-size: 0; }
     .settings-actions {
@@ -453,6 +470,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .field-with-help { display: grid; gap: var(--uui-size-space-1); }
     .field-help { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); }
     .package-status { min-inline-size: 0; }
+    .package-version { color: var(--uui-color-text-alt); font-size: var(--uui-type-small-size); margin-block-start: var(--uui-size-layout-2); overflow-wrap: anywhere; }
     .visually-hidden { block-size: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); inline-size: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
     .section-heading { margin-bottom: var(--uui-size-space-4); }
     .provider-picker { background: var(--uui-color-surface-alt); border-block: 1px solid var(--uui-color-border); margin-block-end: var(--uui-size-space-5); padding: var(--uui-size-space-4) var(--uui-size-space-5) var(--uui-size-space-5); }

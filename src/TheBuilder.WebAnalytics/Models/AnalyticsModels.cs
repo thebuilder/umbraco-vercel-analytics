@@ -169,6 +169,7 @@ public sealed record AnalyticsDocumentRoute(
     IReadOnlyList<string> Warnings);
 
 public sealed record AnalyticsSettingsResponse(
+    string PackageVersion,
     bool Enabled,
     IReadOnlyList<AnalyticsProviderDescriptor> Providers,
     IReadOnlyList<AnalyticsProviderTokenStatus> ProviderTokens,

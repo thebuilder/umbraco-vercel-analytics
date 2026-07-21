@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Reflection;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Extensions;
 using TheBuilder.WebAnalytics.Configuration;
@@ -20,6 +21,13 @@ public sealed class WebAnalyticsSettingsApiController(
     IAnalyticsProviderClientResolver providerClients,
     IAnalyticsConnectionNameService projectNames) : WebAnalyticsApiControllerBase
 {
+    private static readonly string PackageVersion =
+        typeof(WebAnalyticsSettingsApiController).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion.Split('+')[0]
+        ?? typeof(WebAnalyticsSettingsApiController).Assembly.GetName().Version?.ToString(3)
+        ?? "unknown";
+
     [HttpGet("settings")]
     [ProducesResponseType<AnalyticsSettingsResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AnalyticsSettingsResponse>> Settings(CancellationToken cancellationToken)
@@ -143,6 +151,7 @@ public sealed class WebAnalyticsSettingsApiController(
         });
         var responseConnections = await Task.WhenAll(responseTasks);
         return new AnalyticsSettingsResponse(
+            PackageVersion,
             settings.Enabled,
             AnalyticsProviderCatalog.Default.Definitions
                 .Select(definition => definition.ToDescriptor())

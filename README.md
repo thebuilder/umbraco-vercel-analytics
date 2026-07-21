@@ -34,7 +34,7 @@ Plausible's Stats API requires a Business plan. Self-hosted Plausible is not cur
 Web Analytics supports Umbraco CMS 17.1–18.x. Add the package to the Umbraco web project:
 
 ```sh
-dotnet add path/to/Your.Umbraco.Web.csproj package TheBuilder.WebAnalytics
+dotnet add package TheBuilder.WebAnalytics
 ```
 
 The package registers its services and backoffice extensions automatically. No changes to `Program.cs` are required.

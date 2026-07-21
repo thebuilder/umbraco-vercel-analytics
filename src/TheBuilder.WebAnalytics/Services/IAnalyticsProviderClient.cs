@@ -48,12 +48,18 @@ public interface IAnalyticsEventDetailsProviderClient
         AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
-        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken);
 }
 
 public interface IAnalyticsEventPropertiesProviderClient : IAnalyticsEventDetailsProviderClient
 {
+    Task<AnalyticsEventTotals> CountFilteredEventsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        AnalyticsEventDataFilter eventDataFilter,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<string>> GetEventPropertyNamesAsync(
         AnalyticsConnection connection,
         AnalyticsQuery query,

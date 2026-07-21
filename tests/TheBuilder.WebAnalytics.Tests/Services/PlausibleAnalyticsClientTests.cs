@@ -88,7 +88,7 @@ public sealed class PlausibleAnalyticsClientTests
         var client = CreateClient(handler);
 
         var totals = await client.CountEventsAsync(
-            CreateConnection(), CreateQuery(), "Read article", null, CancellationToken.None);
+            CreateConnection(), CreateQuery(), "Read article", CancellationToken.None);
 
         Assert.Equal(new AnalyticsEventTotals(9, 7), totals);
         using var body = JsonDocument.Parse(handler.Body!);

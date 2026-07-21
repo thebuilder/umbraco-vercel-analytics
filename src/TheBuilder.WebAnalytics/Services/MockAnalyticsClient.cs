@@ -118,6 +118,21 @@ public sealed class MockAnalyticsClient :
         AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
+        CancellationToken cancellationToken) =>
+        CountEventsAsync(connection, query, eventName, null, cancellationToken);
+
+    public Task<AnalyticsEventTotals> CountFilteredEventsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        AnalyticsEventDataFilter eventDataFilter,
+        CancellationToken cancellationToken) =>
+        CountEventsAsync(connection, query, eventName, eventDataFilter, cancellationToken);
+
+    private Task<AnalyticsEventTotals> CountEventsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
         AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {

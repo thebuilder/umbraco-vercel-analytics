@@ -124,11 +124,8 @@ public sealed class PlausibleAnalyticsClient(
         AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,
-        AnalyticsEventDataFilter? eventDataFilter,
         CancellationToken cancellationToken)
     {
-        if (eventDataFilter is not null)
-            throw new ArgumentException("Plausible event property filters require configured property support.", nameof(eventDataFilter));
         var response = await QueryAsync(
             connection,
             query,
@@ -157,7 +154,7 @@ public sealed class PlausibleAnalyticsClient(
         var filters = BuildFilters(query, eventName);
         if (search is { } searchFilter)
         {
-            filters.Add(["contains", searchFilter.Dimension, new[] { searchFilter.Value }]);
+            filters.Add(new PlausibleFilter("contains", searchFilter.Dimension, [searchFilter.Value]));
         }
 
         var requestBody = new PlausibleRequest(
@@ -197,20 +194,20 @@ public sealed class PlausibleAnalyticsClient(
         return payload;
     }
 
-    private static List<object[]> BuildFilters(AnalyticsQuery query, string? eventName)
+    private static List<PlausibleFilter> BuildFilters(AnalyticsQuery query, string? eventName)
     {
-        var filters = new List<object[]>();
+        var filters = new List<PlausibleFilter>();
         if (!string.IsNullOrWhiteSpace(query.RequestPath))
         {
-            filters.Add(["is", "event:page", new[] { query.RequestPath }]);
+            filters.Add(new PlausibleFilter("is", "event:page", [query.RequestPath]));
         }
         foreach (var filter in query.Filters ?? [])
         {
-            filters.Add(["is", ToApiDimension(filter.Dimension), new[] { filter.Value }]);
+            filters.Add(new PlausibleFilter("is", ToApiDimension(filter.Dimension), [filter.Value]));
         }
         if (!string.IsNullOrWhiteSpace(eventName))
         {
-            filters.Add(["is", "event:goal", new[] { eventName }]);
+            filters.Add(new PlausibleFilter("is", "event:goal", [eventName]));
         }
         return filters;
     }
@@ -270,7 +267,7 @@ public sealed class PlausibleAnalyticsClient(
         [property: JsonPropertyName("metrics")] string[] Metrics,
         [property: JsonPropertyName("date_range")] string[] DateRange,
         [property: JsonPropertyName("dimensions")] string[] Dimensions,
-        [property: JsonPropertyName("filters")] IReadOnlyList<object[]> Filters,
+        [property: JsonPropertyName("filters")] IReadOnlyList<PlausibleFilter> Filters,
         [property: JsonPropertyName("pagination"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PlausiblePagination? Pagination,
         [property: JsonPropertyName("include"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PlausibleInclude? Include,
         [property: JsonPropertyName("order_by"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[][]? OrderBy);
@@ -292,4 +289,22 @@ public sealed class PlausibleAnalyticsClient(
     private sealed record PlausibleRow(
         [property: JsonPropertyName("dimensions")] IReadOnlyList<string>? Dimensions,
         [property: JsonPropertyName("metrics")] IReadOnlyList<JsonElement>? Metrics);
+
+    [JsonConverter(typeof(PlausibleFilterJsonConverter))]
+    private sealed record PlausibleFilter(string Operator, string Dimension, IReadOnlyList<string> Values);
+
+    private sealed class PlausibleFilterJsonConverter : JsonConverter<PlausibleFilter>
+    {
+        public override PlausibleFilter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            throw new NotSupportedException("Plausible filters are request-only values.");
+
+        public override void Write(Utf8JsonWriter writer, PlausibleFilter value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            writer.WriteStringValue(value.Operator);
+            writer.WriteStringValue(value.Dimension);
+            JsonSerializer.Serialize(writer, value.Values, options);
+            writer.WriteEndArray();
+        }
+    }
 }

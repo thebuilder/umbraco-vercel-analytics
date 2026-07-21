@@ -115,11 +115,18 @@ public sealed class AnalyticsReportService(
         var cacheKey = $"web-analytics:{connection.Provider}:{snapshot.Revision}:event-details:{EncodeCachePart(normalizedEventName)}{eventDataCacheKey}:{Normalize(query)}";
         return await GetOrCreateAsync(cacheKey, snapshot.Settings.CacheDuration, async operationCancellationToken =>
         {
-            var totals = client.CountEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken);
-            var propertyNamesTask = connection.Capabilities.EventProperties
-                && client is IAnalyticsEventPropertiesProviderClient propertiesClient
-                    ? propertiesClient.GetEventPropertyNamesAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken)
-                    : Task.FromResult<IReadOnlyList<string>>([]);
+            var propertiesClient = client as IAnalyticsEventPropertiesProviderClient;
+            var totals = eventDataFilter is null
+                ? client.CountEventsAsync(connection, query, normalizedEventName, operationCancellationToken)
+                : propertiesClient?.CountFilteredEventsAsync(connection, query, normalizedEventName, eventDataFilter, operationCancellationToken)
+                    ?? throw new InvalidOperationException($"{connection.Provider} does not support event property filters.");
+            var propertyNamesTask = propertiesClient?.GetEventPropertyNamesAsync(
+                    connection,
+                    query,
+                    normalizedEventName,
+                    eventDataFilter,
+                    operationCancellationToken)
+                ?? Task.FromResult<IReadOnlyList<string>>([]);
             await Task.WhenAll(totals, propertyNamesTask);
             var propertyNames = await propertyNamesTask;
             var properties = propertyNames

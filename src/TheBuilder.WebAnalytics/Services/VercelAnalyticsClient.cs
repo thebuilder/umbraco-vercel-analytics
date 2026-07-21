@@ -121,7 +121,22 @@ public sealed class VercelAnalyticsClient(
             ?? throw new JsonException("Vercel Analytics breakdown response did not contain data.");
     }
 
-    public async Task<AnalyticsEventTotals> CountEventsAsync(
+    public Task<AnalyticsEventTotals> CountEventsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        CancellationToken cancellationToken) =>
+        CountEventsAsync(connection, query, eventName, null, cancellationToken);
+
+    public Task<AnalyticsEventTotals> CountFilteredEventsAsync(
+        AnalyticsConnection connection,
+        AnalyticsQuery query,
+        string eventName,
+        AnalyticsEventDataFilter eventDataFilter,
+        CancellationToken cancellationToken) =>
+        CountEventsAsync(connection, query, eventName, eventDataFilter, cancellationToken);
+
+    private async Task<AnalyticsEventTotals> CountEventsAsync(
         AnalyticsConnection connection,
         AnalyticsQuery query,
         string eventName,

@@ -381,7 +381,6 @@ public sealed class VercelAnalyticsClientTests
             connection,
             new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day, "/editor's"),
             "CTA's click",
-            null,
             CancellationToken.None);
 
         Assert.Equal(new AnalyticsEventTotals(42, 31), result);
@@ -401,7 +400,6 @@ public sealed class VercelAnalyticsClientTests
             connection,
             new AnalyticsQuery(connection.Key, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 2), AnalyticsInterval.Day),
             "Signup",
-            null,
             CancellationToken.None));
 
         Assert.Contains("count", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -439,7 +437,7 @@ public sealed class VercelAnalyticsClientTests
         Assert.Equal(
             new AnalyticsEventTotals(0, 0),
             await CreateClient(new RecordingHandler("""{"data":{"count":0,"visitors":0}}"""))
-                .CountEventsAsync(connection, query, "Signup", null, CancellationToken.None));
+                .CountEventsAsync(connection, query, "Signup", CancellationToken.None));
 
         var events = await CreateClient(new RecordingHandler(
             """{"data":[{"eventName":"Signup","count":0,"visitors":0}]}"""))

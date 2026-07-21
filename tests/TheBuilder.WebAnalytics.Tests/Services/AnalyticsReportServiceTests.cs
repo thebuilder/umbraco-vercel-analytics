@@ -487,7 +487,13 @@ public sealed class AnalyticsReportServiceTests
             return Task.FromResult<IReadOnlyList<AnalyticsBreakdownRow>>([]);
         }
 
-        public Task<AnalyticsEventTotals> CountEventsAsync(AnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
+        public Task<AnalyticsEventTotals> CountEventsAsync(AnalyticsConnection connection, AnalyticsQuery query, string eventName, CancellationToken cancellationToken) =>
+            CountEvents(connection, eventName, null, cancellationToken);
+
+        public Task<AnalyticsEventTotals> CountFilteredEventsAsync(AnalyticsConnection connection, AnalyticsQuery query, string eventName, AnalyticsEventDataFilter eventDataFilter, CancellationToken cancellationToken) =>
+            CountEvents(connection, eventName, eventDataFilter, cancellationToken);
+
+        private Task<AnalyticsEventTotals> CountEvents(AnalyticsConnection connection, string eventName, AnalyticsEventDataFilter? eventDataFilter, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventCountCalls++;

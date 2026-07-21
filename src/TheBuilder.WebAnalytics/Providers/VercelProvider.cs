@@ -32,18 +32,13 @@ internal static class VercelProvider
             Flags: true,
             BreakdownOrdering: false),
         AnalyticsConnectionIdentifier.ProjectId,
-        supportsTeam: true,
         new(
             "Projects using Vercel Web Analytics",
             "vercel",
             new("projectId", "Vercel project ID", "Use the project ID from your Vercel project settings.", "a Vercel project ID"),
-            "Vercel project ID",
-            "Plausible site ID",
-            "Vercel team",
+            new("team", "Vercel team", "Optional team slug or ID for projects owned by a Vercel team."),
             new("access token", "Configure a Vercel access token in the server settings.", "https://vercel.com/docs/rest-api"),
             null),
-        options => options.Providers.Vercel.AccessToken);
-
-    internal static IServiceCollection AddClient(IServiceCollection services) =>
-        services.AddAnalyticsProvider<VercelAnalyticsClient>(Definition, new Uri("https://api.vercel.com/"));
+        options => options.Providers.Vercel.AccessToken,
+        static (services, definition) => services.AddAnalyticsProvider<VercelAnalyticsClient>(definition, new Uri("https://api.vercel.com/")));
 }

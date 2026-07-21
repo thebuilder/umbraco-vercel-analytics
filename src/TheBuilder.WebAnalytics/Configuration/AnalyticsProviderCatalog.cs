@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Providers;
 
@@ -35,9 +36,9 @@ public sealed class AnalyticsProviderDefinition(
     AnalyticsProvider provider,
     AnalyticsCapabilities capabilities,
     AnalyticsConnectionIdentifier identifier,
-    bool supportsTeam,
     AnalyticsProviderSettingsDescriptor settings,
     Func<WebAnalyticsOptions, string> accessToken,
+    Action<IServiceCollection, AnalyticsProviderDefinition>? registerClient = null,
     IReadOnlySet<HttpStatusCode>? invalidQueryStatuses = null)
 {
     private readonly IReadOnlySet<HttpStatusCode> _invalidQueryStatuses =
@@ -49,7 +50,7 @@ public sealed class AnalyticsProviderDefinition(
 
     public AnalyticsConnectionIdentifier Identifier { get; } = identifier;
 
-    public bool SupportsTeam { get; } = supportsTeam;
+    public bool SupportsTeam => Settings.Team is not null;
 
     public AnalyticsProviderSettingsDescriptor Settings { get; } = settings;
 
@@ -71,7 +72,7 @@ public sealed class AnalyticsProviderDefinition(
 
     public AnalyticsProviderFields Normalize(AnalyticsConnectionSettings connection) => new(
         !connection.IsMock && Identifier == AnalyticsConnectionIdentifier.ProjectId ? connection.ProjectId.Trim() : string.Empty,
-        !connection.IsMock && SupportsTeam ? NullIfWhiteSpace(connection.Team) : null,
+        !connection.IsMock && Settings.Team is not null ? NullIfWhiteSpace(connection.Team) : null,
         !connection.IsMock && Identifier == AnalyticsConnectionIdentifier.SiteId ? connection.SiteId.Trim() : string.Empty,
         !connection.IsMock && Settings.EventProperties is not null
             ? NormalizeNames(connection.EventPropertyNames ?? [])
@@ -89,12 +90,12 @@ public sealed class AnalyticsProviderDefinition(
 
         if (!string.IsNullOrWhiteSpace(connection.ProjectId) &&
             (isSupportedMockScenario || Identifier != AnalyticsConnectionIdentifier.ProjectId))
-            failures.Add($"Connection '{label}' cannot define a {Settings.ProjectIdentifierLabel}.");
+            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.ProjectId.Label}.");
         if (!string.IsNullOrWhiteSpace(connection.Team) && (isSupportedMockScenario || !SupportsTeam))
-            failures.Add($"Connection '{label}' cannot define a {Settings.TeamLabel}.");
+            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.Team.Label}.");
         if (!string.IsNullOrWhiteSpace(connection.SiteId) &&
             (isSupportedMockScenario || Identifier != AnalyticsConnectionIdentifier.SiteId))
-            failures.Add($"Connection '{label}' cannot define a {Settings.SiteIdentifierLabel}.");
+            failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionFields.SiteId.Label}.");
 
         var eventPropertyNames = connection.EventPropertyNames ?? [];
         if (Settings.EventProperties is { } eventProperties)
@@ -111,6 +112,13 @@ public sealed class AnalyticsProviderDefinition(
     }
 
     public bool IsInvalidQuery(HttpStatusCode statusCode) => _invalidQueryStatuses.Contains(statusCode);
+
+    internal void RegisterClient(IServiceCollection services)
+    {
+        if (registerClient is null)
+            throw new InvalidOperationException($"No analytics client registration is configured for {Provider}.");
+        registerClient(services, this);
+    }
 
     public string ConnectionTestFailure(HttpStatusCode statusCode) => statusCode switch
     {
@@ -139,9 +147,7 @@ public sealed record AnalyticsProviderSettingsDescriptor(
     string Description,
     string LogoSlug,
     AnalyticsIdentifierFieldDescriptor Identifier,
-    string ProjectIdentifierLabel,
-    string SiteIdentifierLabel,
-    string TeamLabel,
+    AnalyticsOptionalFieldDescriptor? Team,
     AnalyticsCredentialDescriptor Credential,
     AnalyticsEventPropertyDescriptor? EventProperties);
 
@@ -156,6 +162,11 @@ public sealed record AnalyticsCredentialDescriptor(
     string Description,
     string DocumentationUrl);
 
+public sealed record AnalyticsOptionalFieldDescriptor(
+    string Key,
+    string Label,
+    string Description);
+
 public sealed record AnalyticsEventPropertyDescriptor(
     string Label,
     string Description,
@@ -167,6 +178,15 @@ public sealed record AnalyticsProviderFields(
     string? Team,
     string SiteId,
     string[] EventPropertyNames);
+
+internal static class AnalyticsConnectionFields
+{
+    internal static AnalyticsFlatConnectionField ProjectId { get; } = new("projectId", "Vercel project ID");
+    internal static AnalyticsFlatConnectionField Team { get; } = new("team", "Vercel team");
+    internal static AnalyticsFlatConnectionField SiteId { get; } = new("siteId", "Plausible site ID");
+}
+
+internal sealed record AnalyticsFlatConnectionField(string Key, string Label);
 
 public enum AnalyticsConnectionIdentifier
 {

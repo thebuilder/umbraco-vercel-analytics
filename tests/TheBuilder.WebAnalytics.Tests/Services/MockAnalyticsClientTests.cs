@@ -295,14 +295,11 @@ public sealed class MockAnalyticsClientTests
         provider,
         new AnalyticsCapabilities([], events, eventDetails, eventProperties, false, flags, false),
         AnalyticsConnectionIdentifier.ProjectId,
-        supportsTeam: true,
         new(
             "Test provider",
             "test",
             new("projectId", "project ID", "Test project identifier.", "a project ID"),
-            "project ID",
-            "site ID",
-            "team",
+            new("team", "team", "Optional test team."),
             new("credential", "Test credential.", "https://example.test"),
             null),
         _ => string.Empty);

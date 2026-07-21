@@ -4,7 +4,6 @@ using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Notifications;
 using TheBuilder.WebAnalytics.Configuration;
-using TheBuilder.WebAnalytics.Providers;
 using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Composers
@@ -23,8 +22,8 @@ namespace TheBuilder.WebAnalytics.Composers
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<AnalyticsReportCache>();
             builder.Services.AddSingleton<AnalyticsProviderRequestGate>();
-            VercelProvider.AddClient(builder.Services);
-            PlausibleProvider.AddClient(builder.Services);
+            foreach (var provider in AnalyticsProviderCatalog.Default.Definitions)
+                provider.RegisterClient(builder.Services);
             builder.Services.AddSingleton<MockAnalyticsClient>();
             builder.Services.AddTransient<IAnalyticsProviderClientResolver, AnalyticsProviderClientResolver>();
             builder.Services.AddTransient<AnalyticsReportService>();

@@ -242,7 +242,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
                   <uui-icon name=${credential?.hasAccessToken ? "icon-check" : "icon-alert"} aria-hidden="true"></uui-icon>
                   ${credential?.hasAccessToken ? "Shared credential detected" : "No shared credential detected"}
                 </span>
-                <uui-icon class="provider-choice-arrow" name="icon-navigation-right" aria-hidden="true"></uui-icon>
               </button>
             `;
           })}
@@ -368,8 +367,11 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     return html`
       <form @submit=${this.#save} novalidate>
         ${this._dirty ? html`
-          <div class="save-bar" aria-label="Unsaved Web Analytics settings">
-            <span class="unsaved-indicator" role="status" aria-live="polite">Unsaved changes</span>
+          <div class="settings-actions" aria-label="Web Analytics settings actions">
+            <span class="save-status" role="status" aria-live="polite">
+              <uui-icon name="icon-alert" aria-hidden="true"></uui-icon>
+              Unsaved changes
+            </span>
             <uui-button type="submit" look="primary" label="Save Web Analytics settings" .state=${this._saving ? "waiting" : undefined} ?disabled=${this._saving}>Save settings</uui-button>
           </div>
         ` : ""}
@@ -418,25 +420,29 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
 
   static styles = [UmbTextStyles, css`
     :host { --analytics-z-sticky-action: 10; display: block; }
-    form { max-width: 76rem; margin-inline: auto; padding: var(--uui-size-layout-1); }
+    form { max-width: 76rem; margin-inline: auto; padding: var(--uui-size-layout-1) var(--uui-size-layout-1) calc(var(--uui-size-layout-1) + var(--uui-size-14)); }
     .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-layout-1); }
     .section-heading > div { min-inline-size: 0; }
-    .save-bar {
+    .settings-actions {
       align-items: center;
       background: var(--uui-color-surface);
-      border: 1px solid var(--uui-color-border);
+      box-shadow: var(--uui-shadow-depth-3);
+      box-sizing: border-box;
       display: flex;
       flex-wrap: wrap;
       gap: var(--uui-size-space-4);
       justify-content: flex-end;
-      margin-block-start: var(--uui-size-space-5);
+      inset-block-end: var(--uui-size-layout-1);
+      inset-inline-end: var(--uui-size-layout-1);
+      max-inline-size: calc(100vw - 2 * var(--uui-size-layout-1));
+      min-block-size: var(--uui-size-14);
       padding: var(--uui-size-space-3) var(--uui-size-space-4);
-      position: sticky;
-      top: var(--uui-size-space-4);
+      position: fixed;
+      width: min(32rem, calc(100vw - 2 * var(--uui-size-layout-1)));
       z-index: var(--analytics-z-sticky-action);
     }
-    .unsaved-indicator { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); white-space: nowrap; }
-    .unsaved-indicator::before { background: var(--uui-color-warning-standalone); border-radius: 50%; block-size: var(--uui-size-space-3); content: ""; flex: 0 0 auto; inline-size: var(--uui-size-space-3); }
+    .save-status { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); white-space: nowrap; }
+    .save-status uui-icon { color: var(--uui-color-warning-standalone); }
     h2 { margin: 0; }
     .section-heading p { color: var(--uui-color-text-alt); margin-block: var(--uui-size-space-2) 0; text-wrap: pretty; }
     .status { align-items: flex-start; border: 1px solid var(--uui-color-border); display: flex; gap: var(--uui-size-space-2); margin-block: var(--uui-size-space-5); overflow-wrap: anywhere; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
@@ -470,13 +476,12 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .provider-readiness small { color: var(--uui-color-text-alt); overflow-wrap: anywhere; text-wrap: pretty; }
     .visually-hidden { block-size: 1px; clip: rect(0 0 0 0); clip-path: inset(50%); inline-size: 1px; overflow: hidden; position: absolute; white-space: nowrap; }
     .section-heading { margin-bottom: var(--uui-size-space-4); }
-    .provider-picker { background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); margin-block-end: var(--uui-size-space-5); }
-    .provider-picker-heading { align-items: flex-start; display: flex; gap: var(--uui-size-space-4); justify-content: space-between; padding: var(--uui-size-space-4) var(--uui-size-space-5); }
+    .provider-picker { background: var(--uui-color-surface-alt); border-block: 1px solid var(--uui-color-border); margin-block-end: var(--uui-size-space-5); padding: var(--uui-size-space-4) var(--uui-size-space-5) var(--uui-size-space-5); }
+    .provider-picker-heading { align-items: flex-start; display: flex; gap: var(--uui-size-space-4); justify-content: space-between; margin-block-end: var(--uui-size-space-4); }
     .provider-picker-heading h3 { font-size: var(--uui-type-h5-size); margin: 0; text-wrap: balance; }
     .provider-picker-heading p { color: var(--uui-color-text-alt); margin: var(--uui-size-space-1) 0 0; text-wrap: pretty; }
-    .provider-choices { border-top: 1px solid var(--uui-color-border); }
-    .provider-choice { align-items: center; appearance: none; background: transparent; border: 0; color: inherit; cursor: pointer; display: grid; font: inherit; gap: var(--uui-size-space-4); grid-template-columns: auto minmax(0, 1fr) auto auto; inline-size: 100%; min-block-size: 4rem; padding: var(--uui-size-space-4) var(--uui-size-space-5); text-align: start; }
-    .provider-choice + .provider-choice { border-top: 1px solid var(--uui-color-border); }
+    .provider-choices { display: grid; gap: var(--uui-size-space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .provider-choice { align-items: start; appearance: none; background: var(--uui-color-surface); border: 1px solid var(--uui-color-border); color: inherit; cursor: pointer; display: grid; font: inherit; gap: var(--uui-size-space-2) var(--uui-size-space-4); grid-template-columns: auto minmax(0, 1fr); inline-size: 100%; padding: var(--uui-size-space-4); text-align: start; }
     .provider-choice:hover { background: color-mix(in srgb, var(--uui-color-interactive) 4%, var(--uui-color-surface)); }
     .provider-choice:active { background: color-mix(in srgb, var(--uui-color-interactive) 7%, var(--uui-color-surface)); }
     .provider-choice:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
@@ -485,11 +490,9 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .provider-choice-copy { display: grid; gap: var(--uui-size-space-1); min-inline-size: 0; }
     .provider-choice-copy strong { font-size: var(--uui-type-h5-size); }
     .provider-choice-copy > span { color: var(--uui-color-text-alt); overflow-wrap: anywhere; }
-    .provider-choice-status { align-items: center; display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-1); white-space: nowrap; }
+    .provider-choice-status { align-items: center; display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-1); grid-column: 2; white-space: normal; }
     .provider-choice-status.configured { color: var(--uui-color-positive-standalone); }
     .provider-choice-status.missing { color: var(--uui-color-text-alt); }
-    .provider-choice-arrow { color: var(--uui-color-interactive); transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1); }
-    .provider-choice:hover .provider-choice-arrow { transform: translateX(var(--uui-size-space-1)); }
     .connections { display: grid; gap: var(--uui-size-space-5); }
     .connection-empty-state {
       align-items: center;
@@ -517,22 +520,15 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     @media (max-width: 800px) {
       .section-heading { align-items: stretch; flex-direction: column; }
       .mock-scenarios { grid-template-columns: 1fr; }
-      .save-bar { top: var(--uui-size-space-2); }
+      .settings-actions { inset-block-end: var(--uui-size-space-4); inset-inline: var(--uui-size-space-4); max-inline-size: none; width: auto; }
       .connection-empty-state { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
       .connection-empty-state uui-button { grid-column: 1 / -1; justify-self: start; }
-      .provider-choice { align-items: start; grid-template-columns: auto minmax(0, 1fr) auto; }
-      .provider-choice-status { grid-column: 2 / -1; white-space: normal; }
-      .provider-choice-arrow { grid-column: 3; grid-row: 1; }
+      .provider-choices { grid-template-columns: 1fr; }
       .provider-picker-heading { align-items: stretch; flex-direction: column; }
     }
     @media (forced-colors: active) {
-      .unsaved-indicator::before { background: Highlight; }
+      .save-status uui-icon { color: Highlight; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .provider-choice-arrow { transition: none; }
-      .provider-choice:hover .provider-choice-arrow { transform: none; }
-    }
-    :host-context([dir="rtl"]) .provider-choice-arrow { transform: scaleX(-1); }
   `];
 }
 

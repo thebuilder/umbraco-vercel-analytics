@@ -99,7 +99,7 @@ describe("analytics settings network recovery", () => {
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
 
     await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("Settings were not saved."));
-    expect(dashboard.shadowRoot?.querySelector(".save-bar")).not.toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".save-status")?.textContent).toContain("Unsaved changes");
     expect(input!.value).toBe("31");
     expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.hasAttribute("disabled")).toBe(false);
 
@@ -107,7 +107,7 @@ describe("analytics settings network recovery", () => {
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
 
     await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("Web Analytics settings saved."));
-    expect(dashboard.shadowRoot?.querySelector(".save-bar")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).toBeNull();
     expect(sdk.saveSettings).toHaveBeenCalledTimes(2);
   });
 
@@ -125,7 +125,7 @@ describe("analytics settings network recovery", () => {
     dashboard.shadowRoot?.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
 
     await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("Settings were not saved."));
-    expect(dashboard.shadowRoot?.querySelector(".save-bar")).not.toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".save-status")?.textContent).toContain("Unsaved changes");
     expect(input!.value).toBe("31");
   });
 });
@@ -169,7 +169,7 @@ describe("analytics settings onboarding", () => {
     expect(dashboard.shadowRoot?.querySelector("#default-connection")).toBeNull();
     expect(dashboard.shadowRoot?.querySelector("h1")).toBeNull();
     expect(dashboard.shadowRoot?.textContent).not.toContain("Connect analytics providers and choose where page analytics appears.");
-    expect(dashboard.shadowRoot?.querySelector(".save-bar")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).toBeNull();
     expect(dashboard.shadowRoot?.querySelector(".connection-empty-state h3")?.textContent).toBe("Connect your first analytics provider");
 
     dashboard.shadowRoot?.querySelector<HTMLElement>('.connection-empty-state [label="Choose analytics provider"]')?.click();
@@ -195,8 +195,8 @@ describe("analytics settings onboarding", () => {
     expect(generatedKey).toMatch(/^[0-9a-f-]{36}$/i);
     expect(editor?.shadowRoot?.querySelector(".token-key code")?.textContent)
       .toBe(`WebAnalytics__ConnectionAccessTokens__${generatedKey}`);
-    expect(dashboard.shadowRoot?.querySelector(".unsaved-indicator")?.textContent?.trim()).toBe("Unsaved changes");
-    expect(dashboard.shadowRoot?.querySelector(".save-bar")).not.toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".save-status")?.textContent?.trim()).toContain("Unsaved changes");
+    expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.hasAttribute("disabled")).toBe(false);
     expect(dashboard.shadowRoot?.querySelectorAll('[label="Save Web Analytics settings"]')).toHaveLength(1);
     expect(Array.from(editor?.shadowRoot?.querySelectorAll(".essentials uui-input") ?? []).map((input) => input.getAttribute("name"))).toEqual([
       "projectId",

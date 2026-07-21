@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { generateOpenApiClient, normalizeOpenApiDocument } from './generate-openapi.js';
+import { generateOpenApiClient } from './generate-openapi.js';
 
 const scriptPath = fileURLToPath(new URL('./generate-openapi.js', import.meta.url));
 
@@ -124,35 +124,4 @@ describe('generate-openapi', () => {
     expect(logs).toContain('OpenAPI client generated successfully');
   });
 
-  it('normalizes nullable mock scenarios across Umbraco OpenAPI generators', () => {
-    const document = {
-      components: {
-        schemas: {
-          AnalyticsConnectionSettingsResponse: {
-            required: ['key', 'mockScenario'],
-            properties: { mockScenario: { $ref: '#/components/schemas/MockAnalyticsScenario' } },
-          },
-          UpdateAnalyticsConnectionRequest: {
-            required: ['key', 'mockScenario'],
-            properties: { mockScenario: { $ref: '#/components/schemas/MockAnalyticsScenario' } },
-          },
-        },
-      },
-    };
-
-    expect(normalizeOpenApiDocument(document)).toMatchObject({
-      components: {
-        schemas: {
-          AnalyticsConnectionSettingsResponse: {
-            required: ['key'],
-            properties: { mockScenario: { allOf: [{ $ref: '#/components/schemas/MockAnalyticsScenario' }], nullable: true } },
-          },
-          UpdateAnalyticsConnectionRequest: {
-            required: ['key'],
-            properties: { mockScenario: { allOf: [{ $ref: '#/components/schemas/MockAnalyticsScenario' }], nullable: true } },
-          },
-        },
-      },
-    });
-  });
 });

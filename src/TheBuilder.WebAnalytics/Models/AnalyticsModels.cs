@@ -196,19 +196,21 @@ public sealed record AnalyticsSettingsResponse(
     string CacheDuration,
     IReadOnlyList<AnalyticsConnectionSettingsResponse> Connections);
 
-public sealed record AnalyticsConnectionSettingsResponse(
-    Guid Key,
-    string DisplayName,
-    AnalyticsProvider Provider,
-    string ProjectId,
-    string? Team,
-    string SiteId,
-    IReadOnlyList<string> DocumentRootKeys,
-    bool EnableAllDocumentTypes,
-    IReadOnlyList<string> EnabledDocumentTypeKeys,
-    bool HasAccessToken,
-    bool HasAccessTokenOverride,
-    MockAnalyticsScenario? MockScenario);
+public sealed class AnalyticsConnectionSettingsResponse
+{
+    public required Guid Key { get; init; }
+    public required string DisplayName { get; init; }
+    public required AnalyticsProvider Provider { get; init; }
+    public required string ProjectId { get; init; }
+    public string? Team { get; init; }
+    public required string SiteId { get; init; }
+    public required IReadOnlyList<string> DocumentRootKeys { get; init; }
+    public required bool EnableAllDocumentTypes { get; init; }
+    public required IReadOnlyList<string> EnabledDocumentTypeKeys { get; init; }
+    public required bool HasAccessToken { get; init; }
+    public required bool HasAccessTokenOverride { get; init; }
+    public MockAnalyticsScenario? MockScenario { get; init; }
+}
 
 public sealed record UpdateAnalyticsSettingsRequest(
     bool Enabled,
@@ -216,40 +218,18 @@ public sealed record UpdateAnalyticsSettingsRequest(
     string CacheDuration,
     IReadOnlyList<UpdateAnalyticsConnectionRequest> Connections);
 
-public sealed record UpdateAnalyticsConnectionRequest(
-    Guid Key,
-    string DisplayName,
-    AnalyticsProvider Provider,
-    string ProjectId,
-    string? Team,
-    string SiteId,
-    MockAnalyticsScenario? MockScenario,
-    IReadOnlyList<string> DocumentRootKeys,
-    bool EnableAllDocumentTypes,
-    IReadOnlyList<string> EnabledDocumentTypeKeys)
+public sealed class UpdateAnalyticsConnectionRequest
 {
-    public UpdateAnalyticsConnectionRequest(
-        Guid key,
-        string displayName,
-        string projectId,
-        string? team,
-        MockAnalyticsScenario? mockScenario,
-        IReadOnlyList<string> documentRootKeys,
-        bool enableAllDocumentTypes,
-        IReadOnlyList<string> enabledDocumentTypeKeys)
-        : this(
-            key,
-            displayName,
-            AnalyticsProvider.Vercel,
-            projectId,
-            team,
-            string.Empty,
-            mockScenario,
-            documentRootKeys,
-            enableAllDocumentTypes,
-            enabledDocumentTypeKeys)
-    {
-    }
+    public required Guid Key { get; init; }
+    public required string DisplayName { get; init; }
+    public required AnalyticsProvider Provider { get; init; }
+    public required string ProjectId { get; init; }
+    public string? Team { get; init; }
+    public required string SiteId { get; init; }
+    public MockAnalyticsScenario? MockScenario { get; init; }
+    public required IReadOnlyList<string> DocumentRootKeys { get; init; }
+    public required bool EnableAllDocumentTypes { get; init; }
+    public required IReadOnlyList<string> EnabledDocumentTypeKeys { get; init; }
 }
 
 public sealed record AnalyticsProviderTokenStatus(

@@ -69,15 +69,18 @@ public sealed class WebAnalyticsSettingsApiControllerTests
             30,
             "00:05:00",
             [
-                new UpdateAnalyticsConnectionRequest(
-                    MockKey,
-                    "Unknown mock",
-                    string.Empty,
-                    null,
-                    (MockAnalyticsScenario)999,
-                    [],
-                    false,
-                    [])
+                new UpdateAnalyticsConnectionRequest
+                {
+                    Key = MockKey,
+                    DisplayName = "Unknown mock",
+                    Provider = AnalyticsProvider.Vercel,
+                    ProjectId = string.Empty,
+                    SiteId = string.Empty,
+                    MockScenario = (MockAnalyticsScenario)999,
+                    DocumentRootKeys = [],
+                    EnableAllDocumentTypes = false,
+                    EnabledDocumentTypeKeys = []
+                }
             ]);
 
         var result = await controller.SaveSettings(request, CancellationToken.None);
@@ -108,7 +111,19 @@ public sealed class WebAnalyticsSettingsApiControllerTests
             true,
             30,
             "00:05:00",
-            [new(MockKey, "Example", AnalyticsProvider.Plausible, string.Empty, null, "example.com", null, [], false, [])]);
+            [
+                new()
+                {
+                    Key = MockKey,
+                    DisplayName = "Example",
+                    Provider = AnalyticsProvider.Plausible,
+                    ProjectId = string.Empty,
+                    SiteId = "example.com",
+                    DocumentRootKeys = [],
+                    EnableAllDocumentTypes = false,
+                    EnabledDocumentTypeKeys = []
+                }
+            ]);
 
         var result = await controller.SaveSettings(request, CancellationToken.None);
 

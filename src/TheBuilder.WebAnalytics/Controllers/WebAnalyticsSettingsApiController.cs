@@ -123,19 +123,21 @@ public sealed class WebAnalyticsSettingsApiController(
                 : registered is null
                     ? AnalyticsProviderCatalog.Default.Get(connection.Provider).GetIdentifier(connection)
                     : await projectNames.GetDisplayNameAsync(registered, cancellationToken);
-            return new AnalyticsConnectionSettingsResponse(
-                connection.Key,
-                displayName,
-                connection.Provider,
-                connection.ProjectId,
-                connection.Team,
-                connection.SiteId,
-                connection.DocumentRootKeys,
-                connection.EnableAllDocumentTypes,
-                connection.EnabledDocumentTypeKeys,
-                registered?.HasAccessToken is true,
-                !string.IsNullOrWhiteSpace(serverConfiguration.ConnectionAccessTokens.GetValueOrDefault(connection.Key.ToString())),
-                connection.MockScenario);
+            return new AnalyticsConnectionSettingsResponse
+            {
+                Key = connection.Key,
+                DisplayName = displayName,
+                Provider = connection.Provider,
+                ProjectId = connection.ProjectId,
+                Team = connection.Team,
+                SiteId = connection.SiteId,
+                DocumentRootKeys = connection.DocumentRootKeys,
+                EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
+                EnabledDocumentTypeKeys = connection.EnabledDocumentTypeKeys,
+                HasAccessToken = registered?.HasAccessToken is true,
+                HasAccessTokenOverride = !string.IsNullOrWhiteSpace(serverConfiguration.ConnectionAccessTokens.GetValueOrDefault(connection.Key.ToString())),
+                MockScenario = connection.MockScenario
+            };
         });
         var responseConnections = await Task.WhenAll(responseTasks);
         return new AnalyticsSettingsResponse(

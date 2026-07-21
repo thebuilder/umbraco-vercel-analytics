@@ -3,6 +3,7 @@ using Moq;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Services;
 using TheBuilder.WebAnalytics.Configuration;
+using TheBuilder.WebAnalytics.Models;
 using TheBuilder.WebAnalytics.Services;
 
 namespace TheBuilder.WebAnalytics.Tests.Services;
@@ -137,6 +138,26 @@ public sealed class AnalyticsDocumentRouteServiceTests
         Assert.Equal("https://root.example", baseUrl);
     }
 
+    [Fact]
+    public async Task Plausible_site_id_provides_base_url_without_a_document_root()
+    {
+        var connection = Connection("plausible");
+        connection.Provider = AnalyticsProvider.Plausible;
+        connection.ProjectId = string.Empty;
+        connection.SiteId = "charlietango.dk";
+        var registry = CreateRegistry(connection);
+        var service = new AnalyticsDocumentRouteService(
+            Mock.Of<IContentService>(),
+            Mock.Of<IAnalyticsPublishedContentAccessor>(),
+            registry);
+
+        var baseUrl = await service.GetConnectionBaseUrlAsync(
+            registry.Get(SiteConnectionKey)!,
+            CancellationToken.None);
+
+        Assert.Equal("https://charlietango.dk", baseUrl);
+    }
+
     private static Mock<IContentService> CreateContentTree(Guid rootKey, Guid documentKey)
     {
         var root = new Mock<IContent>();
@@ -178,7 +199,11 @@ public sealed class AnalyticsDocumentRouteServiceTests
         var options = Options.Create(new WebAnalyticsOptions
         {
             Enabled = true,
-            Providers = { Vercel = { AccessToken = "secret" } },
+            Providers =
+            {
+                Vercel = { AccessToken = "secret" },
+                Plausible = { AccessToken = "plausible-secret" }
+            },
             Connections = connections.ToList()
         });
         return new AnalyticsConnectionRegistry(new WebAnalyticsSettingsStore(options), options);

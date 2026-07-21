@@ -33,7 +33,15 @@ public sealed class AnalyticsDocumentRouteService(
             if (baseUrl is not null) return baseUrl;
         }
 
-        return null;
+        return PlausibleSiteBaseUrl(connection);
+    }
+
+    private static string? PlausibleSiteBaseUrl(AnalyticsConnection connection)
+    {
+        if (connection.Provider != AnalyticsProvider.Plausible) return null;
+        var siteId = connection.SiteId.Trim();
+        if (Uri.CheckHostName(siteId) == UriHostNameType.Unknown) return null;
+        return $"https://{siteId}";
     }
 
     public async Task<IReadOnlyList<AnalyticsDocumentRoute>> GetRoutesAsync(

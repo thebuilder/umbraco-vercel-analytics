@@ -422,8 +422,14 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   }
 
   static styles = [UmbTextStyles, css`
-    :host { --analytics-z-sticky-action: 10; display: block; }
-    form { max-width: 76rem; margin-inline: auto; padding: var(--uui-size-layout-1) var(--uui-size-layout-1) calc(var(--uui-size-layout-1) + var(--uui-size-14)); }
+    :host {
+      --analytics-z-sticky-action: 10;
+      --settings-column-max: 76rem;
+      --settings-inline-gutter: var(--uui-size-layout-1);
+      container-type: inline-size;
+      display: block;
+    }
+    form { max-width: var(--settings-column-max); margin-inline: auto; padding: var(--uui-size-layout-1) var(--settings-inline-gutter) calc(var(--uui-size-layout-1) + var(--uui-size-14) + var(--uui-size-space-4)); }
     .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-layout-1); }
     .section-heading > div { min-inline-size: 0; }
     .settings-actions {
@@ -437,13 +443,25 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       gap: var(--uui-size-space-4);
       justify-content: flex-end;
       inset-block-end: var(--uui-size-layout-1);
-      inset-inline-end: var(--uui-size-layout-1);
-      max-inline-size: calc(100vw - 2 * var(--uui-size-layout-1));
+      inset-inline-end: var(--settings-inline-gutter);
+      max-inline-size: calc(100vw - 2 * var(--settings-inline-gutter));
       min-block-size: var(--uui-size-14);
       padding: var(--uui-size-space-3) var(--uui-size-space-4);
       position: fixed;
-      width: min(76rem, calc(100vw - 2 * var(--uui-size-layout-1)));
+      width: min(var(--settings-column-max), calc(100vw - 2 * var(--settings-inline-gutter)));
       z-index: var(--analytics-z-sticky-action);
+    }
+    @supports (width: 1cqi) {
+      .settings-actions {
+        inset-inline-end: max(
+          var(--settings-inline-gutter),
+          calc((100cqi - var(--settings-column-max)) / 2)
+        );
+        width: min(
+          var(--settings-column-max),
+          calc(100cqi - 2 * var(--settings-inline-gutter))
+        );
+      }
     }
     .save-status { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); white-space: nowrap; }
     .save-status uui-icon { color: var(--uui-color-warning-standalone); }
@@ -524,7 +542,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     @media (max-width: 800px) {
       .section-heading { align-items: stretch; flex-direction: column; }
       .mock-scenarios { grid-template-columns: 1fr; }
-      .settings-actions { inset-block-end: var(--uui-size-space-4); inset-inline: var(--uui-size-space-4); max-inline-size: none; width: auto; }
+      .settings-actions { inset-block-end: var(--uui-size-space-4); }
       .connection-empty-state { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
       .connection-empty-state uui-button { grid-column: 1 / -1; justify-self: start; }
       .provider-choices { grid-template-columns: 1fr; }

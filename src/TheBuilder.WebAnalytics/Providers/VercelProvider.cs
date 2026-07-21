@@ -36,7 +36,7 @@ internal static class VercelProvider
             "Projects using Vercel Web Analytics",
             "vercel",
             new("projectId", "Vercel project ID", "Use the project ID from your Vercel project settings.", "a Vercel project ID"),
-            new("team", "Vercel team", "Optional team slug or ID for projects owned by a Vercel team."),
+            new("team", "Team ID or slug", "Optional team slug or ID for projects owned by a Vercel team."),
             new("access token", "Configure a Vercel access token in the server settings.", "https://vercel.com/docs/rest-api"),
             null),
         options => options.Providers.Vercel.AccessToken,

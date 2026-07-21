@@ -170,11 +170,21 @@ public sealed record AnalyticsDocumentRoute(
 
 public sealed record AnalyticsSettingsResponse(
     bool Enabled,
+    IReadOnlyList<AnalyticsProviderDescriptor> Providers,
     IReadOnlyList<AnalyticsProviderTokenStatus> ProviderTokens,
     bool CanCreateMockConnections,
     int DefaultRangeDays,
     string CacheDuration,
     IReadOnlyList<AnalyticsConnectionSettingsResponse> Connections);
+
+public sealed record AnalyticsProviderDescriptor(
+    AnalyticsProvider Provider,
+    string Description,
+    string LogoSlug,
+    AnalyticsIdentifierFieldDescriptor Identifier,
+    AnalyticsOptionalFieldDescriptor? Team,
+    AnalyticsCredentialDescriptor Credential,
+    AnalyticsEventPropertyDescriptor? EventProperties);
 
 public sealed class AnalyticsConnectionSettingsResponse
 {

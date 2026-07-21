@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using Moq;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Security;
@@ -20,7 +21,10 @@ public sealed class WebAnalyticsSettingsApiControllerTests
     [InlineData(false)]
     public async Task Settings_preserve_mock_identity_and_report_runtime_availability(bool mockConnectionsEnabled)
     {
-        var options = Options.Create(new WebAnalyticsOptions());
+        var options = Options.Create(new WebAnalyticsOptions
+        {
+            Providers = { Vercel = { AccessToken = "server-secret" } }
+        });
         var store = new WebAnalyticsSettingsStore(options);
         store.Save(new WebAnalyticsSettings
         {
@@ -50,6 +54,15 @@ public sealed class WebAnalyticsSettingsApiControllerTests
         var connection = Assert.Single(response.Connections);
         Assert.Equal(MockAnalyticsScenario.Flags, connection.MockScenario);
         Assert.Equal(mockConnectionsEnabled, response.CanCreateMockConnections);
+        var vercel = Assert.Single(response.Providers, provider => provider.Provider == AnalyticsProvider.Vercel);
+        Assert.Equal("projectId", vercel.Identifier.Key);
+        Assert.NotNull(vercel.Team);
+        Assert.Null(vercel.EventProperties);
+        var plausible = Assert.Single(response.Providers, provider => provider.Provider == AnalyticsProvider.Plausible);
+        Assert.Equal("siteId", plausible.Identifier.Key);
+        Assert.Null(plausible.Team);
+        Assert.Equal(20, plausible.EventProperties?.MaximumNames);
+        Assert.DoesNotContain("server-secret", JsonSerializer.Serialize(response), StringComparison.Ordinal);
     }
 
     [Fact]

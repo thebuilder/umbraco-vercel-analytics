@@ -16,13 +16,13 @@ export type AnalyticsBreakdownRow = {
 };
 
 export type AnalyticsCapabilities = {
-    breakdownOrdering: boolean;
     dimensions: Array<AnalyticsDimension>;
     events: boolean;
     eventDetails: boolean;
     eventProperties: boolean;
     globalEventFiltering: boolean;
     flags: boolean;
+    breakdownOrdering: boolean;
 };
 
 export type AnalyticsConnectionSettingsResponse = {
@@ -63,6 +63,12 @@ export type AnalyticsConnectionsResponse = {
     connections: Array<AnalyticsConnectionSummary>;
 };
 
+export type AnalyticsCredentialDescriptor = {
+    label: string;
+    description: string;
+    documentationUrl: string;
+};
+
 export type AnalyticsDimension = 'RequestPath' | 'Route' | 'ReferrerHostname' | 'Referrer' | 'Country' | 'DeviceType' | 'BrowserName' | 'OsName' | 'UtmSource' | 'UtmMedium' | 'UtmCampaign' | 'UtmTerm' | 'UtmContent' | 'EventName';
 
 export type AnalyticsDocumentRoute = {
@@ -86,6 +92,13 @@ export type AnalyticsEventDetails = {
 export type AnalyticsEventProperty = {
     name: string;
     values: Array<AnalyticsEventPropertyValue>;
+};
+
+export type AnalyticsEventPropertyDescriptor = {
+    label: string;
+    description: string;
+    maximumNames: number;
+    maximumNameLength: number;
 };
 
 export type AnalyticsEventPropertyValue = {
@@ -120,7 +133,20 @@ export type AnalyticsFlagsReport = {
     rows: Array<AnalyticsFlagRow>;
 };
 
+export type AnalyticsIdentifierFieldDescriptor = {
+    key: string;
+    label: string;
+    description: string;
+    requiredMessage: string;
+};
+
 export type AnalyticsInterval = 'Hour' | 'Day' | 'Week' | 'Month';
+
+export type AnalyticsOptionalFieldDescriptor = {
+    key: string;
+    label: string;
+    description: string;
+};
 
 export type AnalyticsPoint = {
     timestamp: string;
@@ -130,6 +156,16 @@ export type AnalyticsPoint = {
 
 export type AnalyticsProvider = 'Vercel' | 'Plausible';
 
+export type AnalyticsProviderDescriptor = {
+    provider: AnalyticsProvider;
+    description: string;
+    logoSlug: string;
+    identifier: AnalyticsIdentifierFieldDescriptor;
+    team?: AnalyticsOptionalFieldDescriptor | null;
+    credential: AnalyticsCredentialDescriptor;
+    eventProperties?: AnalyticsEventPropertyDescriptor | null;
+};
+
 export type AnalyticsProviderTokenStatus = {
     provider: AnalyticsProvider;
     hasAccessToken: boolean;
@@ -137,6 +173,7 @@ export type AnalyticsProviderTokenStatus = {
 
 export type AnalyticsSettingsResponse = {
     enabled: boolean;
+    providers: Array<AnalyticsProviderDescriptor>;
     providerTokens: Array<AnalyticsProviderTokenStatus>;
     canCreateMockConnections: boolean;
     defaultRangeDays: number;

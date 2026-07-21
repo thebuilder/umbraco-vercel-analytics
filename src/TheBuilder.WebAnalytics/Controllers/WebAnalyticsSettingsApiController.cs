@@ -145,6 +145,9 @@ public sealed class WebAnalyticsSettingsApiController(
         return new AnalyticsSettingsResponse(
             settings.Enabled,
             AnalyticsProviderCatalog.Default.Definitions
+                .Select(definition => definition.ToDescriptor())
+                .ToArray(),
+            AnalyticsProviderCatalog.Default.Definitions
                 .Select(definition => new AnalyticsProviderTokenStatus(
                     definition.Provider,
                     !string.IsNullOrWhiteSpace(definition.GetAccessToken(serverConfiguration))))

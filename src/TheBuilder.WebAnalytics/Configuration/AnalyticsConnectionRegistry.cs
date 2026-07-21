@@ -140,7 +140,7 @@ public sealed record AnalyticsConnection(
         string? accessToken) => new(
             settings.Key,
             string.IsNullOrWhiteSpace(settings.DisplayName)
-                ? settings.Provider == AnalyticsProvider.Plausible ? settings.SiteId : settings.ProjectId
+                ? AnalyticsProviderCatalog.Default.Get(settings.Provider).GetIdentifier(settings)
                 : settings.DisplayName,
             settings.Provider,
             accessToken ?? string.Empty,

@@ -56,6 +56,15 @@ public sealed class AnalyticsProviderDefinition(
 
     public string GetAccessToken(WebAnalyticsOptions options) => accessToken(options);
 
+    public AnalyticsProviderDescriptor ToDescriptor() => new(
+        Provider,
+        Settings.Description,
+        Settings.LogoSlug,
+        Settings.Identifier,
+        Settings.Team,
+        Settings.Credential,
+        Settings.EventProperties);
+
     public string GetIdentifier(AnalyticsConnectionSettings connection) => Identifier switch
     {
         AnalyticsConnectionIdentifier.ProjectId => connection.ProjectId,

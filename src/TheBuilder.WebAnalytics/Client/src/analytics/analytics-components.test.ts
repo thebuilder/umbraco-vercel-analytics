@@ -211,7 +211,7 @@ describe("analytics presentation components", () => {
     expect(element.shadowRoot?.querySelector(".metric-number")?.textContent).toBe("22,304");
   });
 
-  it("places events beside referrers in document analytics", async () => {
+  it("keeps document traffic breakdowns ahead of optional reports", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(true, "unavailable");
     element.events = successState({ rows: [{ eventName: "Signup", visitors: 12, count: 18 }] });
@@ -219,36 +219,43 @@ describe("analytics presentation components", () => {
     await element.updateComplete;
 
     const cards = [...element.shadowRoot?.querySelectorAll("uui-box") ?? []];
-    expect(cards[0]?.querySelector<HTMLElement & { headline: string }>("web-analytics-breakdown-table")?.headline).toBe("Referrers");
-    expect(cards[1]?.querySelector("web-analytics-event-table")).not.toBeNull();
+    expect(cards.slice(0, 4).map((card) => card.querySelector<HTMLElement & { headline: string }>("web-analytics-breakdown-table")?.headline)).toEqual([
+      "Referrers",
+      "Countries",
+      "Devices",
+      "Operating systems",
+    ]);
+    expect(cards[4]?.querySelector("web-analytics-event-table")).not.toBeNull();
+    expect(cards[5]?.querySelector("web-analytics-flag-card")).not.toBeNull();
   });
 
-  it("gives Flags the same wide span as Events in the overview", async () => {
+  it("groups Events and Flags as optional reports in the overview", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(false, "unavailable");
     element.events = successState({ rows: [] });
     document.body.append(element);
     await element.updateComplete;
 
-    const cards = [...element.shadowRoot?.querySelectorAll("uui-box") ?? []];
-    const flagsCard = cards[cards.length - 1];
+    const featureGrid = element.shadowRoot?.querySelector(".feature-grid");
+    const cards = [...featureGrid?.querySelectorAll("uui-box") ?? []];
+    const flagsCard = cards[1];
     expect(flagsCard?.querySelector("web-analytics-flag-card")).not.toBeNull();
     expect(flagsCard?.classList.contains("flags-card")).toBe(true);
-    expect(flagsCard?.classList.contains("wide")).toBe(true);
-    expect(cards[cards.length - 2]?.querySelector("web-analytics-event-table")).not.toBeNull();
+    expect(cards[0]?.querySelector("web-analytics-event-table")).not.toBeNull();
   });
 
-  it("keeps Flags on its own row in document analytics", async () => {
+  it("lets a lone optional report occupy its feature grid", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(true, "unavailable");
+    element.supportsEvents = false;
+    element.supportsFlags = true;
     element.events = successState({ rows: [] });
     document.body.append(element);
     await element.updateComplete;
 
-    const cards = [...element.shadowRoot?.querySelectorAll("uui-box") ?? []];
-    const flagsCard = cards[cards.length - 1];
-    expect(flagsCard?.classList.contains("document-flags-card")).toBe(true);
-    expect(flagsCard?.classList.contains("wide")).toBe(false);
+    const cards = [...element.shadowRoot?.querySelectorAll(".feature-grid > uui-box") ?? []];
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.querySelector("web-analytics-flag-card")).not.toBeNull();
   });
 
   it("merges valid UTM reports into the referrers card with five parameter tabs", async () => {

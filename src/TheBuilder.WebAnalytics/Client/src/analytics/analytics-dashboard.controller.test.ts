@@ -448,6 +448,41 @@ describe("AnalyticsDashboardController", () => {
     expect(controller.cards().some((card) => card.kind === "tabbed-breakdown" && card.id === "utm")).toBe(true);
   });
 
+  it("does not request optional reports disabled for the connection", async () => {
+    const api = dashboardApi();
+    api.connections.mockResolvedValue(ok({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [{
+        key: "11111111-1111-1111-1111-111111111111",
+        displayName: "Traffic only",
+        provider: "Vercel",
+        capabilities: {
+          ...fullCapabilities,
+          dimensions: fullCapabilities.dimensions.filter((dimension) => dimension !== "EventName"),
+          events: false,
+          eventDetails: false,
+          eventProperties: false,
+          globalEventFiltering: false,
+          flags: false,
+        },
+        isDefault: true,
+        isConfigured: true,
+        baseUrl: "https://example.com",
+        warnings: [],
+      }],
+    }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+
+    controller.connect();
+
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    expect(api.events).not.toHaveBeenCalled();
+    expect(api.flags).not.toHaveBeenCalled();
+    expect(controller.state.events.status).toBe("idle");
+    expect(controller.state.flags.status).toBe("idle");
+  });
+
   it("does not create a global event filter for providers that do not support it", async () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());

@@ -189,7 +189,7 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     const rows = topEventRows(stateData(this.events)?.rows ?? [], 10);
     const empty = !loading && rows.length === 0;
     return html`
-      <uui-box class="breakdown-card wide">
+      <uui-box class="breakdown-card feature-card">
         <div class=${`breakdown-card-layout${empty ? " empty-card-layout" : ""}`}>
           <web-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading} .detailsEnabled=${this.supportsEventDetails} .filteringEnabled=${this.supportsGlobalEventFiltering}></web-analytics-event-table>
           ${empty ? "" : html`<footer class="breakdown-footer">
@@ -205,27 +205,31 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     const utmCard = this.cards.find((card): card is Extract<DashboardCard, { kind: "tabbed-breakdown" }> => card.kind === "tabbed-breakdown" && card.id === "utm");
     const referrerCard = standardCards.find((card) => card.kind === "breakdown" && (card.dimension === "ReferrerHostname" || card.dimension === "Referrer"));
     const renderCard = (card: DashboardCard) => card === referrerCard ? this.#renderAcquisitionCard(card, utmCard) : this.#renderCard(card);
-    const documentScoped = !standardCards.some((card) => card.kind === "breakdown" && card.dimension === "RequestPath");
-    const cardsBeforeEvents = documentScoped ? standardCards.slice(0, 1) : standardCards;
-    const cardsAfterEvents = documentScoped ? standardCards.slice(1) : [];
+    const primaryCards = standardCards.filter((card) => card.span === "wide");
+    const detailCards = standardCards.filter((card) => card.span === "normal");
     return html`
-      <section class="grid" aria-label="Traffic breakdowns">
-        ${cardsBeforeEvents.map(renderCard)}
+      <section class="grid primary-grid" aria-label="Primary traffic breakdowns">
+        ${primaryCards.map(renderCard)}
+      </section>
+      <section class="grid detail-grid" aria-label="Traffic breakdowns">
+        ${detailCards.map(renderCard)}
+      </section>
+      ${this.supportsEvents || this.supportsFlags ? html`<section class="grid feature-grid" aria-label="Optional analytics reports">
         ${this.supportsEvents ? this.#renderEvents() : ""}
-        ${cardsAfterEvents.map(renderCard)}
-        ${this.supportsFlags ? html`<uui-box class=${`breakdown-card flags-card${documentScoped ? " document-flags-card" : " wide"}`}>
+        ${this.supportsFlags ? html`<uui-box class="breakdown-card flags-card feature-card">
           <web-analytics-flag-card .report=${this.flags} .selected=${this.selectedFlag}></web-analytics-flag-card>
         </uui-box>` : ""}
-      </section>
+      </section>` : ""}
     `;
   }
 
   static styles = [UmbTextStyles, css`
-    .grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--uui-size-layout-1); }
-    .breakdown-card { --uui-box-default-padding: 0; grid-column: span 2; overflow: hidden; position: relative; }
-    .wide { grid-column: span 3; }
+    .grid { display: grid; gap: var(--uui-size-layout-1); }
+    .grid + .grid { margin-block-start: var(--uui-size-layout-1); }
+    .primary-grid, .feature-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr)); }
+    .detail-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+    .breakdown-card { --uui-box-default-padding: 0; min-inline-size: 0; overflow: hidden; position: relative; }
     .flags-card { --uui-box-default-padding: 0; }
-    .document-flags-card { grid-column: 1 / -1; inline-size: 50%; justify-self: center; }
     .breakdown-card-layout { box-sizing: border-box; min-block-size: 100%; padding-bottom: var(--uui-size-layout-3); }
     .empty-card-layout { block-size: 100%; padding-bottom: 0; }
     .breakdown-footer { align-items: center; background: color-mix(in srgb, var(--uui-color-surface-alt) 9%, var(--uui-color-surface)); border-top: 1px solid var(--uui-color-border); bottom: 0; box-sizing: border-box; display: flex; justify-content: flex-end; left: 0; min-block-size: var(--uui-size-layout-3); padding: 0 var(--uui-size-space-4); position: absolute; right: 0; }
@@ -241,15 +245,6 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     .utm-tabs button[aria-selected="true"] { background: var(--uui-color-surface-alt); color: var(--uui-color-text); font-weight: 600; }
     .utm-tabs button:hover { background: color-mix(in srgb, var(--uui-color-selected) 8%, transparent); color: var(--uui-color-text); }
     .utm-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    @media (max-width: 62rem) {
-      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .breakdown-card, .wide { grid-column: auto; }
-      .document-flags-card { inline-size: 100%; }
-    }
-    @media (max-width: 56rem) {
-      .grid { grid-template-columns: 1fr; }
-      .document-flags-card { grid-column: 1 / -1; }
-    }
   `];
 }
 

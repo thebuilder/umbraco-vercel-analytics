@@ -55,6 +55,10 @@ public sealed class AnalyticsConnectionOptions
 
     public string[] EventPropertyNames { get; set; } = [];
 
+    public bool EnableEvents { get; set; } = true;
+
+    public bool EnableFlags { get; set; } = true;
+
     public MockAnalyticsScenario? MockScenario { get; set; }
 
     public string[] DocumentRootKeys { get; set; } = [];

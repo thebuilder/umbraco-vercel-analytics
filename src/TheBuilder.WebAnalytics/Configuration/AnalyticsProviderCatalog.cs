@@ -62,6 +62,7 @@ public sealed class AnalyticsProviderDefinition(
         Provider,
         Settings.Description,
         Settings.LogoSlug,
+        Capabilities,
         Identifier.ToDescriptor(),
         Settings.Team,
         Settings.Credential,

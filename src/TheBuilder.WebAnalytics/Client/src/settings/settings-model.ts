@@ -59,6 +59,8 @@ export function createSettingsUpdate(settings: AnalyticsSettingsResponse): Updat
       team: connection.team,
       siteId: connection.siteId,
       eventPropertyNames: connection.eventPropertyNames,
+      enableEvents: connection.enableEvents,
+      enableFlags: connection.enableFlags,
       mockScenario: connection.mockScenario,
       documentRootKeys: connection.documentRootKeys,
       enableAllDocumentTypes: connection.enableAllDocumentTypes,

@@ -182,6 +182,7 @@ public sealed record AnalyticsProviderDescriptor(
     AnalyticsProvider Provider,
     string Description,
     string LogoSlug,
+    AnalyticsCapabilities Capabilities,
     AnalyticsIdentifierFieldDescriptor Identifier,
     AnalyticsOptionalFieldDescriptor? Team,
     AnalyticsCredentialDescriptor Credential,
@@ -196,6 +197,8 @@ public sealed class AnalyticsConnectionSettingsResponse
     public string? Team { get; init; }
     public required string SiteId { get; init; }
     public IReadOnlyList<string> EventPropertyNames { get; init; } = [];
+    public bool EnableEvents { get; init; } = true;
+    public bool EnableFlags { get; init; } = true;
     public required IReadOnlyList<string> DocumentRootKeys { get; init; }
     public required bool EnableAllDocumentTypes { get; init; }
     public required IReadOnlyList<string> EnabledDocumentTypeKeys { get; init; }
@@ -219,6 +222,8 @@ public sealed class UpdateAnalyticsConnectionRequest
     public string? Team { get; init; }
     public required string SiteId { get; init; }
     public IReadOnlyList<string> EventPropertyNames { get; init; } = [];
+    public bool EnableEvents { get; init; } = true;
+    public bool EnableFlags { get; init; } = true;
     public MockAnalyticsScenario? MockScenario { get; init; }
     public required IReadOnlyList<string> DocumentRootKeys { get; init; }
     public required bool EnableAllDocumentTypes { get; init; }

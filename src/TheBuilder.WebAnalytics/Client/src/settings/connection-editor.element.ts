@@ -72,6 +72,10 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     this.#update({ enableAllDocumentTypes: (event.target as UUIToggleElement).checked });
   }
 
+  #feature(field: "enableEvents" | "enableFlags", event: Event): void {
+    this.#update({ [field]: (event.target as UUIToggleElement).checked });
+  }
+
   #teamReference(event: Event): void {
     this.#update(parseTeamReference(String((event.target as UUIInputElement).value ?? "")));
   }
@@ -87,6 +91,15 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
   #eventPropertySummary(): string {
     const count = this.connection.eventPropertyNames.length;
     return count ? `${count} custom propert${count === 1 ? "y" : "ies"}` : "Built-in properties only";
+  }
+
+  #dashboardReportsSummary(descriptor: AnalyticsProviderDescriptor): string {
+    const reports = [
+      descriptor.capabilities.events && this.connection.enableEvents,
+      descriptor.capabilities.flags && this.connection.enableFlags,
+    ].filter((enabled) => enabled).length;
+    const supported = Number(descriptor.capabilities.events) + Number(descriptor.capabilities.flags);
+    return `${reports} of ${supported} enabled`;
   }
 
   #mappingSummary(): string {
@@ -225,7 +238,28 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
               </div>
             </details>`}
 
-            ${!isMock && descriptor.eventProperties ? html`
+            ${descriptor.capabilities.events || descriptor.capabilities.flags ? html`
+              <details class="config-section">
+                <summary><span>Dashboard reports</span><small>${this.#dashboardReportsSummary(descriptor)}</small></summary>
+                <div class="config-content report-options">
+                  <p class="section-intro">Choose the optional reports shown for this connection.</p>
+                  ${descriptor.capabilities.events ? html`
+                    <div class="report-option">
+                      <uui-toggle label="Show custom events" ?checked=${connection.enableEvents} @change=${(event: Event) => this.#feature("enableEvents", event)}>Custom events</uui-toggle>
+                      <p>Show event totals, filters, and event details in Analytics.</p>
+                    </div>
+                  ` : ""}
+                  ${descriptor.capabilities.flags ? html`
+                    <div class="report-option">
+                      <uui-toggle label="Show feature flags" ?checked=${connection.enableFlags} @change=${(event: Event) => this.#feature("enableFlags", event)}>Feature flags</uui-toggle>
+                      <p>Show feature flag usage and value breakdowns in Analytics.</p>
+                    </div>
+                  ` : ""}
+                </div>
+              </details>
+            ` : ""}
+
+            ${!isMock && descriptor.eventProperties && connection.enableEvents ? html`
               <details class="config-section">
                 <summary><span>Event properties</span><small>${this.#eventPropertySummary()}</small></summary>
                 <div class="config-content event-properties-content">
@@ -391,6 +425,10 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     code { font-family: var(--uui-font-monospace); overflow-wrap: anywhere; }
     .mapping-content .fields { max-inline-size: 32rem; }
     .event-properties-content > uui-form-layout-item { margin-top: 0; max-inline-size: 32rem; }
+    .report-options { display: grid; gap: var(--uui-size-space-4); }
+    .report-options > .section-intro { margin-bottom: 0; }
+    .report-option { display: grid; gap: var(--uui-size-space-1); max-inline-size: 40rem; }
+    .report-option p { color: var(--uui-color-text-alt); margin: 0 0 0 var(--uui-size-7); }
     .document-types { margin-top: var(--uui-size-space-4); }
     .toggle-help { margin-bottom: 0; }
     .field-control { display: grid; gap: var(--uui-size-space-2); }

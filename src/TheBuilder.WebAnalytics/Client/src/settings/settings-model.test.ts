@@ -17,6 +17,7 @@ const settings = (): AnalyticsSettingsResponse => ({
       provider: "Vercel",
       description: "Projects using Vercel Web Analytics",
       logoSlug: "vercel",
+      capabilities: { dimensions: ["RequestPath", "EventName"], events: true, eventDetails: true, eventProperties: false, globalEventFiltering: false, flags: true, breakdownOrdering: false },
       identifier: { key: "projectId", label: "Vercel project ID", description: "Use the project ID from your Vercel project settings.", requiredMessage: "a Vercel project ID" },
       team: { key: "team", label: "Team ID or slug", description: "Optional team slug or ID for projects owned by a Vercel team." },
       credential: { label: "access token", description: "Configure a Vercel access token in the server settings.", documentationUrl: "https://vercel.com/docs/rest-api" },
@@ -26,6 +27,7 @@ const settings = (): AnalyticsSettingsResponse => ({
       provider: "Plausible",
       description: "Sites using Plausible Analytics",
       logoSlug: "plausible",
+      capabilities: { dimensions: ["RequestPath", "EventName"], events: true, eventDetails: true, eventProperties: true, globalEventFiltering: true, flags: false, breakdownOrdering: true },
       identifier: { key: "siteId", label: "Plausible site ID", description: "Use the domain configured in your Plausible site settings.", requiredMessage: "a Plausible site ID" },
       team: null,
       credential: { label: "Stats API key", description: "Configure a Plausible Stats API key in the server settings.", documentationUrl: "https://plausible.io/docs/stats-api" },
@@ -44,6 +46,8 @@ const settings = (): AnalyticsSettingsResponse => ({
     team: null,
     siteId: "",
     eventPropertyNames: [],
+    enableEvents: true,
+    enableFlags: true,
     documentRootKeys: [],
     enableAllDocumentTypes: false,
     enabledDocumentTypeKeys: [],
@@ -118,6 +122,16 @@ describe("analytics settings model", () => {
     const model = settings();
 
     expect(createSettingsUpdate(model).connections[0].key).toBe(model.connections[0].key);
+  });
+
+  it("preserves enabled dashboard reports in updates", () => {
+    const model = settings();
+    model.connections[0].enableEvents = false;
+
+    expect(createSettingsUpdate(model).connections[0]).toMatchObject({
+      enableEvents: false,
+      enableFlags: true,
+    });
   });
 
   it("validates and serializes Plausible event property names", () => {

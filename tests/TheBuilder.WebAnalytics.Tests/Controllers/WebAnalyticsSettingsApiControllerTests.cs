@@ -59,10 +59,16 @@ public sealed class WebAnalyticsSettingsApiControllerTests
         Assert.Equal("projectId", vercel.Identifier.Key);
         Assert.NotNull(vercel.Team);
         Assert.Null(vercel.EventProperties);
+        Assert.True(vercel.Capabilities.Events);
+        Assert.True(vercel.Capabilities.Flags);
         var plausible = Assert.Single(response.Providers, provider => provider.Provider == AnalyticsProvider.Plausible);
         Assert.Equal("siteId", plausible.Identifier.Key);
         Assert.Null(plausible.Team);
         Assert.Equal(20, plausible.EventProperties?.MaximumNames);
+        Assert.True(plausible.Capabilities.Events);
+        Assert.False(plausible.Capabilities.Flags);
+        Assert.True(connection.EnableEvents);
+        Assert.True(connection.EnableFlags);
         Assert.DoesNotContain("server-secret", JsonSerializer.Serialize(response), StringComparison.Ordinal);
     }
 

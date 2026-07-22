@@ -116,7 +116,9 @@ public sealed record AnalyticsConnection(
     bool EnableAllDocumentTypes,
     IReadOnlySet<Guid> EnabledDocumentTypeKeys,
     IReadOnlySet<string> EnabledDocumentTypes,
-    MockAnalyticsScenario? MockScenario = null)
+    MockAnalyticsScenario? MockScenario = null,
+    bool EnableEvents = true,
+    bool EnableFlags = true)
 {
     public bool HasAccessToken => !string.IsNullOrWhiteSpace(AccessToken);
 
@@ -125,9 +127,26 @@ public sealed record AnalyticsConnection(
     public bool IsConfigured => IsMock || HasAccessToken &&
         !string.IsNullOrWhiteSpace(AnalyticsProviderCatalog.Default.Get(Provider).GetIdentifier(this));
 
-    public AnalyticsCapabilities Capabilities => IsMock
-        ? AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel).Capabilities
-        : AnalyticsProviderCatalog.Default.Get(Provider).Capabilities;
+    public AnalyticsCapabilities Capabilities
+    {
+        get
+        {
+            var supported = IsMock
+                ? AnalyticsProviderCatalog.Default.Get(AnalyticsProvider.Vercel).Capabilities
+                : AnalyticsProviderCatalog.Default.Get(Provider).Capabilities;
+            return supported with
+            {
+                Dimensions = EnableEvents
+                    ? supported.Dimensions
+                    : supported.Dimensions.Where(dimension => dimension != AnalyticsDimension.EventName).ToArray(),
+                Events = supported.Events && EnableEvents,
+                EventDetails = supported.EventDetails && EnableEvents,
+                EventProperties = supported.EventProperties && EnableEvents,
+                GlobalEventFiltering = supported.GlobalEventFiltering && EnableEvents,
+                Flags = supported.Flags && EnableFlags
+            };
+        }
+    }
 
     public override string ToString() =>
         $"{nameof(AnalyticsConnection)} {{ Key = {Key}, DisplayName = {DisplayName}, Provider = {Provider}, ProjectId = {ProjectId}, Team = {Team}, SiteId = {SiteId}, AccessToken = [REDACTED] }}";
@@ -153,7 +172,9 @@ public sealed record AnalyticsConnection(
             ParseGuidValues(settings.EnabledDocumentTypeKeys).ToHashSet(),
             settings.EnabledDocumentTypes.Select(value => value.Trim()).Where(value => value.Length > 0)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase),
-            settings.MockScenario);
+            settings.MockScenario,
+            settings.EnableEvents,
+            settings.EnableFlags);
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

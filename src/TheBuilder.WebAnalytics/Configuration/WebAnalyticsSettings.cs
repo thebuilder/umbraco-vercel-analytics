@@ -35,6 +35,10 @@ public sealed class AnalyticsConnectionSettings
 
     public string[] EventPropertyNames { get; set; } = [];
 
+    public bool EnableEvents { get; set; } = true;
+
+    public bool EnableFlags { get; set; } = true;
+
     public MockAnalyticsScenario? MockScenario { get; set; }
 
     [JsonIgnore]
@@ -134,6 +138,8 @@ public sealed class WebAnalyticsSettingsStore
             Team = fields.Team,
             SiteId = fields.SiteId,
             EventPropertyNames = fields.EventPropertyNames,
+            EnableEvents = connection.EnableEvents,
+            EnableFlags = connection.EnableFlags,
             MockScenario = connection.MockScenario,
             DocumentRootKeys = NormalizeGuidValues(connection.DocumentRootKeys),
             EnableAllDocumentTypes = connection.EnableAllDocumentTypes,
@@ -174,6 +180,8 @@ internal static class WebAnalyticsSettingsMapper
             Team = connection.Team,
             SiteId = connection.SiteId,
             EventPropertyNames = connection.EventPropertyNames,
+            EnableEvents = connection.EnableEvents,
+            EnableFlags = connection.EnableFlags,
             MockScenario = connection.MockScenario,
             DocumentRootKeys = connection.DocumentRootKeys,
             EnableAllDocumentTypes = connection.EnableAllDocumentTypes,

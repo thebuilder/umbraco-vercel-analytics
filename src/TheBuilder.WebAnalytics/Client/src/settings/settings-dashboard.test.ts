@@ -254,6 +254,39 @@ function connection(): AnalyticsConnectionSettingsResponse {
 }
 
 describe("analytics settings onboarding", () => {
+  it("orders connection settings by the editor workflow without reserving an empty status row", async () => {
+    const plausible = {
+      ...connection(),
+      key: "connection-2",
+      provider: "Plausible" as const,
+      projectId: "",
+      siteId: "example.com",
+    };
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection(), plausible] })));
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelectorAll("web-analytics-connection-editor")).toHaveLength(2));
+    const editors = [...dashboard.shadowRoot?.querySelectorAll("web-analytics-connection-editor") ?? []] as AnalyticsConnectionEditorElement[];
+    const sectionLabels = (editor: AnalyticsConnectionEditorElement) =>
+      [...editor.shadowRoot?.querySelectorAll(".config-section > summary > span") ?? []].map((label) => label.textContent?.trim());
+
+    expect(editors[0].shadowRoot?.querySelector(".action-status")).toBeNull();
+    expect(sectionLabels(editors[0])).toEqual([
+      "Page analytics",
+      "Document workspace",
+      "Dashboard reports",
+      "Credential override",
+    ]);
+    expect(sectionLabels(editors[1])).toEqual([
+      "Page analytics",
+      "Document workspace",
+      "Dashboard reports",
+      "Event properties",
+      "Credential override",
+    ]);
+  });
+
   it("renders only the dashboard reports supported by each connection provider", async () => {
     const plausible = {
       ...connection(),
@@ -411,6 +444,13 @@ describe("analytics settings onboarding", () => {
     const testButton = editor.shadowRoot?.querySelector<HTMLElement>('[label="Add a server-side credential before testing this connection."]');
     expect(testButton?.hasAttribute("disabled")).toBe(true);
     expect(editor.shadowRoot?.querySelector(".summary-health uui-tag")?.textContent?.trim()).toBe("Setup required");
+    expect([...editor.shadowRoot?.querySelectorAll(".config-section > summary > span") ?? []].map((label) => label.textContent?.trim())).toEqual([
+      "Connection credential",
+      "Page analytics",
+      "Document workspace",
+      "Dashboard reports",
+    ]);
+    expect(editor.shadowRoot?.querySelector(".token-section small")?.textContent?.trim()).toBe("Required before testing");
   });
 
   it("shows a recoverable message when the override setting name cannot be copied", async () => {

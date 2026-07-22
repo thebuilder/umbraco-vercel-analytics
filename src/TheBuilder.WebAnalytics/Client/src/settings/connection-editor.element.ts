@@ -128,6 +128,30 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true }));
   }
 
+  #renderCredentialSection(connection: EditableAnalyticsConnection, descriptor: AnalyticsProviderDescriptor) {
+    const required = !connection.hasAccessToken;
+    return html`<details class="config-section token-section">
+      <summary><span>${required ? "Connection credential" : "Credential override"}</span><small>${required ? "Required before testing" : connection.hasAccessTokenOverride ? "Configured on the server" : "Using shared credential"}</small></summary>
+      <div class="config-content token-content">
+        <p>
+          ${required
+            ? `No shared ${connection.provider} ${descriptor.credential.label} was detected. Add a connection-specific credential before testing this connection.`
+            : `Set a connection-specific credential only when this connection cannot use the shared ${connection.provider} ${descriptor.credential.label}.`}
+          <a href=${descriptor.credential.documentationUrl} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} ${descriptor.credential.label} (opens in a new tab)`}>
+            Create a ${connection.provider} ${descriptor.credential.label}<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
+          </a>
+        </p>
+        <div class="token-key">
+          <code>WebAnalytics__ConnectionAccessTokens__${connection.key}</code>
+          <uui-button compact look="secondary" label="Copy credential setting name" @click=${this.#copyTokenKey}>${this._tokenCopyStatus === "copied" ? "Copied" : "Copy"}</uui-button>
+        </div>
+        <span class=${`copy-feedback${this._tokenCopyStatus === "failed" ? " error" : ""}`} role="status" aria-live="polite">
+          ${this._tokenCopyStatus === "failed" ? "Could not copy the setting name. Select and copy it manually." : this._tokenCopyStatus === "copied" ? "Setting name copied." : ""}
+        </span>
+      </div>
+    </details>`;
+  }
+
   render() {
     const connection = this.connection;
     const descriptor = this.descriptor;
@@ -193,9 +217,9 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
                 <div class="essentials-heading">
                   <h3 id=${`${connection.key}-project-heading`}>${isMock ? "Mock data" : `${connection.provider} connection`}</h3>
                 </div>
-                <div class="action-status" role=${this.status?.type === "error" ? "alert" : "status"} aria-live="polite">
-                  ${this.status ? html`<span class=${this.status.type}><uui-icon name=${this.status.type === "success" ? "icon-check" : this.status.type === "error" ? "icon-alert" : "icon-info"}></uui-icon>${this.status.message}</span>` : ""}
-                </div>
+                ${this.status ? html`<div class="action-status" role=${this.status.type === "error" ? "alert" : "status"} aria-live="polite">
+                  <span class=${this.status.type}><uui-icon name=${this.status.type === "success" ? "icon-check" : this.status.type === "error" ? "icon-alert" : "icon-info"}></uui-icon>${this.status.message}</span>
+                </div>` : ""}
                 <div class="connection-actions">
                   <uui-button
                     look="secondary"
@@ -217,26 +241,35 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
               `}
             </section>
 
-            ${isMock ? "" : html`<details class="config-section token-section">
-              <summary><span>Credential override</span><small>${connection.hasAccessTokenOverride ? "Configured on the server" : connection.hasAccessToken ? "Using shared credential" : "Required without a shared credential"}</small></summary>
-              <div class="config-content token-content">
-                <p>
-                  ${connection.hasAccessToken
-                    ? `Set a connection-specific credential only when this connection cannot use the shared ${connection.provider} ${descriptor.credential.label}.`
-                    : `No shared ${connection.provider} ${descriptor.credential.label} was detected. Add a connection-specific credential before testing this connection.`}
-                  <a href=${descriptor.credential.documentationUrl} target="_blank" rel="noopener noreferrer" aria-label=${`Create a ${connection.provider} ${descriptor.credential.label} (opens in a new tab)`}>
-                    Create a ${connection.provider} ${descriptor.credential.label}<uui-icon name="icon-out" aria-hidden="true"></uui-icon>
-                  </a>
-                </p>
-                <div class="token-key">
-                  <code>WebAnalytics__ConnectionAccessTokens__${connection.key}</code>
-                  <uui-button compact look="secondary" label="Copy credential setting name" @click=${this.#copyTokenKey}>${this._tokenCopyStatus === "copied" ? "Copied" : "Copy"}</uui-button>
+            ${!isMock && !connection.hasAccessToken ? this.#renderCredentialSection(connection, descriptor) : ""}
+
+            <details class="config-section">
+              <summary><span>Page analytics</span><small>${this.#mappingSummary()}</small></summary>
+              <div class="config-content mapping-content">
+                <p class="section-intro">Optional. Select the Umbraco site roots that use this analytics connection. Leave empty for global analytics only.</p>
+                <div class="fields">
+                  <uui-form-layout-item>
+                    <uui-label slot="label">Document roots</uui-label>
+                    <umb-input-document .selection=${connection.documentRootKeys} @change=${this.#documentRoots}></umb-input-document>
+                    <span slot="description">Documents below a selected root use this connection for page analytics.</span>
+                  </uui-form-layout-item>
                 </div>
-                <span class=${`copy-feedback${this._tokenCopyStatus === "failed" ? " error" : ""}`} role="status" aria-live="polite">
-                  ${this._tokenCopyStatus === "failed" ? "Could not copy the setting name. Select and copy it manually." : this._tokenCopyStatus === "copied" ? "Setting name copied." : ""}
-                </span>
               </div>
-            </details>`}
+            </details>
+
+            <details class="config-section">
+              <summary><span>Document workspace</span><small>${this.#documentTypeSummary()}</small></summary>
+              <div class="config-content">
+                <p class="section-intro">Choose which document types show an Analytics workspace tab. This does not affect the global dashboard.</p>
+                <uui-toggle label="Show analytics on all document types" ?checked=${connection.enableAllDocumentTypes} @change=${this.#allDocumentTypes}>Show analytics on all document types</uui-toggle>
+                ${connection.enableAllDocumentTypes ? html`<p class="section-intro toggle-help">New document types are included automatically.</p>` : html`
+                  <uui-form-layout-item class="document-types">
+                    <uui-label slot="label">Selected document types</uui-label>
+                    <umb-input-document-type documentTypesOnly .selection=${connection.enabledDocumentTypeKeys} @change=${this.#documentTypes}></umb-input-document-type>
+                  </uui-form-layout-item>
+                `}
+              </div>
+            </details>
 
             ${descriptor.capabilities.events || descriptor.capabilities.flags ? html`
               <details class="config-section">
@@ -284,33 +317,7 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
               </details>
             ` : ""}
 
-            <details class="config-section">
-              <summary><span>Page analytics</span><small>${this.#mappingSummary()}</small></summary>
-              <div class="config-content mapping-content">
-                <p class="section-intro">Optional. Select the Umbraco site roots that use this analytics connection. Leave empty for global analytics only.</p>
-                <div class="fields">
-                  <uui-form-layout-item>
-                    <uui-label slot="label">Document roots</uui-label>
-                    <umb-input-document .selection=${connection.documentRootKeys} @change=${this.#documentRoots}></umb-input-document>
-                    <span slot="description">Documents below a selected root use this connection for page analytics.</span>
-                  </uui-form-layout-item>
-                </div>
-              </div>
-            </details>
-
-            <details class="config-section">
-              <summary><span>Document workspace</span><small>${this.#documentTypeSummary()}</small></summary>
-              <div class="config-content">
-                <p class="section-intro">Choose which document types show an Analytics workspace tab. This does not affect the global dashboard.</p>
-                <uui-toggle label="Show analytics on all document types" ?checked=${connection.enableAllDocumentTypes} @change=${this.#allDocumentTypes}>Show analytics on all document types</uui-toggle>
-                ${connection.enableAllDocumentTypes ? html`<p class="section-intro toggle-help">New document types are included automatically.</p>` : html`
-                  <uui-form-layout-item class="document-types">
-                    <uui-label slot="label">Selected document types</uui-label>
-                    <umb-input-document-type documentTypesOnly .selection=${connection.enabledDocumentTypeKeys} @change=${this.#documentTypes}></umb-input-document-type>
-                  </uui-form-layout-item>
-                `}
-              </div>
-            </details>
+            ${!isMock && connection.hasAccessToken ? this.#renderCredentialSection(connection, descriptor) : ""}
           </div>
         </details>
       </uui-box>
@@ -395,7 +402,6 @@ export class AnalyticsConnectionEditorElement extends UmbElementMixin(LitElement
     .essentials-heading h3 { font-size: var(--uui-type-h5-size); margin: 0; }
     .connection-actions { align-items: center; display: flex; flex: 0 1 auto; flex-wrap: wrap; gap: var(--uui-size-space-3); grid-area: actions; justify-content: flex-end; }
     .action-status { grid-area: status; justify-self: start; min-inline-size: 0; }
-    .action-status:empty { display: none; }
     .action-status span { align-items: center; display: flex; gap: var(--uui-size-space-2); max-inline-size: 70ch; overflow-wrap: anywhere; text-align: start; }
     .action-status .success { color: var(--uui-color-positive-standalone); }
     .action-status .error { color: var(--uui-color-danger-standalone); }

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AnalyticsCapabilities, AnalyticsDocumentRoute } from "../api/types.gen.js";
 import { AnalyticsDashboardController, type DashboardEnvironment } from "./analytics-dashboard.controller.js";
 import type { DashboardApi } from "./dashboard-api.js";
+import { UTM_OPTIONS } from "./dashboard-cards.js";
 import { dateRangeForPreset } from "./date-range.js";
 
 const fullCapabilities: AnalyticsCapabilities = {
@@ -113,6 +114,28 @@ describe("AnalyticsDashboardController", () => {
     await opening;
 
     expect(controller.state.expandedBreakdown).toBeUndefined();
+  });
+
+  it("preserves grouped dialog context and updates its selected UTM dimension", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    const context = {
+      kind: "acquisition" as const,
+      title: "Traffic sources" as const,
+      referrer: { dimension: "ReferrerHostname" as const, headline: "Referrers", label: "Referrers" },
+      utmDimension: "UtmMedium" as const,
+      utmOptions: UTM_OPTIONS,
+    };
+
+    await controller.openBreakdown("UtmCampaign", "UTM campaigns", { context });
+
+    expect(controller.state.expandedBreakdown?.context).toMatchObject({
+      kind: "acquisition",
+      title: "Traffic sources",
+      utmDimension: "UtmCampaign",
+    });
   });
 
   it("does not restore event details after the dialog closes during a request", async () => {

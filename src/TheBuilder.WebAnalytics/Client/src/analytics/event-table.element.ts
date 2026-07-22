@@ -29,7 +29,7 @@ export class WebAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
       ${this.loading ? html`<span class="visually-hidden" role="status">Loading events</span>` : ""}
       <table aria-busy=${this.loading ? "true" : "false"}>
         <caption>Events and goals</caption>
-        <thead><tr><th scope="col">Events and goals</th><th scope="col">Visitors</th><th scope="col">Total</th></tr></thead>
+        <thead><tr><th scope="col">Event</th><th scope="col">Visitors</th><th scope="col">Total events</th></tr></thead>
         <tbody>${this.loading
           ? Array.from({ length: this.skeletonRows }, () => html`
               <tr><th scope="row"><span class="skeleton-line"></span></th><td><span class="skeleton-number"></span></td><td><span class="skeleton-number"></span></td></tr>

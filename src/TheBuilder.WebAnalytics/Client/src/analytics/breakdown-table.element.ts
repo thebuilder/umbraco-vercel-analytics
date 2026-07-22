@@ -1,4 +1,4 @@
-import { LitElement, css, customElement, html, property } from "@umbraco-cms/backoffice/external/lit";
+import { LitElement, css, customElement, html, nothing, property } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen.js";
 import {
@@ -15,10 +15,15 @@ import {
 import { countryDisplayName, countryFlagUrl, normalizeCountryCode } from "./country-display.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import { googleFaviconUrl } from "./favicon.js";
+import { renderReportTabs, reportTabsStyles, selectedReportTabId, type ReportTabGroup } from "./report-tabs.js";
+
+const BREAKDOWN_PANEL_ID = "breakdown-report-panel";
 
 @customElement("web-analytics-breakdown-table")
 export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElement) {
   @property() headline = "Breakdown";
+  @property() rowLabel?: string;
+  @property() emptyMessage = "No traffic was recorded for this breakdown.";
   @property() unavailable?: string;
   @property() baseUrl?: string;
   @property() dimension?: AnalyticsDimension;
@@ -30,12 +35,14 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
   @property({ type: Number }) total = 0;
   @property({ attribute: false }) rows: AnalyticsBreakdownRow[] = [];
   @property({ attribute: false }) filters: AnalyticsFilter[] = [];
+  @property({ attribute: false }) headingTabs?: ReportTabGroup;
+  @property({ attribute: false }) subheadingTabs?: ReportTabGroup;
 
   render() {
     if (this.loading) {
       return html`
         <span class="visually-hidden" role="status">Loading ${this.headline}</span>
-        <table class="skeleton-table" aria-hidden="true">
+        <table id=${BREAKDOWN_PANEL_ID} class="skeleton-table" aria-hidden="true">
           <caption>${this.headline}</caption>
           ${this.#renderHeading()}
           <tbody>${Array.from({ length: this.skeletonRows }, () => html`
@@ -47,17 +54,22 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
         </table>
       `;
     }
-    if (this.unavailable) return html`<p class="message">${this.unavailable}</p>`;
     const rows = visibleBreakdownRows(this.rows);
-    if (rows.length === 0) return html`<p class="message">No traffic was recorded for this breakdown.</p>`;
     const maximum = Math.max(...rows.map((row) => breakdownMetricValue(row, this.metric)), 1);
     const percentageDimension = isPercentageDimension(this.dimension);
+    const message = this.unavailable ?? (rows.length === 0 ? this.emptyMessage : undefined);
 
+    const labelledBy = [this.headingTabs, this.subheadingTabs]
+      .map((group) => group ? selectedReportTabId(group) : undefined)
+      .filter(Boolean)
+      .join(" ");
     return html`
-      <table>
+      <table id=${BREAKDOWN_PANEL_ID} aria-labelledby=${labelledBy || nothing}>
         <caption>${this.headline}</caption>
         ${this.#renderHeading()}
-        <tbody>${rows.map((row, index) => {
+        <tbody>${message ? html`
+          <tr class="message-row"><td colspan="2"><p>${message}</p></td></tr>
+        ` : rows.map((row, index) => {
           const isReferrer = this.dimension === "ReferrerHostname" || this.dimension === "Referrer";
           const href = isReferrer
             ? referrerExternalHref(row.value)
@@ -130,16 +142,30 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
     return html`
       <thead>
         <tr>
-          <th scope="col"><slot name="heading">${this.headline}</slot></th>
+          <th scope="col">${this.headingTabs
+            ? renderReportTabs(this.headingTabs, (value) => this.dispatchEvent(new CustomEvent("heading-tab-change", {
+                bubbles: true,
+                composed: true,
+                detail: { value },
+              })), BREAKDOWN_PANEL_ID)
+            : this.rowLabel ?? this.headline}</th>
           <th scope="col">${this.#metricLabel()}</th>
         </tr>
-        ${this.hasSubheading ? html`<tr class="subheading-row"><th scope="col" colspan="2"><slot name="subheading"></slot></th></tr>` : ""}
+        ${this.hasSubheading || this.subheadingTabs ? html`
+          <tr class="subheading-row"><th scope="col" colspan="2">${this.subheadingTabs
+            ? renderReportTabs(this.subheadingTabs, (value) => this.dispatchEvent(new CustomEvent("subheading-tab-change", {
+                bubbles: true,
+                composed: true,
+                detail: { value },
+              })), BREAKDOWN_PANEL_ID)
+            : ""}</th></tr>
+        ` : ""}
       </thead>
     `;
   }
 
-  static styles = css`
-    :host { display: block; overflow-x: clip; overflow-y: visible; }
+  static styles = [reportTabsStyles, css`
+    :host { display: block; overflow-x: auto; overflow-y: visible; scrollbar-width: thin; }
     table {
       --bar-inset: var(--uui-size-space-3);
       --metric-column-width: 8.5rem;
@@ -170,9 +196,9 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
     .row-label a { align-items: center; color: inherit; display: flex; gap: var(--uui-size-space-1); min-inline-size: 0; text-decoration: none; }
     .link-label { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .row-label a:hover .link-label, .row-label a:focus-visible .link-label { text-decoration: underline; text-underline-offset: 0.12em; }
-    .external-indicator { color: var(--uui-color-text-alt); flex: 0 0 auto; font-size: 0.75rem; opacity: 0; transition: opacity 150ms ease-out; }
+    .external-indicator { color: var(--uui-color-text-alt); flex: 0 0 auto; font-size: var(--uui-type-small-size); opacity: 0; transition: opacity 150ms ease-out; }
     .row-label a:hover .external-indicator, .row-label a:focus-visible .external-indicator { opacity: 1; }
-    .country-flag { border-radius: 2px; flex: 0 0 auto; object-fit: cover; }
+    .country-flag { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: cover; }
     .referrer-favicon { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: contain; }
     .percentage-value { display: inline-block; font-weight: 700; outline: none; position: relative; }
     .percentage-value:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
@@ -217,7 +243,7 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
       bottom: 100%;
       top: auto;
     }
-    .percentage-tooltip strong { font-size: 1rem; }
+    .percentage-tooltip strong { font-size: var(--uui-type-default-size); }
     .percentage-tooltip span { color: color-mix(in srgb, var(--uui-color-surface) 70%, transparent); }
     .percentage-value:hover .percentage-tooltip,
     .percentage-value:focus .percentage-tooltip { opacity: 1; transform: translateY(0); visibility: visible; }
@@ -249,10 +275,11 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
     .skeleton-table tbody tr:nth-child(3n + 2) .skeleton-line { width: 56%; }
     .skeleton-table tbody tr:nth-child(3n) .skeleton-line { width: 84%; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-    .message { color: var(--uui-color-text-alt); padding: var(--uui-size-space-5); }
+    .message-row td { color: var(--uui-color-text-alt); padding: var(--uui-size-space-5); text-align: left; }
+    .message-row p { margin: 0; }
     @media (hover: none) { .filter-action { opacity: 1; } .external-indicator { opacity: 0.65; } }
     @media (prefers-reduced-motion: reduce) { .external-indicator, .percentage-tooltip { transition: none; } }
-  `;
+  `];
 }
 
 declare global {

@@ -15,7 +15,7 @@ import type {
 import { dashboardApi, type DashboardApi } from "./dashboard-api.js";
 import { activeDocumentRoute } from "./document-route.js";
 import { countrySearchValue } from "./country-display.js";
-import { dashboardReportPlan, type AcquisitionView, type DashboardCard, type DashboardReportPlan } from "./dashboard-cards.js";
+import { dashboardReportPlan, type AcquisitionView, type BreakdownDialogContext, type DashboardCard, type DashboardReportPlan } from "./dashboard-cards.js";
 import { dateRangeForPreset, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
 import {
   parseDashboardUrlState,
@@ -30,12 +30,13 @@ import { loadDashboardBreakdown, loadDashboardBreakdowns, loadDashboardReports, 
 import { visibleEventRows } from "./event-rows.js";
 import { reportErrorMessage } from "./report-error.js";
 import { DebouncedRequest, RequestCoordinator } from "./request-coordinator.js";
-import { detectUtmCapability, type UtmCapability } from "./utm-capability.js";
+import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-capability.js";
 import { errorState, idleState, loadingState, successState, type AsyncState } from "./async-state.js";
 import { normalizeDashboardSelection, supportsDimension, unavailableCapabilities } from "./dashboard-capabilities.js";
 
 type ReportScope = { documentId?: string; culture?: string; path?: string };
 export type ExpandedBreakdown = {
+  context?: BreakdownDialogContext;
   dimension: AnalyticsDimension;
   headline: string;
   report: AsyncState<AnalyticsBreakdown["rows"]>;
@@ -317,25 +318,33 @@ export class AnalyticsDashboardController {
 
   clearFilters(): void { this.#set({ filters: [] }); this.#syncUrlState(); void this.loadReports(); }
 
-  async openBreakdown(dimension: AnalyticsDimension, headline: string, search = "", debounce = false): Promise<void> {
+  async openBreakdown(
+    dimension: AnalyticsDimension,
+    headline: string,
+    options: { context?: BreakdownDialogContext; search?: string; debounce?: boolean } = {},
+  ): Promise<void> {
     if (!supportsDimension(this.#capabilities(), dimension)) return;
     const connection = this.state.connection;
     if (!connection) return;
+    const search = options.search ?? "";
+    const context = options.context?.kind === "acquisition" && isUtmDimension(dimension)
+      ? { ...options.context, utmDimension: dimension }
+      : options.context;
     const previous = this.state.expandedBreakdown?.dimension === dimension ? this.state.expandedBreakdown.report : undefined;
-    this.#set({ expandedBreakdown: { dimension, headline, report: loadingState(previous) } });
+    this.#set({ expandedBreakdown: { context, dimension, headline, report: loadingState(previous) } });
     const run = (signal: AbortSignal) => this.#api.breakdown({
       path: { dimension },
       query: { ...this.#reportQuery(connection, this.#visitFilterQuery()), limit: 100, search: search || undefined },
       signal,
     });
-    const result = await (debounce ? this.#expandedRequest.schedule(run) : this.#expandedRequest.run(run));
+    const result = await (options.debounce ? this.#expandedRequest.schedule(run) : this.#expandedRequest.run(run));
     if (result.status === "cancelled" || result.status === "stale" || this.state.expandedBreakdown?.dimension !== dimension) return;
     if (result.status === "error") {
-      this.#set({ expandedBreakdown: { dimension, headline, report: errorState(reportErrorMessage(result.error), previous) } });
+      this.#set({ expandedBreakdown: { context, dimension, headline, report: errorState(reportErrorMessage(result.error), previous) } });
       return;
     }
     const { data, error, response } = result.value;
-    this.#set({ expandedBreakdown: { dimension, headline, report: error
+    this.#set({ expandedBreakdown: { context, dimension, headline, report: error
       ? errorState(apiErrorMessage(error, response?.status ?? 0), previous)
       : successState(data?.rows ?? []) } });
   }
@@ -344,7 +353,11 @@ export class AnalyticsDashboardController {
     const expanded = this.state.expandedBreakdown;
     if (!expanded) return;
     const value = expanded.dimension === "Country" ? countrySearchValue(search, this.#environment.languages) : search;
-    void this.openBreakdown(expanded.dimension, expanded.headline, value, true);
+    void this.openBreakdown(expanded.dimension, expanded.headline, {
+      context: expanded.context,
+      search: value,
+      debounce: true,
+    });
   }
 
   closeBreakdown(): void { this.#expandedRequest.cancel(); this.#set({ expandedBreakdown: undefined }); }

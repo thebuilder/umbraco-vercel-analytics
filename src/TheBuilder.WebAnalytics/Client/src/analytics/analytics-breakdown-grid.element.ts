@@ -10,6 +10,7 @@ import "./breakdown-table.element.js";
 import "./event-table.element.js";
 import "./flag-card.element.js";
 import { stateData, type AsyncState } from "./async-state.js";
+import type { ReportTabGroup } from "./report-tabs.js";
 
 @customElement("web-analytics-breakdown-grid")
 export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement) {
@@ -33,74 +34,38 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail }));
   }
 
-  #onTabKeydown(event: KeyboardEvent): void {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const tabs = Array.from((event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []);
-    const currentIndex = tabs.indexOf(event.currentTarget as HTMLButtonElement);
-    const targetIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
-      : event.key === "ArrowLeft" ? (currentIndex - 1 + tabs.length) % tabs.length
-        : (currentIndex + 1) % tabs.length;
-    tabs[targetIndex]?.click();
-    tabs[targetIndex]?.focus();
-  }
-
-  #renderTabs(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>) {
+  #tabsForCard(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>): ReportTabGroup {
     const selected = card.id === "audience" ? this.audienceDimension : this.utmDimension;
     const options = card.id === "utm" ? UTM_OPTIONS : card.options;
-    return html`
-      <div slot="heading" class="breakdown-tabs" role="tablist" aria-label=${card.id === "audience" ? "Audience technology" : "UTM parameter"}>
-        ${options.map(({ dimension, label }) => html`
-          <button
-            type="button"
-            role="tab"
-            aria-selected=${selected === dimension}
-            tabindex=${selected === dimension ? 0 : -1}
-            @click=${() => this.#dispatch(card.id === "audience" ? "audience-change" : "utm-change", { dimension })}
-            @keydown=${this.#onTabKeydown}>${label}</button>
-        `)}
-      </div>
-    `;
+    return {
+      ariaLabel: card.id === "audience" ? "Audience technology" : "UTM parameter",
+      idPrefix: `${card.id}-card-tab`,
+      options: options.map(({ dimension, label }) => ({ value: dimension, label })),
+      selected,
+    };
   }
 
-  #renderAcquisitionTabs(utmAvailable: boolean) {
+  #acquisitionTabs(utmAvailable: boolean): ReportTabGroup {
     const selected = utmAvailable ? this.acquisitionView : "referrers";
-    return html`
-      <div slot="heading" class="breakdown-tabs acquisition-tabs" role="tablist" aria-label="Traffic source">
-        <button
-          type="button"
-          role="tab"
-          aria-selected=${selected === "referrers"}
-          tabindex=${selected === "referrers" ? 0 : -1}
-          @click=${() => this.#dispatch("acquisition-change", { view: "referrers" })}
-          @keydown=${this.#onTabKeydown}>Referrers</button>
-        ${utmAvailable ? html`
-          <button
-            type="button"
-            role="tab"
-            aria-selected=${selected === "utm"}
-            tabindex=${selected === "utm" ? 0 : -1}
-            @click=${() => this.#dispatch("acquisition-change", { view: "utm" })}
-            @keydown=${this.#onTabKeydown}>UTM Parameters</button>
-        ` : ""}
-      </div>
-    `;
+    return {
+      ariaLabel: "Traffic source",
+      idPrefix: "acquisition-card-tab",
+      options: [
+        { value: "referrers", label: "Referrers" },
+        ...(utmAvailable ? [{ value: "utm", label: "UTM" }] : []),
+      ],
+      selected,
+    };
   }
 
-  #renderUtmTabs(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>) {
-    return html`
-      <div slot="subheading" class="utm-tabs" role="tablist" aria-label="UTM parameter">
-        ${card.options.map(({ dimension, label }) => html`
-          <button
-            type="button"
-            role="tab"
-            aria-selected=${this.utmDimension === dimension}
-            tabindex=${this.utmDimension === dimension ? 0 : -1}
-            @click=${() => this.#dispatch("utm-change", { dimension })}
-            @keydown=${this.#onTabKeydown}>${label}</button>
-        `)}
-      </div>
-    `;
+  #utmTabs(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>): ReportTabGroup {
+    return {
+      appearance: "secondary",
+      ariaLabel: "UTM parameter",
+      idPrefix: "utm-card-tab",
+      options: card.options.map(({ dimension, label }) => ({ value: dimension, label })),
+      selected: this.utmDimension,
+    };
   }
 
   #renderCard(card: DashboardCard) {
@@ -113,6 +78,10 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     const unavailable = state?.status === "error" ? state.message : undefined;
     const planLimited = card.kind === "tabbed-breakdown" && card.planLimited;
     const linkValues = selected.dimension === "RequestPath" || selected.dimension === "Route";
+    const headingTabs = card.kind === "tabbed-breakdown" ? this.#tabsForCard(card) : undefined;
+    const context = card.kind === "tabbed-breakdown" && card.id === "audience"
+      ? { kind: "audience" as const, title: "Audience" as const, options: card.options }
+      : undefined;
     return html`
       <uui-box class=${`breakdown-card ${card.span === "wide" ? "wide" : ""}`}>
         <div class="breakdown-card-layout">
@@ -126,13 +95,14 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
             .filters=${this.filters}
             .baseUrl=${this.baseUrl}
             .linkValues=${linkValues}
+            .headingTabs=${headingTabs}
+            @heading-tab-change=${(event: CustomEvent<{ value: AnalyticsDimension }>) => card.kind === "tabbed-breakdown" && this.#dispatch(card.id === "audience" ? "audience-change" : "utm-change", { dimension: event.detail.value })}
             .unavailable=${unavailable}>
-            ${card.kind === "tabbed-breakdown" ? this.#renderTabs(card) : ""}
           </web-analytics-breakdown-table>
           ${planLimited && unavailable ? html`<p class="hint breakdown-hint">UTM reporting availability depends on your analytics plan and reporting window.</p>` : ""}
           <footer class="breakdown-footer">
             ${!loading && !unavailable && rows.length ? html`
-              <uui-button look="secondary" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", selected)}>View all</uui-button>
+              <uui-button look="secondary" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", { ...selected, context })}>View all</uui-button>
             ` : !loading && unavailable ? html`
               <uui-button look="secondary" label=${`Retry ${selected.headline} report`} @click=${() => this.#dispatch("retry-reports")}>Retry</uui-button>
             ` : ""}
@@ -154,6 +124,13 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     const rows = topBreakdownRows(allRows, 10);
     const total = breakdownMetricTotal(allRows, this.metric);
     const unavailable = report?.status === "error" ? report.message : undefined;
+    const context = utmCard ? {
+      kind: "acquisition" as const,
+      title: "Traffic sources" as const,
+      referrer: selectedCardDimension(referrerCard, this.audienceDimension, this.utmDimension),
+      utmDimension: this.utmDimension,
+      utmOptions: utmCard.options,
+    } : undefined;
 
     return html`
       <uui-box class="breakdown-card wide">
@@ -167,14 +144,15 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
             .loading=${loading}
             .filters=${this.filters}
             .baseUrl=${this.baseUrl}
+            .headingTabs=${this.#acquisitionTabs(utmAvailable)}
+            .subheadingTabs=${showingUtm ? this.#utmTabs(utmCard) : undefined}
             .hasSubheading=${Boolean(showingUtm)}
-            .unavailable=${unavailable}>
-            ${this.#renderAcquisitionTabs(utmAvailable)}
-            ${showingUtm ? this.#renderUtmTabs(utmCard) : ""}
-          </web-analytics-breakdown-table>
+            .unavailable=${unavailable}
+            @heading-tab-change=${(event: CustomEvent<{ value: AcquisitionView }>) => this.#dispatch("acquisition-change", { view: event.detail.value })}
+            @subheading-tab-change=${(event: CustomEvent<{ value: UtmDimension }>) => this.#dispatch("utm-change", { dimension: event.detail.value })}></web-analytics-breakdown-table>
           <footer class="breakdown-footer">
             ${!loading && !unavailable && rows.length ? html`
-              <uui-button look="secondary" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", selected)}>View all</uui-button>
+              <uui-button look="secondary" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", { ...selected, context })}>View all</uui-button>
             ` : !loading && unavailable ? html`
               <uui-button look="secondary" label=${`Retry ${selected.headline} report`} @click=${() => this.#dispatch("retry-reports")}>Retry</uui-button>
             ` : ""}
@@ -236,16 +214,6 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     .breakdown-footer { align-items: center; background: color-mix(in srgb, var(--uui-color-surface-alt) 9%, var(--uui-color-surface)); border-top: 1px solid var(--uui-color-border); bottom: 0; box-sizing: border-box; display: flex; justify-content: flex-end; left: 0; min-block-size: var(--uui-size-layout-3); padding: 0 var(--uui-size-space-4); position: absolute; right: 0; }
     .hint { color: var(--uui-color-text-alt); }
     .breakdown-hint { margin: 0; padding: var(--uui-size-space-3) var(--uui-size-space-5); }
-    .breakdown-tabs { align-items: stretch; display: flex; margin: calc(-1 * var(--uui-size-space-3)); min-inline-size: 0; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
-    .breakdown-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; font-weight: 500; padding: calc(var(--uui-size-space-3) - 1px) var(--uui-size-space-3); white-space: nowrap; }
-    .breakdown-tabs button[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); color: var(--uui-color-text); font-weight: 700; }
-    .breakdown-tabs button:hover { background: var(--uui-color-surface-alt); }
-    .breakdown-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    .utm-tabs { align-items: center; display: flex; gap: var(--uui-size-space-1); margin-inline: calc(-1 * var(--uui-size-space-3)); min-inline-size: 0; overflow-x: auto; padding-block: var(--uui-size-space-2); scrollbar-width: thin; }
-    .utm-tabs button { appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
-    .utm-tabs button[aria-selected="true"] { background: var(--uui-color-surface-alt); color: var(--uui-color-text); font-weight: 600; }
-    .utm-tabs button:hover { background: color-mix(in srgb, var(--uui-color-selected) 8%, transparent); color: var(--uui-color-text); }
-    .utm-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
   `];
 }
 

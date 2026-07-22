@@ -2,11 +2,25 @@ import type { AnalyticsDimension } from "../api/types.gen.js";
 import type { AudienceDimension, UtmDimension } from "./dashboard-url-state.js";
 import type { UtmCapability } from "./utm-capability.js";
 
-type DimensionOption<TDimension extends AnalyticsDimension = AnalyticsDimension> = {
+export type DimensionOption<TDimension extends AnalyticsDimension = AnalyticsDimension> = {
   dimension: TDimension;
   headline: string;
   label: string;
 };
+
+export type BreakdownDialogContext =
+  | {
+      kind: "audience";
+      title: "Audience";
+      options: ReadonlyArray<DimensionOption>;
+    }
+  | {
+      kind: "acquisition";
+      title: "Traffic sources";
+      referrer: DimensionOption;
+      utmDimension: UtmDimension;
+      utmOptions: ReadonlyArray<DimensionOption<UtmDimension>>;
+    };
 
 export type DashboardCard =
   | {

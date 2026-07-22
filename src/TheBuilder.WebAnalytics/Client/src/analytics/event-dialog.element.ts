@@ -3,6 +3,7 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventRow } from "../api/types.gen.js";
+import { analyticsDialogStyles } from "./analytics-dialog.styles.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import "./event-table.element.js";
 
@@ -45,13 +46,11 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
     `;
   }
 
-  static styles = [UmbTextStyles, css`
-    dialog { border: 0; border-radius: var(--uui-border-radius); box-shadow: var(--uui-shadow-depth-5); box-sizing: border-box; margin: auto; max-height: min(52rem, calc(100dvh - 2 * var(--uui-size-layout-1))); max-width: min(58rem, calc(100vw - 2 * var(--uui-size-layout-1))); padding: 0; width: 100%; }
-    dialog::backdrop { background: rgb(0 0 0 / 45%); }
-    uui-dialog-layout { --uui-size-10: var(--uui-size-space-5); --uui-size-14: var(--uui-size-space-6); }
+  static styles = [UmbTextStyles, analyticsDialogStyles, css`
+    dialog { --analytics-dialog-max-width: 58rem; }
     uui-input { box-sizing: border-box; width: 100%; }
     uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
-    .results { block-size: min(30rem, 52dvh); margin-top: var(--uui-size-space-4); overflow: auto; scrollbar-gutter: stable; }
+    .results { max-block-size: min(30rem, 52dvh); margin-top: var(--uui-size-space-4); overflow: auto; scrollbar-gutter: stable; }
   `];
 }
 

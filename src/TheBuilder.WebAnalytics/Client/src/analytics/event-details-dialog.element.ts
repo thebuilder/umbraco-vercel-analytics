@@ -3,6 +3,8 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventDetails, AnalyticsEventProperty } from "../api/types.gen.js";
+import { analyticsDialogStyles } from "./analytics-dialog.styles.js";
+import { renderReportTabs, reportTabsStyles } from "./report-tabs.js";
 
 @customElement("web-analytics-event-details-dialog")
 export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitElement) {
@@ -53,23 +55,6 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     this.#notifySearch(propertyName, "");
   }
 
-  #onTabKeydown(event: KeyboardEvent): void {
-    const properties = this.details?.properties ?? [];
-    if (!properties.length || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, properties.findIndex((property) => property.name === this.#activeProperty()?.name));
-    const nextIndex = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? properties.length - 1
-        : (activeIndex + (event.key === "ArrowLeft" ? -1 : 1) + properties.length) % properties.length;
-    this._propertyName = properties[nextIndex].name;
-    this.#clearSearch(properties[nextIndex].name);
-    this.updateComplete.then(() => this.shadowRoot
-      ?.querySelector<HTMLButtonElement>(`[data-property-index="${nextIndex}"]`)
-      ?.focus());
-  }
-
   #toggleFilter(property: string, value: string): void {
     this.#clearSearch(property);
     this.dispatchEvent(new CustomEvent("toggle-event-property-filter", {
@@ -80,22 +65,12 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
   }
 
   #renderPropertyTabs(activeProperty: AnalyticsEventProperty) {
-    return html`
-      <div class="property-tabs" role="tablist" aria-label="Event properties">
-        ${this.details?.properties.map((property, index) => html`
-          <button
-            id=${`event-property-${index}`}
-            data-property-index=${index}
-            type="button"
-            role="tab"
-            aria-controls="event-property-panel"
-            aria-selected=${activeProperty.name === property.name}
-            tabindex=${activeProperty.name === property.name ? 0 : -1}
-            @click=${() => this.#selectProperty(property.name)}
-            @keydown=${this.#onTabKeydown}>${property.name}</button>
-        `)}
-      </div>
-    `;
+    return renderReportTabs({
+      ariaLabel: "Event properties",
+      idPrefix: "event-property-tab",
+      options: this.details?.properties.map(({ name }) => ({ value: name, label: name })) ?? [],
+      selected: activeProperty.name,
+    }, (propertyName) => this.#selectProperty(propertyName), "event-property-panel");
   }
 
   #renderProperty(property: AnalyticsEventProperty) {
@@ -105,7 +80,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     const values = searchIsCurrent ? this.searchedProperty?.values ?? [] : search ? [] : property.values;
     const maximum = Math.max(...values.map((value) => value.count), 1);
     return html`
-      <div id="event-property-panel" role="tabpanel" aria-labelledby=${`event-property-${this.details?.properties.indexOf(property) ?? 0}`}>
+      <div id="event-property-panel" role="tabpanel" aria-labelledby=${`event-property-tab-${this.details?.properties.indexOf(property) ?? 0}`}>
         <div class="property-controls">
           ${property.values.length ? html`
             <uui-input
@@ -203,18 +178,9 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     `;
   }
 
-  static styles = [UmbTextStyles, css`
-    dialog { border: 0; border-radius: var(--uui-border-radius); box-shadow: var(--uui-shadow-depth-5); box-sizing: border-box; margin: auto; max-height: min(52rem, calc(100dvh - 2 * var(--uui-size-layout-1))); max-width: min(50rem, calc(100vw - 2 * var(--uui-size-layout-1))); padding: 0; width: 100%; }
-    dialog::backdrop { background: rgb(0 0 0 / 45%); }
-    uui-dialog-layout { --uui-size-10: var(--uui-size-space-5); --uui-size-14: var(--uui-size-space-6); }
-    .dialog-content { block-size: min(28rem, 52dvh); display: flex; flex-direction: column; min-block-size: 0; position: relative; }
+  static styles = [UmbTextStyles, analyticsDialogStyles, reportTabsStyles, css`
+    .dialog-content { display: flex; flex-direction: column; max-block-size: min(28rem, 52dvh); min-block-size: 0; position: relative; }
     .property-controls { display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding-block-end: var(--uui-size-space-4); }
-    .property-tabs { display: flex; gap: var(--uui-size-space-1); margin: calc(-1 * var(--uui-size-space-3)) calc(-1 * var(--uui-size-space-5)); overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
-    .property-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
-    .property-tabs button:first-child { padding-inline-start: var(--uui-size-space-5); }
-    .property-tabs button:hover { color: var(--uui-color-text); }
-    .property-tabs button[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); color: var(--uui-color-text); font-weight: 700; }
-    .property-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -3px; }
     .property-controls uui-input { box-sizing: border-box; width: 100%; }
     .property-controls uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
     #event-property-panel { display: flex; flex: 1; flex-direction: column; min-block-size: 0; }
@@ -224,7 +190,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     th, td { box-sizing: border-box; padding: var(--uui-size-space-3) var(--uui-size-space-5); text-align: left; }
     thead { background: var(--uui-color-surface); box-shadow: 0 1px 0 var(--uui-color-border); position: sticky; top: 0; z-index: 3; }
     thead th { background: var(--uui-color-surface); font-weight: 700; }
-    .property-heading { overflow: hidden; padding-block: var(--uui-size-space-3); }
+    .property-heading { --analytics-report-tabs-margin: calc(-1 * var(--uui-size-space-3)) calc(-1 * var(--uui-size-space-5)); overflow: hidden; padding-block: var(--uui-size-space-3); }
     .active-filter { align-items: center; background: var(--uui-color-surface-alt); border: 1px solid var(--uui-color-border); border-radius: var(--uui-border-radius); color: var(--uui-color-text); cursor: pointer; display: inline-flex; gap: var(--uui-size-space-2); max-inline-size: 100%; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
     .active-filter span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .metric-headings th { box-shadow: 0 1px 0 var(--uui-color-border); }
@@ -247,8 +213,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     .empty-row td { padding: var(--uui-size-space-5); text-align: left; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     @media (max-width: 600px) {
-      dialog { max-height: 100dvh; max-width: 100vw; }
-      .dialog-content { block-size: 48dvh; }
+      .dialog-content { max-block-size: 48dvh; }
     }
     @media (hover: none) { .filter-button { opacity: 1; } }
   `];

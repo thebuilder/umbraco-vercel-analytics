@@ -4,7 +4,7 @@ import type { AnalyticsDimension } from "../api/types.gen.js";
 import { countryDisplayName, normalizeCountryCode } from "./country-display.js";
 import type { AnalyticsDateRangeChangeDetail } from "./date-range-picker.element.js";
 import type { AnalyticsFilter, AudienceDimension, DashboardMetric, UtmDimension } from "./dashboard-url-state.js";
-import type { AcquisitionView } from "./dashboard-cards.js";
+import type { AcquisitionView, BreakdownDialogContext } from "./dashboard-cards.js";
 import { AnalyticsDashboardController } from "./analytics-dashboard.controller.js";
 import { stateData, type AsyncState } from "./async-state.js";
 import { analyticsDashboardStyles } from "./analytics-dashboard.styles.js";
@@ -131,7 +131,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
           .supportsEventDetails=${capabilities?.eventDetails ?? false}
           .supportsGlobalEventFiltering=${capabilities?.globalEventFiltering ?? false}
           .supportsFlags=${capabilities?.flags ?? false}
-          @view-breakdown=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
+          @view-breakdown=${(event: CustomEvent<{ context?: BreakdownDialogContext; dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline, { context: event.detail.context })}
           @view-events=${() => this.#controller.openEvents()}
           @select-event=${(event: CustomEvent<{ eventName: string }>) => this.#controller.selectEvent(event.detail.eventName)}
           @select-flag=${(event: CustomEvent<{ flagKey: string }>) => this.#controller.selectFlag(event.detail.flagKey)}
@@ -143,6 +143,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
         ${expanded ? html`
           <web-analytics-breakdown-dialog
             .headline=${expanded.headline}
+            .context=${expanded.context}
             .dimension=${expanded.dimension}
             .rows=${stateData(expanded.report) ?? []}
             .filters=${state.filters}
@@ -152,7 +153,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
             .baseUrl=${this.#controller.linkBaseUrl()}
             .linkValues=${expanded.dimension === "RequestPath" || expanded.dimension === "Route"}
             @search-breakdown=${(event: CustomEvent<{ search: string }>) => this.#controller.searchBreakdown(event.detail.search)}
-            @breakdown-dimension-change=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
+            @breakdown-dimension-change=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline, { context: expanded.context })}
             @close-breakdown=${() => this.#controller.closeBreakdown()}></web-analytics-breakdown-dialog>
         ` : ""}
         ${expandedEvents ? html`

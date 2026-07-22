@@ -157,7 +157,10 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    const browserTab = [...element.shadowRoot?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []]
+    const table = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((candidate) => (candidate as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Audience technology") as WebAnalyticsBreakdownTableElement;
+    await table.updateComplete;
+    const browserTab = [...table.shadowRoot?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []]
       .find((button) => button.textContent?.trim() === "Browsers");
     browserTab?.click();
 
@@ -281,19 +284,22 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    const topTabs = [...element.shadowRoot?.querySelectorAll<HTMLButtonElement>(".acquisition-tabs [role=tab]") ?? []];
-    expect(topTabs.map((tab) => tab.textContent?.trim())).toEqual(["Referrers", "UTM Parameters"]);
+    const acquisitionTable = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((table) => (table as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Traffic source") as WebAnalyticsBreakdownTableElement;
+    await acquisitionTable.updateComplete;
+    const topTabs = [...acquisitionTable.shadowRoot?.querySelectorAll<HTMLButtonElement>(".report-tabs.primary [role=tab]") ?? []];
+    expect(topTabs.map((tab) => tab.textContent?.trim())).toEqual(["Referrers", "UTM"]);
     topTabs[1]?.click();
     expect((onAcquisitionChange.mock.calls[0][0] as CustomEvent).detail).toEqual({ view: "utm" });
     element.acquisitionView = "utm";
     await element.updateComplete;
 
-    const parameterTabs = [...element.shadowRoot?.querySelectorAll<HTMLButtonElement>(".utm-tabs [role=tab]") ?? []];
+    const updatedAcquisitionTable = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((table) => (table as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Traffic source") as WebAnalyticsBreakdownTableElement;
+    await updatedAcquisitionTable.updateComplete;
+    const parameterTabs = [...updatedAcquisitionTable.shadowRoot?.querySelectorAll<HTMLButtonElement>(".report-tabs.secondary [role=tab]") ?? []];
     expect(parameterTabs.map((tab) => tab.textContent?.trim())).toEqual(["Source", "Medium", "Campaign", "Term", "Content"]);
-    const acquisitionTable = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
-      .find((table) => table.querySelector(".utm-tabs")) as WebAnalyticsBreakdownTableElement;
-    await acquisitionTable.updateComplete;
-    const headerRows = acquisitionTable.shadowRoot?.querySelectorAll("thead tr");
+    const headerRows = updatedAcquisitionTable.shadowRoot?.querySelectorAll("thead tr");
     expect(headerRows?.[0].lastElementChild?.textContent?.trim()).toBe("Visitors");
     expect(headerRows?.[0].lastElementChild?.hasAttribute("rowspan")).toBe(false);
     expect(headerRows?.[1].firstElementChild?.getAttribute("colspan")).toBe("2");
@@ -312,8 +318,12 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector(".acquisition-tabs")?.textContent?.trim()).toBe("Referrers");
-    expect(element.shadowRoot?.querySelector(".utm-tabs")).toBeNull();
+    const table = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((candidate) => (candidate as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Traffic source") as WebAnalyticsBreakdownTableElement;
+    await table.updateComplete;
+    expect([...table.shadowRoot?.querySelectorAll<HTMLButtonElement>(".report-tabs.primary [role=tab]") ?? []]
+      .map((tab) => tab.textContent?.trim())).toEqual(["Referrers"]);
+    expect(table.shadowRoot?.querySelector(".report-tabs.secondary")).toBeNull();
   });
 
   it("shows event setup guidance when no custom events have been tracked", async () => {

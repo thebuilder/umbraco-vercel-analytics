@@ -146,7 +146,9 @@ describe("analytics settings network recovery", () => {
     await vi.waitFor(() => expect(notifications.peek).toHaveBeenCalledWith("positive", {
       data: { message: "Web Analytics settings saved." },
     }));
-    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).not.toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".save-status")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.hasAttribute("disabled")).toBe(true);
     expect(dashboard.shadowRoot?.querySelector(".status")).toBeNull();
     expect(sdk.saveSettings).toHaveBeenCalledTimes(2);
   });
@@ -356,7 +358,9 @@ describe("analytics settings onboarding", () => {
     expect(dashboard.shadowRoot?.querySelector("#default-connection")).toBeNull();
     expect(dashboard.shadowRoot?.querySelector("h1")).toBeNull();
     expect(dashboard.shadowRoot?.textContent).not.toContain("Connect analytics providers and choose where page analytics appears.");
-    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".settings-actions")?.tagName).toBe("UMB-FOOTER-LAYOUT");
+    expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.getAttribute("color")).toBe("positive");
+    expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.hasAttribute("disabled")).toBe(true);
     expect(dashboard.shadowRoot?.querySelector(".connection-empty-state h3")?.textContent).toBe("Connect your first analytics provider");
 
     dashboard.shadowRoot?.querySelector<HTMLElement>('.connection-empty-state [label="Choose analytics provider"]')?.click();

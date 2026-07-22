@@ -355,15 +355,22 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
 
     return html`
       <form @submit=${this.#save} novalidate>
-        ${this._dirty ? html`
-          <div class="settings-actions" aria-label="Web Analytics settings actions">
+        <umb-footer-layout class="settings-actions" aria-label="Web Analytics settings actions">
+          ${this._dirty ? html`
             <span class="save-status" role="status" aria-live="polite">
               <uui-icon name="icon-alert" aria-hidden="true"></uui-icon>
               Unsaved changes
             </span>
-            <uui-button type="submit" look="primary" label="Save Web Analytics settings" .state=${this._saving ? "waiting" : undefined} ?disabled=${this._saving}>Save settings</uui-button>
-          </div>
-        ` : ""}
+          ` : ""}
+          <uui-button
+            slot="actions"
+            type="submit"
+            look="primary"
+            color="positive"
+            label="Save Web Analytics settings"
+            .state=${this._saving ? "waiting" : undefined}
+            ?disabled=${!this._dirty || this._saving}>Save settings</uui-button>
+        </umb-footer-layout>
 
         ${this._status ? html`<div class="status error" role="alert" aria-live="polite"><uui-icon name="icon-alert"></uui-icon><span>${this._status.message}</span></div>` : ""}
 
@@ -412,13 +419,12 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   static styles = [UmbTextStyles, css`
     :host {
       --analytics-z-sticky-action: 10;
-      --settings-actions-inline-inset: var(--uui-size-space-4);
       --settings-column-max: 76rem;
       --settings-inline-gutter: var(--uui-size-layout-1);
       container-type: inline-size;
       display: block;
     }
-    form { max-width: var(--settings-column-max); margin-inline: auto; padding: var(--uui-size-layout-1) var(--settings-inline-gutter) calc(var(--uui-size-layout-1) + var(--uui-size-14) + var(--uui-size-space-4)); }
+    form { max-width: var(--settings-column-max); margin-inline: auto; padding: var(--uui-size-layout-1) var(--settings-inline-gutter) calc(var(--uui-size-layout-1) + var(--umb-footer-layout-height)); }
     .load-error { box-sizing: border-box; margin-inline: auto; max-width: var(--settings-column-max); padding: var(--uui-size-layout-1) var(--settings-inline-gutter); }
     .load-error-content { align-items: flex-start; display: flex; gap: var(--uui-size-space-3); margin-block-end: var(--uui-size-space-5); max-inline-size: 70ch; }
     .load-error-content uui-icon { color: var(--uui-color-danger-standalone); flex: 0 0 auto; font-size: var(--uui-size-6); }
@@ -426,40 +432,16 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--uui-size-layout-1); }
     .section-heading > div { min-inline-size: 0; }
     .settings-actions {
-      align-items: center;
-      background: var(--uui-color-surface-alt);
-      border-radius: var(--uui-border-radius);
-      box-shadow: var(--uui-shadow-depth-3);
-      box-sizing: border-box;
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--uui-size-space-4);
-      justify-content: flex-end;
-      inset-block-end: var(--uui-size-layout-1);
-      inset-inline-end: calc(var(--settings-inline-gutter) + var(--settings-actions-inline-inset));
-      max-inline-size: calc(100vw - 2 * var(--settings-inline-gutter) - 2 * var(--settings-actions-inline-inset));
-      min-block-size: var(--uui-size-14);
-      padding: var(--uui-size-space-3) var(--uui-size-space-4);
+      inset-block-end: 0;
+      inset-inline-end: 0;
       position: fixed;
-      width: min(
-        calc(var(--settings-column-max) - 2 * var(--settings-actions-inline-inset)),
-        calc(100vw - 2 * var(--settings-inline-gutter) - 2 * var(--settings-actions-inline-inset))
-      );
+      width: 100%;
       z-index: var(--analytics-z-sticky-action);
     }
     @supports (width: 1cqi) {
-      .settings-actions {
-        inset-inline-end: max(
-          calc(var(--settings-inline-gutter) + var(--settings-actions-inline-inset)),
-          calc((100cqi - var(--settings-column-max)) / 2 + var(--settings-actions-inline-inset))
-        );
-        width: min(
-          calc(var(--settings-column-max) - 2 * var(--settings-actions-inline-inset)),
-          calc(100cqi - 2 * var(--settings-inline-gutter) - 2 * var(--settings-actions-inline-inset))
-        );
-      }
+      .settings-actions { width: 100cqi; }
     }
-    .save-status { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); white-space: nowrap; }
+    .save-status { align-items: center; color: var(--uui-color-text-alt); display: inline-flex; font-size: var(--uui-type-small-size); gap: var(--uui-size-space-2); margin-inline-start: var(--uui-size-layout-1); white-space: nowrap; }
     .save-status uui-icon { color: var(--uui-color-warning-standalone); }
     h2 { margin: 0; }
     .section-heading p { color: var(--uui-color-text-alt); margin-block: var(--uui-size-space-2) 0; text-wrap: pretty; }
@@ -524,7 +506,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     @media (max-width: 800px) {
       .section-heading { align-items: stretch; flex-direction: column; }
       .mock-scenarios { grid-template-columns: 1fr; }
-      .settings-actions { inset-block-end: var(--uui-size-space-4); }
       .connection-empty-state { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
       .connection-empty-state uui-button { grid-column: 1 / -1; justify-self: start; }
       .provider-choices { grid-template-columns: 1fr; }

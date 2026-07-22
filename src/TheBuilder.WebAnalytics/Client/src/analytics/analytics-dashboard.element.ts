@@ -152,6 +152,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
             .baseUrl=${this.#controller.linkBaseUrl()}
             .linkValues=${expanded.dimension === "RequestPath" || expanded.dimension === "Route"}
             @search-breakdown=${(event: CustomEvent<{ search: string }>) => this.#controller.searchBreakdown(event.detail.search)}
+            @breakdown-dimension-change=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
             @close-breakdown=${() => this.#controller.closeBreakdown()}></web-analytics-breakdown-dialog>
         ` : ""}
         ${expandedEvents ? html`

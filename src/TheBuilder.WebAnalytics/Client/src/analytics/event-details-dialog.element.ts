@@ -162,7 +162,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     return html`
       <dialog aria-label=${`${this.eventName} event details`} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
         <uui-dialog-layout headline=${`${this.eventName} event`}>
-          <div class="dialog-content" aria-busy=${this.loading}>
+          <div class="dialog-content analytics-dialog-body" aria-busy=${this.loading}>
             ${this.details ? html`
               ${this.propertiesEnabled ? activeProperty ? html`
                   ${this.#renderProperty(activeProperty)}
@@ -179,7 +179,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
   }
 
   static styles = [UmbTextStyles, analyticsDialogStyles, reportTabsStyles, css`
-    .dialog-content { display: flex; flex-direction: column; max-block-size: min(28rem, 52dvh); min-block-size: 0; position: relative; }
+    .dialog-content { --analytics-dialog-body-height: min(28rem, 52dvh); display: flex; flex-direction: column; position: relative; }
     .property-controls { display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding-block-end: var(--uui-size-space-4); }
     .property-controls uui-input { box-sizing: border-box; width: 100%; }
     .property-controls uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
@@ -212,9 +212,6 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     .error-overlay { background: color-mix(in srgb, var(--uui-color-warning) 8%, var(--uui-color-surface)); border: 1px solid color-mix(in srgb, var(--uui-color-warning) 28%, var(--uui-color-border)); border-radius: var(--uui-border-radius); inset-block-start: var(--uui-size-space-3); inset-inline: var(--uui-size-space-3); padding: var(--uui-size-space-4); position: absolute; z-index: 5; }
     .empty-row td { padding: var(--uui-size-space-5); text-align: left; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
-    @media (max-width: 600px) {
-      .dialog-content { max-block-size: 48dvh; }
-    }
     @media (hover: none) { .filter-button { opacity: 1; } }
   `];
 }

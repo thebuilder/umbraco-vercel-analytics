@@ -137,7 +137,7 @@ export class WebAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEleme
             @input=${this.#onSearch}>
             <uui-icon name="icon-search" slot="prepend"></uui-icon>
           </uui-input>
-          <div class="results" aria-busy=${this.loading} aria-live="polite">
+          <div class="results analytics-dialog-body" aria-busy=${this.loading} aria-live="polite">
             <web-analytics-breakdown-table
               .headline=${this.headline}
               .rowLabel=${breakdownDimensionLabel(this.dimension)}
@@ -166,10 +166,7 @@ export class WebAnalyticsBreakdownDialogElement extends UmbElementMixin(LitEleme
   static styles = [UmbTextStyles, analyticsDialogStyles, css`
     uui-input { box-sizing: border-box; width: 100%; }
     uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
-    .results { max-block-size: min(30rem, 52dvh); margin-top: var(--uui-size-space-4); overflow: auto; scrollbar-gutter: stable; }
-    @media (max-width: 600px) {
-      .results { max-block-size: 48dvh; }
-    }
+    .results { margin-top: var(--uui-size-space-4); overflow: auto; scrollbar-gutter: stable; }
   `];
 }
 

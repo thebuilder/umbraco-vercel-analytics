@@ -33,7 +33,7 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
           <uui-input type="search" label="Search events" maxlength="200" placeholder="Search" .value=${this._search} @input=${this.#onSearch}>
             <uui-icon name="icon-search" slot="prepend"></uui-icon>
           </uui-input>
-          <div class="results" aria-busy=${this.loading} aria-live="polite">
+          <div class="results analytics-dialog-body" aria-busy=${this.loading} aria-live="polite">
             ${!this.loading && this.unavailable ? html`<umb-empty-state headline="Events unavailable"><p>${this.unavailable}</p></umb-empty-state>` : ""}
             ${!this.loading && !this.unavailable && this._search && this.rows.length === 0 ? html`<umb-empty-state headline="No matching events"><p>Try a different search.</p></umb-empty-state>` : ""}
             ${this.loading || (!this.unavailable && (!this._search || this.rows.length > 0)) ? html`
@@ -50,7 +50,7 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
     dialog { --analytics-dialog-max-width: 58rem; }
     uui-input { box-sizing: border-box; width: 100%; }
     uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
-    .results { max-block-size: min(30rem, 52dvh); margin-top: var(--uui-size-space-4); overflow: auto; scrollbar-gutter: stable; }
+    .results { margin-top: var(--uui-size-space-4); overflow: auto; scrollbar-gutter: stable; }
   `];
 }
 

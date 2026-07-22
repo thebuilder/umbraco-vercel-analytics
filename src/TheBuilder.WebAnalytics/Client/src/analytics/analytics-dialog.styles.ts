@@ -17,7 +17,12 @@ export const analyticsDialogStyles = css`
     --uui-size-10: var(--uui-size-space-5);
     --uui-size-14: var(--uui-size-space-6);
   }
+  .analytics-dialog-body {
+    block-size: var(--analytics-dialog-body-height, min(30rem, 52dvh));
+    min-block-size: 0;
+  }
   @media (max-width: 600px) {
     dialog { max-height: 100dvh; max-width: 100vw; }
+    .analytics-dialog-body { block-size: 48dvh; }
   }
 `;

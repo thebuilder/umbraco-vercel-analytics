@@ -29,7 +29,7 @@ export class WebAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
       ${this.loading ? html`<span class="visually-hidden" role="status">Loading events</span>` : ""}
       <table aria-busy=${this.loading ? "true" : "false"}>
         <caption>Events and goals</caption>
-        <thead><tr><th scope="col">Events and goals</th><th scope="col">Visitors</th><th scope="col">Total</th></tr></thead>
+        <thead><tr><th scope="col">Event</th><th scope="col">Visitors</th><th scope="col">Total events</th></tr></thead>
         <tbody>${this.loading
           ? Array.from({ length: this.skeletonRows }, () => html`
               <tr><th scope="row"><span class="skeleton-line"></span></th><td><span class="skeleton-number"></span></td><td><span class="skeleton-number"></span></td></tr>
@@ -59,9 +59,9 @@ export class WebAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
                     }))}>
                     <uui-icon name="icon-filter" aria-hidden="true"></uui-icon>
                   </button>` : ""}
-                  <span>${this.localize.number(row.visitors)}</span>
+                  <strong class="metric-value">${this.localize.number(row.visitors)}</strong>
                 </span></td>
-                <td>${this.localize.number(row.count)}</td>
+                <td><strong class="metric-value">${this.localize.number(row.count)}</strong></td>
               </tr>
             `;})}</tbody>
       </table>
@@ -91,6 +91,7 @@ export class WebAnalyticsEventTableElement extends UmbElementMixin(LitElement) {
     .details-action:hover { text-decoration: underline; text-underline-offset: 0.18em; }
     .details-action:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
     .event-name { position: relative; z-index: 1; }
+    .metric-value { font-weight: 700; }
     .metric-cell { align-items: center; display: flex; gap: var(--uui-size-space-2); justify-content: flex-end; }
     .filter-action { align-items: center; appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; display: inline-flex; font: inherit; justify-content: center; opacity: 0; padding: var(--uui-size-space-2); }
     tbody tr:hover .filter-action, .filter-action:focus-visible, .filter-action[aria-pressed="true"] { opacity: 1; }

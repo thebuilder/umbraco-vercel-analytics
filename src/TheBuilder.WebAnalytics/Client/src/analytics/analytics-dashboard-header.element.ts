@@ -51,6 +51,7 @@ export class WebAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEleme
 
   render() {
     const connection = this.#connection();
+    const showDateRange = connection?.isConfigured !== false;
     const hostname = this.#hostname();
     const siteLabel = hostname ?? connection?.displayName;
     const linkUrl = this.documentScoped ? this.route?.url ?? this.siteUrl : this.siteUrl;
@@ -85,7 +86,7 @@ export class WebAnalyticsDashboardHeaderElement extends UmbElementMixin(LitEleme
           ${!this.documentScoped && this.connections.length > 1 ? html`
             <uui-select class="project-select" label="Analytics connection" .options=${this.#selectOptions()} @change=${this.#onConnectionChange}></uui-select>
           ` : ""}
-          <web-analytics-date-range-picker .preset=${this.preset} .range=${this.range}></web-analytics-date-range-picker>
+          ${showDateRange ? html`<web-analytics-date-range-picker .preset=${this.preset} .range=${this.range}></web-analytics-date-range-picker>` : ""}
         </div>
       </header>
       <div class="warnings">

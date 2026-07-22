@@ -6,10 +6,18 @@ const sdk = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   testConnection: vi.fn(),
 }));
+const notifications = vi.hoisted(() => ({
+  peek: vi.fn(),
+}));
 
 vi.mock("../api/sdk.gen.js", () => ({ WebAnalyticsService: sdk }));
+vi.mock("@umbraco-cms/backoffice/notification", () => ({ UMB_NOTIFICATION_CONTEXT: { TYPE: {} } }));
 vi.mock("@umbraco-cms/backoffice/element-api", () => ({
-  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => base,
+  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => class extends base {
+    consumeContext(_token: unknown, callback: (context: typeof notifications) => void) {
+      callback(notifications);
+    }
+  },
 }));
 vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
 vi.mock("@umbraco-cms/backoffice/document", () => ({}));
@@ -23,6 +31,7 @@ beforeEach(() => {
   sdk.settings.mockReset();
   sdk.saveSettings.mockReset();
   sdk.testConnection.mockReset();
+  notifications.peek.mockReset();
   Element.prototype.scrollIntoView = vi.fn();
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -134,8 +143,13 @@ describe("analytics settings network recovery", () => {
     sdk.saveSettings.mockResolvedValueOnce(apiOk(settings({ defaultRangeDays: 31 })));
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
 
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("Web Analytics settings saved."));
-    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).toBeNull();
+    await vi.waitFor(() => expect(notifications.peek).toHaveBeenCalledWith("positive", {
+      data: { message: "Web Analytics settings saved." },
+    }));
+    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).not.toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".save-status")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.hasAttribute("disabled")).toBe(true);
+    expect(dashboard.shadowRoot?.querySelector(".status")).toBeNull();
     expect(sdk.saveSettings).toHaveBeenCalledTimes(2);
   });
 
@@ -215,6 +229,7 @@ const PROVIDERS: AnalyticsSettingsResponse["providers"] = [
     provider: "Vercel",
     description: "Projects using Vercel Web Analytics",
     logoSlug: "vercel",
+    capabilities: { dimensions: ["RequestPath", "EventName"], events: true, eventDetails: true, eventProperties: false, globalEventFiltering: false, flags: true, breakdownOrdering: false },
     identifier: { key: "projectId", label: "Vercel project ID", description: "Use the project ID from your Vercel project settings.", requiredMessage: "a Vercel project ID" },
     team: { key: "team", label: "Team ID or slug", description: "Optional team slug or ID for projects owned by a Vercel team." },
     credential: { label: "access token", description: "Configure a Vercel access token in the server settings.", documentationUrl: "https://vercel.com/docs/rest-api" },
@@ -224,6 +239,7 @@ const PROVIDERS: AnalyticsSettingsResponse["providers"] = [
     provider: "Plausible",
     description: "Sites using Plausible Analytics",
     logoSlug: "plausible",
+    capabilities: { dimensions: ["RequestPath", "EventName"], events: true, eventDetails: true, eventProperties: true, globalEventFiltering: true, flags: false, breakdownOrdering: true },
     identifier: { key: "siteId", label: "Plausible site ID", description: "Use the domain configured in your Plausible site settings.", requiredMessage: "a Plausible site ID" },
     team: null,
     credential: { label: "Stats API key", description: "Configure a Plausible Stats API key in the server settings.", documentationUrl: "https://plausible.io/docs/stats-api" },
@@ -240,6 +256,8 @@ function connection(): AnalyticsConnectionSettingsResponse {
     team: null,
     siteId: "",
     eventPropertyNames: [],
+    enableEvents: true,
+    enableFlags: true,
     documentRootKeys: [],
     enableAllDocumentTypes: false,
     enabledDocumentTypeKeys: [],
@@ -250,6 +268,75 @@ function connection(): AnalyticsConnectionSettingsResponse {
 }
 
 describe("analytics settings onboarding", () => {
+  it("orders connection settings by the editor workflow without reserving an empty status row", async () => {
+    const plausible = {
+      ...connection(),
+      key: "connection-2",
+      provider: "Plausible" as const,
+      projectId: "",
+      siteId: "example.com",
+    };
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection(), plausible] })));
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelectorAll("web-analytics-connection-editor")).toHaveLength(2));
+    const editors = [...dashboard.shadowRoot?.querySelectorAll("web-analytics-connection-editor") ?? []] as AnalyticsConnectionEditorElement[];
+    const sectionLabels = (editor: AnalyticsConnectionEditorElement) =>
+      [...editor.shadowRoot?.querySelectorAll(".config-section > summary > span") ?? []].map((label) => label.textContent?.trim());
+
+    expect(editors[0].shadowRoot?.querySelector(".action-status")).toBeNull();
+    expect(sectionLabels(editors[0])).toEqual([
+      "Page analytics",
+      "Document workspace",
+      "Dashboard reports",
+      "Credential override",
+    ]);
+    expect(sectionLabels(editors[1])).toEqual([
+      "Page analytics",
+      "Document workspace",
+      "Dashboard reports",
+      "Event properties",
+      "Credential override",
+    ]);
+  });
+
+  it("renders only the dashboard reports supported by each connection provider", async () => {
+    const plausible = {
+      ...connection(),
+      key: "connection-2",
+      provider: "Plausible" as const,
+      projectId: "",
+      siteId: "example.com",
+    };
+    sdk.settings.mockResolvedValueOnce(apiOk(settings({ connections: [connection(), plausible] })));
+    const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
+    document.body.append(dashboard);
+
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelectorAll("web-analytics-connection-editor")).toHaveLength(2));
+    const editors = [...dashboard.shadowRoot?.querySelectorAll("web-analytics-connection-editor") ?? []] as AnalyticsConnectionEditorElement[];
+    expect(editors[0].shadowRoot?.querySelector('[label="Show custom events"]')).not.toBeNull();
+    expect(editors[0].shadowRoot?.querySelector('[label="Show feature flags"]')).not.toBeNull();
+    expect(editors[1].shadowRoot?.querySelector('[label="Show custom events"]')).not.toBeNull();
+    expect(editors[1].shadowRoot?.querySelector('[label="Show feature flags"]')).toBeNull();
+  });
+
+  it("emits connection changes when a dashboard report is disabled", async () => {
+    const editor = document.createElement("web-analytics-connection-editor") as AnalyticsConnectionEditorElement;
+    editor.connection = connection();
+    editor.descriptor = PROVIDERS[0];
+    const changed = vi.fn();
+    editor.addEventListener("connection-change", changed);
+    document.body.append(editor);
+    await editor.updateComplete;
+
+    const events = editor.shadowRoot?.querySelector<HTMLElement & { checked: boolean }>('[label="Show custom events"]');
+    events!.checked = false;
+    events!.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+
+    expect((changed.mock.calls[0][0] as CustomEvent<AnalyticsConnectionSettingsResponse>).detail.enableEvents).toBe(false);
+  });
+
   it("shows an unsupported connection and blocks saving when its descriptor is missing", async () => {
     sdk.settings.mockResolvedValueOnce(apiOk(settings({ providers: [], connections: [connection()] })));
     const dashboard = document.createElement("web-analytics-settings-dashboard") as WebAnalyticsSettingsDashboardElement;
@@ -271,7 +358,9 @@ describe("analytics settings onboarding", () => {
     expect(dashboard.shadowRoot?.querySelector("#default-connection")).toBeNull();
     expect(dashboard.shadowRoot?.querySelector("h1")).toBeNull();
     expect(dashboard.shadowRoot?.textContent).not.toContain("Connect analytics providers and choose where page analytics appears.");
-    expect(dashboard.shadowRoot?.querySelector(".settings-actions")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".settings-actions")?.tagName).toBe("UMB-FOOTER-LAYOUT");
+    expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.getAttribute("color")).toBe("positive");
+    expect(dashboard.shadowRoot?.querySelector<HTMLElement>('[label="Save Web Analytics settings"]')?.hasAttribute("disabled")).toBe(true);
     expect(dashboard.shadowRoot?.querySelector(".connection-empty-state h3")?.textContent).toBe("Connect your first analytics provider");
 
     dashboard.shadowRoot?.querySelector<HTMLElement>('.connection-empty-state [label="Choose analytics provider"]')?.click();
@@ -371,6 +460,13 @@ describe("analytics settings onboarding", () => {
     const testButton = editor.shadowRoot?.querySelector<HTMLElement>('[label="Add a server-side credential before testing this connection."]');
     expect(testButton?.hasAttribute("disabled")).toBe(true);
     expect(editor.shadowRoot?.querySelector(".summary-health uui-tag")?.textContent?.trim()).toBe("Setup required");
+    expect([...editor.shadowRoot?.querySelectorAll(".config-section > summary > span") ?? []].map((label) => label.textContent?.trim())).toEqual([
+      "Connection credential",
+      "Page analytics",
+      "Document workspace",
+      "Dashboard reports",
+    ]);
+    expect(editor.shadowRoot?.querySelector(".token-section small")?.textContent?.trim()).toBe("Required before testing");
   });
 
   it("shows a recoverable message when the override setting name cannot be copied", async () => {

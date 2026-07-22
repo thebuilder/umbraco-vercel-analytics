@@ -47,13 +47,13 @@ export class WebAnalyticsHistoryChartElement extends UmbElementMixin(LitElement)
 
     const style = getComputedStyle(this);
     const color = style.getPropertyValue("--web-analytics-chart-color").trim() || "oklch(51.51% .2399 257.85)";
-    const lineColor = `color-mix(in srgb, ${color} 72%, transparent)`;
-    const fillColor = style.getPropertyValue("--web-analytics-chart-fill").trim() || "oklch(51.51% .2399 257.85 / 0.12)";
+    const lineColor = `color-mix(in srgb, ${color} 82%, transparent)`;
+    const fillColor = style.getPropertyValue("--web-analytics-chart-fill").trim() || "oklch(51.51% .2399 257.85 / 0.1)";
     const guideColor = style.getPropertyValue("--uui-color-text").trim() || "#1b264f";
     const mutedColor = style.getPropertyValue("--uui-color-text-alt").trim() || "#5c5c5c";
     const surfaceColor = style.getPropertyValue("--uui-color-surface").trim() || "#ffffff";
     const borderColor = style.getPropertyValue("--uui-color-border").trim() || "#d8d7d9";
-    const gridColor = `color-mix(in srgb, ${borderColor} 55%, transparent)`;
+    const gridColor = `color-mix(in srgb, ${borderColor} 42%, transparent)`;
     const label = this.#metricLabel();
     const latestPoint = this.points[this.points.length - 1];
     const latestPeriodInProgress = latestPoint
@@ -89,7 +89,7 @@ export class WebAnalyticsHistoryChartElement extends UmbElementMixin(LitElement)
           label,
           data: this.points.map((point) => point[this.metric] ?? 0),
           borderColor: lineColor,
-          borderWidth: 2,
+          borderWidth: 2.25,
           backgroundColor: fillColor,
           fill: true,
           pointRadius: 0,

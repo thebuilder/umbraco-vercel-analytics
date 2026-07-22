@@ -21,3 +21,7 @@ export function errorState<T>(message: string, state?: AsyncState<T>): AsyncStat
 export function stateData<T>(state: AsyncState<T>): T | undefined {
   return "data" in state ? state.data : "previous" in state ? state.previous : undefined;
 }
+
+export function isInitialLoading<T>(state: AsyncState<T> | undefined): boolean {
+  return !state || state.status === "idle" || (state.status === "loading" && state.previous === undefined);
+}

@@ -153,6 +153,25 @@ public sealed class WebAnalyticsOptionsValidatorTests
     }
 
     [Fact]
+    public void Registry_intersects_provider_capabilities_with_enabled_connection_features()
+    {
+        var options = CreateOptions();
+        var configured = Assert.Single(options.Connections);
+        configured.EnableEvents = false;
+        configured.EnableFlags = false;
+
+        var connection = CreateRegistry(options).Get(MainKey);
+
+        Assert.NotNull(connection);
+        Assert.DoesNotContain(AnalyticsDimension.EventName, connection.Capabilities.Dimensions);
+        Assert.False(connection.Capabilities.Events);
+        Assert.False(connection.Capabilities.EventDetails);
+        Assert.False(connection.Capabilities.EventProperties);
+        Assert.False(connection.Capabilities.GlobalEventFiltering);
+        Assert.False(connection.Capabilities.Flags);
+    }
+
+    [Fact]
     public void Connection_string_representation_redacts_access_token()
     {
         var connection = CreateRegistry(CreateOptions()).Get(MainKey);

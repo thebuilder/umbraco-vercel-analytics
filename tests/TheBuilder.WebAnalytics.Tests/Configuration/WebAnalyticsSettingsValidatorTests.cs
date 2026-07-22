@@ -229,6 +229,22 @@ public sealed class WebAnalyticsSettingsValidatorTests
     }
 
     [Fact]
+    public void Disabled_events_do_not_validate_dormant_event_property_names()
+    {
+        var settings = CreateSettings();
+        var connection = settings.Connections[0];
+        connection.Provider = AnalyticsProvider.Plausible;
+        connection.ProjectId = string.Empty;
+        connection.SiteId = "example.com";
+        connection.EnableEvents = false;
+        connection.EventPropertyNames = Enumerable.Range(1, 21).Select(index => $"property-{index}").ToArray();
+
+        var failures = WebAnalyticsSettingsValidator.Validate(settings);
+
+        Assert.DoesNotContain(failures, failure => failure.Contains("event propert", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Null_event_property_names_from_external_json_are_normalized()
     {
         var settings = CreateSettings();

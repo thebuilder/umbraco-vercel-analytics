@@ -3,6 +3,22 @@ import type { AnalyticsBreakdownRow, AnalyticsDimension } from "../api/types.gen
 const OTHERS_LABEL = "others";
 const UNKNOWN_LABEL = "unknown";
 
+const DIMENSION_LABELS: Partial<Record<AnalyticsDimension, string>> = {
+  RequestPath: "Page",
+  Route: "Page",
+  ReferrerHostname: "Referrer",
+  Referrer: "Referrer",
+  Country: "Country",
+  DeviceType: "Device",
+  BrowserName: "Browser",
+  OsName: "Operating system",
+  UtmSource: "Source",
+  UtmMedium: "Medium",
+  UtmCampaign: "Campaign",
+  UtmTerm: "Term",
+  UtmContent: "Content",
+};
+
 export type TrafficMetric = "visitors" | "pageViews";
 
 const PERCENTAGE_DIMENSIONS = new Set<AnalyticsDimension>([
@@ -55,6 +71,10 @@ export function breakdownDisplayValue(value: string, dimension?: AnalyticsDimens
   return dimension === "DeviceType" && trimmed
     ? `${trimmed.charAt(0).toLocaleUpperCase()}${trimmed.slice(1)}`
     : trimmed;
+}
+
+export function breakdownDimensionLabel(dimension?: AnalyticsDimension): string {
+  return dimension ? DIMENSION_LABELS[dimension] ?? "Value" : "Value";
 }
 
 export function topBreakdownRows(

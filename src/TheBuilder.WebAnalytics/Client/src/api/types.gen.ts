@@ -33,6 +33,8 @@ export type AnalyticsConnectionSettingsResponse = {
     team?: string | null;
     siteId: string;
     eventPropertyNames: Array<string>;
+    enableEvents: boolean;
+    enableFlags: boolean;
     documentRootKeys: Array<string>;
     enableAllDocumentTypes: boolean;
     enabledDocumentTypeKeys: Array<string>;
@@ -160,6 +162,7 @@ export type AnalyticsProviderDescriptor = {
     provider: AnalyticsProvider;
     description: string;
     logoSlug: string;
+    capabilities: AnalyticsCapabilities;
     identifier: AnalyticsIdentifierFieldDescriptor;
     team?: AnalyticsOptionalFieldDescriptor | null;
     credential: AnalyticsCredentialDescriptor;
@@ -205,6 +208,8 @@ export type UpdateAnalyticsConnectionRequest = {
     team?: string | null;
     siteId: string;
     eventPropertyNames: Array<string>;
+    enableEvents: boolean;
+    enableFlags: boolean;
     mockScenario?: MockAnalyticsScenario | null;
     documentRootKeys: Array<string>;
     enableAllDocumentTypes: boolean;

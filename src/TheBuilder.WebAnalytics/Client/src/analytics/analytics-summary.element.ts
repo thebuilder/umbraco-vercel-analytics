@@ -5,7 +5,7 @@ import type { AnalyticsSummary } from "../api/types.gen.js";
 import { inclusiveRangeDays, type AnalyticsDateRange } from "./date-range.js";
 import { metricComparison } from "./metric-comparison.js";
 import type { DashboardMetric } from "./dashboard-url-state.js";
-import { stateData, type AsyncState } from "./async-state.js";
+import { isInitialLoading, stateData, type AsyncState } from "./async-state.js";
 import "./history-chart.element.js";
 
 @customElement("web-analytics-summary")
@@ -76,7 +76,7 @@ export class WebAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
         @click=${() => this.#selectMetric(metric)}
         @keydown=${this.#onTabKeydown}>
         <span class="eyebrow">${label}</span>
-        ${this.report.status === "loading"
+        ${isInitialLoading(this.report)
           ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
           : html`<span class="metric-value">
               <strong>${this.localize.number(stateData(this.report)?.totals[metric] ?? 0)}</strong>
@@ -110,7 +110,7 @@ export class WebAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
           class="history-panel"
           role="tabpanel"
           aria-labelledby=${`metric-${this.metric}-tab`}>
-          ${this.report.status === "loading" ? html`
+          ${isInitialLoading(this.report) ? html`
             <span class="visually-hidden" role="status">Loading traffic summary and history</span>
             <div class="chart-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
           ` : stateData(this.report)?.points.length
@@ -126,16 +126,16 @@ export class WebAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
     .history, .summary-error { --uui-box-default-padding: 0; margin-bottom: var(--uui-size-layout-1); overflow: hidden; }
     .history { --web-analytics-chart-color: oklch(51.51% .2399 257.85); }
     .metric-tabs { background: var(--uui-color-surface-alt); border-bottom: 1px solid var(--uui-color-border); display: flex; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
-    .metric-tab { --metric-font-size: clamp(2rem, 3cqi, 3rem); appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; inline-size: max-content; min-block-size: clamp(6.5rem, 10cqi, 7.75rem); min-inline-size: 18rem; padding: clamp(var(--uui-size-space-4), 2cqi, var(--uui-size-space-5)) var(--uui-size-space-5); text-align: left; transition: background-color 160ms ease-out, color 160ms ease-out; }
+    .metric-tab { --metric-font-size: clamp(2rem, 3cqi, 3rem); appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; box-sizing: border-box; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; inline-size: max-content; min-block-size: clamp(6.5rem, 10cqi, 7.75rem); min-inline-size: 18rem; padding: clamp(var(--uui-size-space-4), 2cqi, var(--uui-size-space-5)) var(--uui-size-space-5); text-align: left; transition: background-color 160ms ease-out, color 160ms ease-out; }
     .metric-tab:last-child { border-inline-end: 1px solid var(--uui-color-border); }
     .metric-tab[aria-selected="true"] { background: var(--uui-color-surface); border-bottom-color: var(--web-analytics-chart-color); color: var(--uui-color-text); }
     .metric-tab[aria-selected="false"]:hover { background: color-mix(in srgb, var(--uui-color-interactive) 7%, var(--uui-color-surface)); }
     .metric-tab[aria-selected="false"]:active { background: color-mix(in srgb, var(--uui-color-interactive) 11%, var(--uui-color-surface)); }
     .metric-tab:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    .metric-value { align-items: center; display: flex; flex-wrap: nowrap; gap: var(--uui-size-space-4); margin-top: var(--uui-size-space-3); }
-    .metric-tab strong { font-size: var(--metric-font-size); font-variant-numeric: tabular-nums; line-height: 1.1; white-space: nowrap; }
+    .metric-value { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--uui-size-space-2) var(--uui-size-space-4); margin-top: var(--uui-size-space-3); }
+    .metric-tab strong { font-size: var(--metric-font-size); font-variant-numeric: tabular-nums; font-weight: 400; letter-spacing: -0.02em; line-height: 1.05; white-space: nowrap; }
     .eyebrow { color: currentColor; font-weight: 700; }
-    .comparison { border-radius: var(--uui-border-radius); flex: 0 0 auto; font-weight: 700; padding: var(--uui-size-space-2) var(--uui-size-space-3); white-space: nowrap; }
+    .comparison { border-radius: var(--uui-border-radius); flex: 0 0 auto; font-size: var(--uui-type-small-size); font-weight: 700; line-height: var(--uui-type-default-line-height); padding: var(--uui-size-space-1) var(--uui-size-space-2); white-space: nowrap; }
     .comparison.increase { background: color-mix(in srgb, var(--uui-color-positive-standalone) 14%, var(--uui-color-surface)); color: var(--uui-color-positive-standalone); }
     .comparison.decrease { background: color-mix(in srgb, var(--uui-color-danger-standalone) 14%, var(--uui-color-surface)); color: var(--uui-color-danger-standalone); }
     .comparison.unchanged { background: var(--uui-color-surface-alt); color: var(--uui-color-text-alt); }
@@ -150,14 +150,12 @@ export class WebAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
     .summary-error-copy p { color: var(--uui-color-text-alt); margin: var(--uui-size-space-1) 0 0; }
     .visually-hidden { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     @media (max-width: 48rem) {
-      .metric-tab { --metric-font-size: clamp(1.5rem, 4cqi, 2rem); box-sizing: border-box; flex: 0 0 65cqi; min-block-size: 6.5rem; min-inline-size: 14rem; padding: var(--uui-size-space-4); }
+      .metric-tab { --metric-font-size: clamp(1.5rem, 4cqi, 2rem); flex: 0 0 65cqi; min-block-size: 6.5rem; min-inline-size: 14rem; padding: var(--uui-size-space-4); }
       .metric-value { gap: var(--uui-size-space-2); }
-      .comparison { font-size: 0.875rem; padding: var(--uui-size-space-1) var(--uui-size-space-2); }
     }
     @media (max-width: 40rem) {
       .metric-tab { --metric-font-size: clamp(1.25rem, 5cqi, 1.75rem); min-block-size: 5.5rem; padding: var(--uui-size-space-3); }
-      .eyebrow { font-size: 0.875rem; }
-      .comparison { font-size: 0.75rem; }
+      .eyebrow, .comparison { font-size: var(--uui-type-small-size); }
     }
     @media (prefers-reduced-motion: reduce) { .metric-tab { transition: none; } }
   `];

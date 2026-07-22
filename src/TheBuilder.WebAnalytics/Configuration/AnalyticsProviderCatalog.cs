@@ -62,6 +62,7 @@ public sealed class AnalyticsProviderDefinition(
         Provider,
         Settings.Description,
         Settings.LogoSlug,
+        Capabilities,
         Identifier.ToDescriptor(),
         Settings.Team,
         Settings.Credential,
@@ -102,7 +103,7 @@ public sealed class AnalyticsProviderDefinition(
             failures.Add($"Connection '{label}' cannot define a {AnalyticsConnectionIdentifier.SiteId.ToLabel()}.");
 
         var eventPropertyNames = connection.EventPropertyNames ?? [];
-        if (Settings.EventProperties is { } eventProperties)
+        if (connection.EnableEvents && Settings.EventProperties is { } eventProperties)
         {
             if (eventPropertyNames.Count(value => !string.IsNullOrWhiteSpace(value)) > eventProperties.MaximumNames)
                 failures.Add($"Connection '{label}' cannot define more than {eventProperties.MaximumNames} event properties.");
@@ -110,7 +111,7 @@ public sealed class AnalyticsProviderDefinition(
                 failures.Add($"Connection '{label}' contains an invalid event property name.");
         }
 
-        if (eventPropertyNames.Any(value => !string.IsNullOrWhiteSpace(value)) &&
+        if (connection.EnableEvents && eventPropertyNames.Any(value => !string.IsNullOrWhiteSpace(value)) &&
             (Settings.EventProperties is null || isSupportedMockScenario))
             failures.Add($"Connection '{label}' cannot define {Settings.EventProperties?.Label ?? "event properties"} for {Provider}.");
     }

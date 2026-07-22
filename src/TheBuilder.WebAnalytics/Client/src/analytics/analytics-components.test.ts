@@ -23,11 +23,12 @@ vi.mock("@umbraco-cms/backoffice/element-api", () => ({
 vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
 
 import { dateRangeForPreset } from "./date-range.js";
-import { successState } from "./async-state.js";
+import { loadingState, successState } from "./async-state.js";
 import { dashboardCards } from "./dashboard-cards.js";
 import type { WebAnalyticsSummaryElement } from "./analytics-summary.element.js";
 import type { WebAnalyticsBreakdownGridElement } from "./analytics-breakdown-grid.element.js";
 import type { WebAnalyticsBreakdownTableElement } from "./breakdown-table.element.js";
+import type { WebAnalyticsEventTableElement } from "./event-table.element.js";
 import type { WebAnalyticsDashboardElement } from "./analytics-dashboard.element.js";
 import type { WebAnalyticsDashboardHeaderElement } from "./analytics-dashboard-header.element.js";
 import type { WebAnalyticsFlagCardElement } from "./flag-card.element.js";
@@ -115,6 +116,35 @@ describe("analytics presentation components", () => {
     expect(action?.getAttribute("label")).toBe("Open Web Analytics settings");
   });
 
+  it("replaces reports with connection setup guidance when credentials are missing", async () => {
+    sdk.connections.mockResolvedValue(apiOk({
+      enabled: true,
+      defaultRangeDays: 30,
+      connections: [{
+        key: "11111111-1111-1111-1111-111111111111",
+        displayName: "Production",
+        provider: "Vercel",
+        capabilities: { dimensions: ["RequestPath", "Country"], events: true, eventDetails: true, eventProperties: true, globalEventFiltering: false, flags: true, breakdownOrdering: false },
+        isDefault: true,
+        isConfigured: false,
+        baseUrl: "https://example.com",
+        warnings: ["No server-side credential is configured for this connection."],
+      }],
+    }));
+    const element = document.createElement("web-analytics-dashboard") as WebAnalyticsDashboardElement;
+    document.body.append(element);
+
+    await vi.waitFor(() => expect(element.shadowRoot?.querySelector("#connection-setup-title")?.textContent).toBe("Connection credentials required"));
+
+    const header = element.shadowRoot?.querySelector<WebAnalyticsDashboardHeaderElement>("web-analytics-dashboard-header");
+    await header?.updateComplete;
+    expect(element.shadowRoot?.querySelector("web-analytics-summary")).toBeNull();
+    expect(element.shadowRoot?.querySelector("web-analytics-breakdown-grid")).toBeNull();
+    expect(header?.shadowRoot?.querySelector("web-analytics-date-range-picker")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".connection-setup p")?.textContent).toContain("server-side credentials");
+    expect(element.shadowRoot?.querySelector(".connection-setup uui-button")?.getAttribute("href")).toBe("/umbraco/section/settings/dashboard/web-analytics");
+  });
+
   it("emits metric changes from the summary tabs", async () => {
     const element = document.createElement("web-analytics-summary") as WebAnalyticsSummaryElement;
     element.range = dateRangeForPreset(30);
@@ -143,6 +173,44 @@ describe("analytics presentation components", () => {
     expect(element.shadowRoot?.querySelector("#metric-visitors-tab strong")?.textContent).toBe("185.508");
   });
 
+  it("keeps the previous summary visible while a filtered report refreshes", async () => {
+    const element = document.createElement("web-analytics-summary") as WebAnalyticsSummaryElement;
+    element.range = dateRangeForPreset(30);
+    element.metric = "visitors";
+    element.report = loadingState(successState({ totals: { visitors: 12, pageViews: 34 }, points: [] }));
+    document.body.append(element);
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector(".history")?.getAttribute("aria-busy")).toBe("true");
+    expect(element.shadowRoot?.querySelector("#metric-visitors-tab strong")?.textContent).toBe("12");
+    expect(element.shadowRoot?.querySelector(".metric-skeleton")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".chart-skeleton")).toBeNull();
+  });
+
+  it("keeps previous breakdown, event, and flag rows visible while filters refresh", async () => {
+    const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
+    element.cards = dashboardCards(false, "unavailable").filter((card) => card.kind === "breakdown" && card.dimension === "Country");
+    element.breakdowns = {
+      Country: loadingState(successState({ dimension: "Country", rows: [{ value: "DK", visitors: 12, pageViews: 18 }] })),
+    };
+    element.events = loadingState(successState({ rows: [{ eventName: "Signup", visitors: 8, count: 9 }] }));
+    element.flags = loadingState(successState({ rows: [{ value: "new-checkout", visitors: 5, pageViews: 7 }] }));
+    document.body.append(element);
+    await element.updateComplete;
+
+    const breakdown = element.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table");
+    const events = element.shadowRoot?.querySelector<WebAnalyticsEventTableElement>("web-analytics-event-table");
+    const flags = element.shadowRoot?.querySelector<WebAnalyticsFlagCardElement>("web-analytics-flag-card");
+    await Promise.all([breakdown?.updateComplete, events?.updateComplete, flags?.updateComplete]);
+
+    expect(breakdown?.loading).toBe(false);
+    expect(breakdown?.shadowRoot?.querySelector(".row-label")?.textContent).toContain("Denmark");
+    expect(events?.loading).toBe(false);
+    expect(events?.shadowRoot?.querySelector(".details-action")?.textContent).toBe("Signup");
+    expect(flags?.shadowRoot?.querySelector(".value")?.textContent).toBe("new-checkout");
+    expect(element.shadowRoot?.querySelectorAll('[aria-busy="true"]')).toHaveLength(3);
+  });
+
   it("emits audience changes from the breakdown tabs", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(false, "unavailable").filter((card) => card.kind === "tabbed-breakdown" && card.id === "audience");
@@ -157,7 +225,10 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    const browserTab = [...element.shadowRoot?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []]
+    const table = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((candidate) => (candidate as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Audience technology") as WebAnalyticsBreakdownTableElement;
+    await table.updateComplete;
+    const browserTab = [...table.shadowRoot?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []]
       .find((button) => button.textContent?.trim() === "Browsers");
     browserTab?.click();
 
@@ -165,7 +236,7 @@ describe("analytics presentation components", () => {
     expect((onChange.mock.calls[0][0] as CustomEvent).detail).toEqual({ dimension: "BrowserName" });
   });
 
-  it("normalizes percentage cards against all visible grouped rows", async () => {
+  it("keeps audience cards as percentages of the selected metric", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(false, "unavailable").filter((card) => card.kind === "tabbed-breakdown" && card.id === "audience");
     element.audienceDimension = "DeviceType";
@@ -184,8 +255,34 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    const table = element.shadowRoot?.querySelector<HTMLElement & { total: number }>("web-analytics-breakdown-table");
-    expect(table?.total).toBe(11_339);
+    const table = element.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table")!;
+    await table.updateComplete;
+    expect(table.total).toBe(11_339);
+    const headers = [...table.shadowRoot?.querySelectorAll("thead th") ?? []]
+      .map((header) => header.textContent?.replace(/\s+/g, "").trim());
+    expect(headers).toEqual(["DevicesBrowsers", "Visitors"]);
+    const values = [...table.shadowRoot?.querySelectorAll("tbody .percentage-value > span:first-child") ?? []]
+      .map((value) => value.textContent?.trim());
+    expect(values).toEqual(["99%", "1%"]);
+  });
+
+  it("keeps standard cards focused on the selected metric", async () => {
+    const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
+    element.cards = dashboardCards(false, "unavailable").filter((card) => card.kind === "breakdown" && card.dimension === "RequestPath");
+    element.metric = "pageViews";
+    element.breakdowns = {
+      RequestPath: successState({ dimension: "RequestPath", rows: [{ value: "/", visitors: 8_525, pageViews: 15_119 }] }),
+    };
+    element.events = successState({ rows: [] });
+    document.body.append(element);
+    await element.updateComplete;
+
+    const table = element.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table")!;
+    await table.updateComplete;
+    expect([...table.shadowRoot?.querySelectorAll("thead th") ?? []].map((header) => header.textContent?.trim())).toEqual(["Pages", "Page views"]);
+    expect([...table.shadowRoot?.querySelectorAll(".metric-number") ?? []].map((value) => value.textContent)).toEqual(["15,119"]);
+    expect(table.shadowRoot?.querySelector(".metric-cell .filter-action")).not.toBeNull();
+    expect(table.shadowRoot?.querySelector(".row-value .filter-action")).toBeNull();
   });
 
   it.each(["ReferrerHostname", "Referrer"] as const)("renders %s rows as secure external links with favicons for attributed hosts", async (dimension) => {
@@ -208,10 +305,10 @@ describe("analytics presentation components", () => {
     expect(favicons?.[0]?.src).toBe("https://www.google.com/s2/favicons?domain=google.com&sz=32");
     expect(favicons?.[0]?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect([...element.shadowRoot?.querySelectorAll(".row-label") ?? []].map((label) => label.textContent?.trim())).toEqual(["google.com (opens in a new tab)", "Unknown"]);
-    expect(element.shadowRoot?.querySelector(".metric-number")?.textContent).toBe("22,304");
+    expect([...element.shadowRoot?.querySelectorAll(".metric-number") ?? []].map((value) => value.textContent)).toEqual(["22,304", "30,000", "1", "1"]);
   });
 
-  it("places events beside referrers in document analytics", async () => {
+  it("keeps document traffic breakdowns ahead of optional reports", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(true, "unavailable");
     element.events = successState({ rows: [{ eventName: "Signup", visitors: 12, count: 18 }] });
@@ -219,36 +316,73 @@ describe("analytics presentation components", () => {
     await element.updateComplete;
 
     const cards = [...element.shadowRoot?.querySelectorAll("uui-box") ?? []];
-    expect(cards[0]?.querySelector<HTMLElement & { headline: string }>("web-analytics-breakdown-table")?.headline).toBe("Referrers");
-    expect(cards[1]?.querySelector("web-analytics-event-table")).not.toBeNull();
+    expect(cards.slice(0, 4).map((card) => card.querySelector<HTMLElement & { headline: string }>("web-analytics-breakdown-table")?.headline)).toEqual([
+      "Referrers",
+      "Countries",
+      "Devices",
+      "Operating systems",
+    ]);
+    expect(cards[4]?.querySelector("web-analytics-event-table")).not.toBeNull();
+    expect(cards[5]?.querySelector("web-analytics-flag-card")).not.toBeNull();
   });
 
-  it("gives Flags the same wide span as Events in the overview", async () => {
+  it("keeps View all actions low priority while retaining emphasis for Retry", async () => {
+    const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
+    element.cards = dashboardCards(false, "unavailable").filter((card) => card.kind === "breakdown" && card.dimension === "Country");
+    element.breakdowns = {
+      Country: successState({ dimension: "Country", rows: [{ value: "DK", visitors: 12, pageViews: 18 }] }),
+    };
+    element.events = successState({ rows: [{ eventName: "Signup", visitors: 8, count: 9 }] });
+    element.supportsFlags = false;
+    document.body.append(element);
+    await element.updateComplete;
+
+    const viewAllActions = [...element.shadowRoot?.querySelectorAll("uui-button") ?? []]
+      .filter((button) => button.textContent?.trim() === "View all");
+    expect(viewAllActions).toHaveLength(2);
+    expect(viewAllActions.every((button) => button.getAttribute("look") === "default")).toBe(true);
+    expect(viewAllActions.every((button) => button.classList.contains("view-all") && button.hasAttribute("compact"))).toBe(true);
+
+    element.breakdowns = { Country: { status: "error", message: "Unavailable" } };
+    element.supportsEvents = false;
+    await element.updateComplete;
+
+    const retry = element.shadowRoot?.querySelector("uui-button");
+    expect(retry?.textContent?.trim()).toBe("Retry");
+    expect(retry?.getAttribute("look")).toBe("secondary");
+  });
+
+  it("groups Events and Flags as optional reports in the overview", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(false, "unavailable");
     element.events = successState({ rows: [] });
     document.body.append(element);
     await element.updateComplete;
 
-    const cards = [...element.shadowRoot?.querySelectorAll("uui-box") ?? []];
-    const flagsCard = cards[cards.length - 1];
+    const featureGrid = element.shadowRoot?.querySelector(".feature-grid");
+    const cards = [...featureGrid?.querySelectorAll("uui-box") ?? []];
+    const flagsCard = cards[1];
     expect(flagsCard?.querySelector("web-analytics-flag-card")).not.toBeNull();
     expect(flagsCard?.classList.contains("flags-card")).toBe(true);
-    expect(flagsCard?.classList.contains("wide")).toBe(true);
-    expect(cards[cards.length - 2]?.querySelector("web-analytics-event-table")).not.toBeNull();
+    expect(cards[0]?.querySelector("web-analytics-event-table")).not.toBeNull();
   });
 
-  it("keeps Flags on its own row in document analytics", async () => {
+  it("keeps a lone optional report in one feature-grid track", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(true, "unavailable");
+    element.supportsEvents = false;
+    element.supportsFlags = true;
     element.events = successState({ rows: [] });
     document.body.append(element);
     await element.updateComplete;
 
-    const cards = [...element.shadowRoot?.querySelectorAll("uui-box") ?? []];
-    const flagsCard = cards[cards.length - 1];
-    expect(flagsCard?.classList.contains("document-flags-card")).toBe(true);
-    expect(flagsCard?.classList.contains("wide")).toBe(false);
+    const featureGrid = element.shadowRoot?.querySelector<HTMLElement>(".feature-grid");
+    const cards = [...featureGrid?.querySelectorAll("uui-box") ?? []];
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.querySelector("web-analytics-flag-card")).not.toBeNull();
+    const styles = [...element.shadowRoot?.querySelectorAll("style") ?? []].map((style) => style.textContent).join("\n");
+    expect(styles).toContain(".feature-grid");
+    expect(styles).toContain("repeat(auto-fill");
   });
 
   it("merges valid UTM reports into the referrers card with five parameter tabs", async () => {
@@ -270,20 +404,23 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    const topTabs = [...element.shadowRoot?.querySelectorAll<HTMLButtonElement>(".acquisition-tabs [role=tab]") ?? []];
-    expect(topTabs.map((tab) => tab.textContent?.trim())).toEqual(["Referrers", "UTM Parameters"]);
+    const acquisitionTable = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((table) => (table as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Traffic source") as WebAnalyticsBreakdownTableElement;
+    await acquisitionTable.updateComplete;
+    const topTabs = [...acquisitionTable.shadowRoot?.querySelectorAll<HTMLButtonElement>(".report-tabs.primary [role=tab]") ?? []];
+    expect(topTabs.map((tab) => tab.textContent?.trim())).toEqual(["Referrers", "UTM"]);
     topTabs[1]?.click();
     expect((onAcquisitionChange.mock.calls[0][0] as CustomEvent).detail).toEqual({ view: "utm" });
     element.acquisitionView = "utm";
     await element.updateComplete;
 
-    const parameterTabs = [...element.shadowRoot?.querySelectorAll<HTMLButtonElement>(".utm-tabs [role=tab]") ?? []];
+    const updatedAcquisitionTable = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((table) => (table as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Traffic source") as WebAnalyticsBreakdownTableElement;
+    await updatedAcquisitionTable.updateComplete;
+    const parameterTabs = [...updatedAcquisitionTable.shadowRoot?.querySelectorAll<HTMLButtonElement>(".report-tabs.secondary [role=tab]") ?? []];
     expect(parameterTabs.map((tab) => tab.textContent?.trim())).toEqual(["Source", "Medium", "Campaign", "Term", "Content"]);
-    const acquisitionTable = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
-      .find((table) => table.querySelector(".utm-tabs")) as WebAnalyticsBreakdownTableElement;
-    await acquisitionTable.updateComplete;
-    const headerRows = acquisitionTable.shadowRoot?.querySelectorAll("thead tr");
-    expect(headerRows?.[0].lastElementChild?.textContent?.trim()).toBe("Visitors");
+    const headerRows = updatedAcquisitionTable.shadowRoot?.querySelectorAll("thead tr");
+    expect([...headerRows?.[0].children ?? []].map((header) => header.textContent?.replace(/\s+/g, "").trim())).toEqual(["ReferrersUTM", "Visitors"]);
     expect(headerRows?.[0].lastElementChild?.hasAttribute("rowspan")).toBe(false);
     expect(headerRows?.[1].firstElementChild?.getAttribute("colspan")).toBe("2");
     parameterTabs[4]?.click();
@@ -301,8 +438,12 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector(".acquisition-tabs")?.textContent?.trim()).toBe("Referrers");
-    expect(element.shadowRoot?.querySelector(".utm-tabs")).toBeNull();
+    const table = [...element.shadowRoot?.querySelectorAll("web-analytics-breakdown-table") ?? []]
+      .find((candidate) => (candidate as WebAnalyticsBreakdownTableElement).headingTabs?.ariaLabel === "Traffic source") as WebAnalyticsBreakdownTableElement;
+    await table.updateComplete;
+    expect([...table.shadowRoot?.querySelectorAll<HTMLButtonElement>(".report-tabs.primary [role=tab]") ?? []]
+      .map((tab) => tab.textContent?.trim())).toEqual(["Referrers"]);
+    expect(table.shadowRoot?.querySelector(".report-tabs.secondary")).toBeNull();
   });
 
   it("shows event setup guidance when no custom events have been tracked", async () => {
@@ -329,6 +470,9 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
     expect(element.shadowRoot?.querySelector(".filter-action")).toBeNull();
+    const metrics = [...element.shadowRoot?.querySelectorAll(".metric-value") ?? []];
+    expect(metrics.map((metric) => metric.textContent)).toEqual(["12", "15"]);
+    expect(metrics.every((metric) => metric.tagName === "STRONG")).toBe(true);
 
     element.filteringEnabled = true;
     await element.updateComplete;
@@ -351,7 +495,8 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector("uui-dialog-layout")?.getAttribute("headline")).toBe("Read article event");
+    expect(element.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.textContent).toBe("Read article event");
+    expect(element.shadowRoot?.querySelector(".analytics-dialog-close")?.getAttribute("aria-label")).toBe("Close event details");
     expect(element.shadowRoot?.querySelector(".event-totals")).toBeNull();
     expect(element.shadowRoot?.querySelector(".dialog-content")?.classList.contains("no-properties")).toBe(false);
     expect(element.shadowRoot?.querySelector("umb-empty-state")?.getAttribute("headline")).toBe("No property data");
@@ -392,6 +537,7 @@ describe("analytics presentation components", () => {
     expect(element.shadowRoot?.querySelector(".flag-back uui-icon")?.getAttribute("name")).toBe("icon-navigation-left");
     expect(element.shadowRoot?.querySelector(".selected-label")?.textContent).toBe("summer-sale");
     expect(element.shadowRoot?.querySelector(".row .value")?.textContent).toBe("true");
+    expect(element.shadowRoot?.querySelector(".row .value")?.tagName).toBe("SPAN");
 
     element.selected = undefined;
     element.report = successState({ rows: [] });

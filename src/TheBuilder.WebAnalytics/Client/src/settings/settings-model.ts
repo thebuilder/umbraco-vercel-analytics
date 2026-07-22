@@ -26,7 +26,7 @@ export function validateConnection(
   const identifier = identifierValue(connection, descriptor);
   if (!field || identifier === undefined) return { provider: `Unsupported identifier field for ${connection.provider}.` };
   if (connection.mockScenario == null && !identifier.trim()) errors[field] = `Enter ${descriptor.identifier.requiredMessage}.`;
-  const eventProperties = descriptor.eventProperties;
+  const eventProperties = connection.enableEvents ? descriptor.eventProperties : undefined;
   if (eventProperties && connection.eventPropertyNames.length > eventProperties.maximumNames)
     errors.eventPropertyNames = `Add no more than ${eventProperties.maximumNames} event properties.`;
   else if (eventProperties && connection.eventPropertyNames.some((name) => name.length > eventProperties.maximumNameLength))
@@ -59,6 +59,8 @@ export function createSettingsUpdate(settings: AnalyticsSettingsResponse): Updat
       team: connection.team,
       siteId: connection.siteId,
       eventPropertyNames: connection.eventPropertyNames,
+      enableEvents: connection.enableEvents,
+      enableFlags: connection.enableFlags,
       mockScenario: connection.mockScenario,
       documentRootKeys: connection.documentRootKeys,
       enableAllDocumentTypes: connection.enableAllDocumentTypes,

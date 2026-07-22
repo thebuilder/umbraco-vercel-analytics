@@ -3,13 +3,14 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { AnalyticsBreakdown, AnalyticsDimension, AnalyticsEventsReport, AnalyticsFlagsReport } from "../api/types.gen.js";
 import { breakdownMetricTotal, topBreakdownRows } from "./breakdown-rows.js";
-import { selectedCardDimension, type AcquisitionView, type DashboardCard, UTM_OPTIONS } from "./dashboard-cards.js";
+import { selectedCardDimension, type AcquisitionView, type DashboardCard } from "./dashboard-cards.js";
 import type { AnalyticsFilter, AudienceDimension, DashboardMetric, UtmDimension } from "./dashboard-url-state.js";
 import { topEventRows } from "./event-rows.js";
 import "./breakdown-table.element.js";
 import "./event-table.element.js";
 import "./flag-card.element.js";
-import { stateData, type AsyncState } from "./async-state.js";
+import { isInitialLoading, stateData, type AsyncState } from "./async-state.js";
+import type { ReportTabGroup } from "./report-tabs.js";
 
 @customElement("web-analytics-breakdown-grid")
 export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement) {
@@ -33,106 +34,71 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail }));
   }
 
-  #onTabKeydown(event: KeyboardEvent): void {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const tabs = Array.from((event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]") ?? []);
-    const currentIndex = tabs.indexOf(event.currentTarget as HTMLButtonElement);
-    const targetIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
-      : event.key === "ArrowLeft" ? (currentIndex - 1 + tabs.length) % tabs.length
-        : (currentIndex + 1) % tabs.length;
-    tabs[targetIndex]?.click();
-    tabs[targetIndex]?.focus();
+  #tabsForCard(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>): ReportTabGroup {
+    return {
+      ariaLabel: "Audience technology",
+      idPrefix: `${card.id}-card-tab`,
+      options: card.options.map(({ dimension, label }) => ({ value: dimension, label })),
+      selected: this.audienceDimension,
+    };
   }
 
-  #renderTabs(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>) {
-    const selected = card.id === "audience" ? this.audienceDimension : this.utmDimension;
-    const options = card.id === "utm" ? UTM_OPTIONS : card.options;
-    return html`
-      <div slot="heading" class="breakdown-tabs" role="tablist" aria-label=${card.id === "audience" ? "Audience technology" : "UTM parameter"}>
-        ${options.map(({ dimension, label }) => html`
-          <button
-            type="button"
-            role="tab"
-            aria-selected=${selected === dimension}
-            tabindex=${selected === dimension ? 0 : -1}
-            @click=${() => this.#dispatch(card.id === "audience" ? "audience-change" : "utm-change", { dimension })}
-            @keydown=${this.#onTabKeydown}>${label}</button>
-        `)}
-      </div>
-    `;
-  }
-
-  #renderAcquisitionTabs(utmAvailable: boolean) {
+  #acquisitionTabs(utmAvailable: boolean): ReportTabGroup {
     const selected = utmAvailable ? this.acquisitionView : "referrers";
-    return html`
-      <div slot="heading" class="breakdown-tabs acquisition-tabs" role="tablist" aria-label="Traffic source">
-        <button
-          type="button"
-          role="tab"
-          aria-selected=${selected === "referrers"}
-          tabindex=${selected === "referrers" ? 0 : -1}
-          @click=${() => this.#dispatch("acquisition-change", { view: "referrers" })}
-          @keydown=${this.#onTabKeydown}>Referrers</button>
-        ${utmAvailable ? html`
-          <button
-            type="button"
-            role="tab"
-            aria-selected=${selected === "utm"}
-            tabindex=${selected === "utm" ? 0 : -1}
-            @click=${() => this.#dispatch("acquisition-change", { view: "utm" })}
-            @keydown=${this.#onTabKeydown}>UTM Parameters</button>
-        ` : ""}
-      </div>
-    `;
+    return {
+      ariaLabel: "Traffic source",
+      idPrefix: "acquisition-card-tab",
+      options: [
+        { value: "referrers", label: "Referrers" },
+        ...(utmAvailable ? [{ value: "utm", label: "UTM" }] : []),
+      ],
+      selected,
+    };
   }
 
-  #renderUtmTabs(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>) {
-    return html`
-      <div slot="subheading" class="utm-tabs" role="tablist" aria-label="UTM parameter">
-        ${card.options.map(({ dimension, label }) => html`
-          <button
-            type="button"
-            role="tab"
-            aria-selected=${this.utmDimension === dimension}
-            tabindex=${this.utmDimension === dimension ? 0 : -1}
-            @click=${() => this.#dispatch("utm-change", { dimension })}
-            @keydown=${this.#onTabKeydown}>${label}</button>
-        `)}
-      </div>
-    `;
+  #utmTabs(card: Extract<DashboardCard, { kind: "tabbed-breakdown" }>): ReportTabGroup {
+    return {
+      appearance: "secondary",
+      ariaLabel: "UTM parameter",
+      idPrefix: "utm-card-tab",
+      options: card.options.map(({ dimension, label }) => ({ value: dimension, label })),
+      selected: this.utmDimension,
+    };
   }
 
   #renderCard(card: DashboardCard) {
     const selected = selectedCardDimension(card, this.audienceDimension, this.utmDimension);
     const state = this.breakdowns[selected.dimension];
-    const loading = !state || state.status === "idle" || state.status === "loading";
+    const loading = isInitialLoading(state);
     const allRows = state ? stateData(state)?.rows ?? [] : [];
     const rows = topBreakdownRows(allRows, 10);
     const total = breakdownMetricTotal(allRows, this.metric);
     const unavailable = state?.status === "error" ? state.message : undefined;
     const planLimited = card.kind === "tabbed-breakdown" && card.planLimited;
     const linkValues = selected.dimension === "RequestPath" || selected.dimension === "Route";
+    const headingTabs = card.kind === "tabbed-breakdown" ? this.#tabsForCard(card) : undefined;
     return html`
-      <uui-box class=${`breakdown-card ${card.span === "wide" ? "wide" : ""}`}>
+      <uui-box class=${`breakdown-card ${card.span === "wide" ? "wide" : ""}`} aria-busy=${state?.status === "loading" ? "true" : "false"}>
         <div class="breakdown-card-layout">
           <web-analytics-breakdown-table
             .headline=${selected.headline}
             .dimension=${selected.dimension}
             .metric=${this.metric}
+            .compact=${true}
             .total=${total}
             .rows=${rows}
             .loading=${loading}
             .filters=${this.filters}
             .baseUrl=${this.baseUrl}
             .linkValues=${linkValues}
+            .headingTabs=${headingTabs}
+            @heading-tab-change=${(event: CustomEvent<{ value: AnalyticsDimension }>) => card.kind === "tabbed-breakdown" && this.#dispatch(card.id === "audience" ? "audience-change" : "utm-change", { dimension: event.detail.value })}
             .unavailable=${unavailable}>
-            ${card.kind === "tabbed-breakdown" ? this.#renderTabs(card) : ""}
           </web-analytics-breakdown-table>
           ${planLimited && unavailable ? html`<p class="hint breakdown-hint">UTM reporting availability depends on your analytics plan and reporting window.</p>` : ""}
           <footer class="breakdown-footer">
             ${!loading && !unavailable && rows.length ? html`
-              <uui-button look="secondary" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", selected)}>View all</uui-button>
+              <uui-button class="view-all" compact look="default" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", selected)}>View all</uui-button>
             ` : !loading && unavailable ? html`
               <uui-button look="secondary" label=${`Retry ${selected.headline} report`} @click=${() => this.#dispatch("retry-reports")}>Retry</uui-button>
             ` : ""}
@@ -149,32 +115,32 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
       ? selectedCardDimension(utmCard, this.audienceDimension, this.utmDimension)
       : selectedCardDimension(referrerCard, this.audienceDimension, this.utmDimension);
     const report = this.breakdowns[selected.dimension];
-    const loading = !report || report.status === "idle" || report.status === "loading";
+    const loading = isInitialLoading(report);
     const allRows = report ? stateData(report)?.rows ?? [] : [];
     const rows = topBreakdownRows(allRows, 10);
     const total = breakdownMetricTotal(allRows, this.metric);
     const unavailable = report?.status === "error" ? report.message : undefined;
-
     return html`
-      <uui-box class="breakdown-card wide">
+      <uui-box class="breakdown-card wide" aria-busy=${report?.status === "loading" ? "true" : "false"}>
         <div class="breakdown-card-layout">
           <web-analytics-breakdown-table
             .headline=${selected.headline}
             .dimension=${selected.dimension}
             .metric=${this.metric}
+            .compact=${true}
             .total=${total}
             .rows=${rows}
             .loading=${loading}
             .filters=${this.filters}
             .baseUrl=${this.baseUrl}
-            .hasSubheading=${Boolean(showingUtm)}
-            .unavailable=${unavailable}>
-            ${this.#renderAcquisitionTabs(utmAvailable)}
-            ${showingUtm ? this.#renderUtmTabs(utmCard) : ""}
-          </web-analytics-breakdown-table>
+            .headingTabs=${this.#acquisitionTabs(utmAvailable)}
+            .subheadingTabs=${showingUtm ? this.#utmTabs(utmCard) : undefined}
+            .unavailable=${unavailable}
+            @heading-tab-change=${(event: CustomEvent<{ value: AcquisitionView }>) => this.#dispatch("acquisition-change", { view: event.detail.value })}
+            @subheading-tab-change=${(event: CustomEvent<{ value: UtmDimension }>) => this.#dispatch("utm-change", { dimension: event.detail.value })}></web-analytics-breakdown-table>
           <footer class="breakdown-footer">
             ${!loading && !unavailable && rows.length ? html`
-              <uui-button look="secondary" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", selected)}>View all</uui-button>
+              <uui-button class="view-all" compact look="default" label=${`View all ${selected.headline}`} @click=${() => this.#dispatch("view-breakdown", selected)}>View all</uui-button>
             ` : !loading && unavailable ? html`
               <uui-button look="secondary" label=${`Retry ${selected.headline} report`} @click=${() => this.#dispatch("retry-reports")}>Retry</uui-button>
             ` : ""}
@@ -185,15 +151,15 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
   }
 
   #renderEvents() {
-    const loading = this.events.status === "idle" || this.events.status === "loading";
+    const loading = isInitialLoading(this.events);
     const rows = topEventRows(stateData(this.events)?.rows ?? [], 10);
     const empty = !loading && rows.length === 0;
     return html`
-      <uui-box class="breakdown-card wide">
+      <uui-box class="breakdown-card feature-card" aria-busy=${this.events.status === "loading" ? "true" : "false"}>
         <div class=${`breakdown-card-layout${empty ? " empty-card-layout" : ""}`}>
           <web-analytics-event-table .rows=${rows} .filters=${this.filters} .loading=${loading} .detailsEnabled=${this.supportsEventDetails} .filteringEnabled=${this.supportsGlobalEventFiltering}></web-analytics-event-table>
           ${empty ? "" : html`<footer class="breakdown-footer">
-            ${!loading && rows.length ? html`<uui-button look="secondary" label="View all events" @click=${() => this.#dispatch("view-events")}>View all</uui-button>` : ""}
+            ${!loading && rows.length ? html`<uui-button class="view-all" compact look="default" label="View all events" @click=${() => this.#dispatch("view-events")}>View all</uui-button>` : ""}
           </footer>`}
         </div>
       </uui-box>
@@ -205,51 +171,38 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
     const utmCard = this.cards.find((card): card is Extract<DashboardCard, { kind: "tabbed-breakdown" }> => card.kind === "tabbed-breakdown" && card.id === "utm");
     const referrerCard = standardCards.find((card) => card.kind === "breakdown" && (card.dimension === "ReferrerHostname" || card.dimension === "Referrer"));
     const renderCard = (card: DashboardCard) => card === referrerCard ? this.#renderAcquisitionCard(card, utmCard) : this.#renderCard(card);
-    const documentScoped = !standardCards.some((card) => card.kind === "breakdown" && card.dimension === "RequestPath");
-    const cardsBeforeEvents = documentScoped ? standardCards.slice(0, 1) : standardCards;
-    const cardsAfterEvents = documentScoped ? standardCards.slice(1) : [];
+    const primaryCards = standardCards.filter((card) => card.span === "wide");
+    const detailCards = standardCards.filter((card) => card.span === "normal");
     return html`
-      <section class="grid" aria-label="Traffic breakdowns">
-        ${cardsBeforeEvents.map(renderCard)}
+      <section class="grid primary-grid" aria-label="Primary traffic breakdowns">
+        ${primaryCards.map(renderCard)}
+      </section>
+      <section class="grid detail-grid" aria-label="Traffic breakdowns">
+        ${detailCards.map(renderCard)}
+      </section>
+      ${this.supportsEvents || this.supportsFlags ? html`<section class="grid feature-grid" aria-label="Optional analytics reports">
         ${this.supportsEvents ? this.#renderEvents() : ""}
-        ${cardsAfterEvents.map(renderCard)}
-        ${this.supportsFlags ? html`<uui-box class=${`breakdown-card flags-card${documentScoped ? " document-flags-card" : " wide"}`}>
+        ${this.supportsFlags ? html`<uui-box class="breakdown-card flags-card feature-card" aria-busy=${this.flags.status === "loading" ? "true" : "false"}>
           <web-analytics-flag-card .report=${this.flags} .selected=${this.selectedFlag}></web-analytics-flag-card>
         </uui-box>` : ""}
-      </section>
+      </section>` : ""}
     `;
   }
 
   static styles = [UmbTextStyles, css`
-    .grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--uui-size-layout-1); }
-    .breakdown-card { --uui-box-default-padding: 0; grid-column: span 2; overflow: hidden; position: relative; }
-    .wide { grid-column: span 3; }
+    .grid { display: grid; gap: var(--uui-size-layout-1); }
+    .grid + .grid { margin-block-start: var(--uui-size-layout-1); }
+    .primary-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr)); }
+    .feature-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 28rem), 1fr)); }
+    .detail-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+    .breakdown-card { --uui-box-default-padding: 0; min-inline-size: 0; overflow: hidden; position: relative; }
     .flags-card { --uui-box-default-padding: 0; }
-    .document-flags-card { grid-column: 1 / -1; inline-size: 50%; justify-self: center; }
     .breakdown-card-layout { box-sizing: border-box; min-block-size: 100%; padding-bottom: var(--uui-size-layout-3); }
     .empty-card-layout { block-size: 100%; padding-bottom: 0; }
     .breakdown-footer { align-items: center; background: color-mix(in srgb, var(--uui-color-surface-alt) 9%, var(--uui-color-surface)); border-top: 1px solid var(--uui-color-border); bottom: 0; box-sizing: border-box; display: flex; justify-content: flex-end; left: 0; min-block-size: var(--uui-size-layout-3); padding: 0 var(--uui-size-space-4); position: absolute; right: 0; }
+    .view-all { --uui-button-border-width: 0; --uui-button-content-align: right; }
     .hint { color: var(--uui-color-text-alt); }
     .breakdown-hint { margin: 0; padding: var(--uui-size-space-3) var(--uui-size-space-5); }
-    .breakdown-tabs { align-items: stretch; display: flex; margin: calc(-1 * var(--uui-size-space-3)); min-inline-size: 0; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
-    .breakdown-tabs button { appearance: none; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; font-weight: 500; padding: calc(var(--uui-size-space-3) - 1px) var(--uui-size-space-3); white-space: nowrap; }
-    .breakdown-tabs button[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); color: var(--uui-color-text); font-weight: 700; }
-    .breakdown-tabs button:hover { background: var(--uui-color-surface-alt); }
-    .breakdown-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    .utm-tabs { align-items: center; display: flex; gap: var(--uui-size-space-1); margin-inline: calc(-1 * var(--uui-size-space-3)); min-inline-size: 0; overflow-x: auto; padding-block: var(--uui-size-space-2); scrollbar-width: thin; }
-    .utm-tabs button { appearance: none; background: transparent; border: 0; border-radius: var(--uui-border-radius); color: var(--uui-color-text-alt); cursor: pointer; flex: 0 0 auto; font: inherit; padding: var(--uui-size-space-2) var(--uui-size-space-3); }
-    .utm-tabs button[aria-selected="true"] { background: var(--uui-color-surface-alt); color: var(--uui-color-text); font-weight: 600; }
-    .utm-tabs button:hover { background: color-mix(in srgb, var(--uui-color-selected) 8%, transparent); color: var(--uui-color-text); }
-    .utm-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -2px; }
-    @media (max-width: 62rem) {
-      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .breakdown-card, .wide { grid-column: auto; }
-      .document-flags-card { inline-size: 100%; }
-    }
-    @media (max-width: 56rem) {
-      .grid { grid-template-columns: 1fr; }
-      .document-flags-card { grid-column: 1 / -1; }
-    }
   `];
 }
 

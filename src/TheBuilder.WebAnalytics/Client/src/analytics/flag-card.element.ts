@@ -2,7 +2,7 @@ import { LitElement, css, customElement, html, property } from "@umbraco-cms/bac
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { AnalyticsFlagRow, AnalyticsFlagsReport } from "../api/types.gen.js";
-import { stateData, type AsyncState } from "./async-state.js";
+import { isInitialLoading, stateData, type AsyncState } from "./async-state.js";
 
 const FLAGS_SETUP_URL = "https://vercel.com/docs/flags/observability/web-analytics";
 
@@ -27,7 +27,7 @@ export class WebAnalyticsFlagCardElement extends UmbElementMixin(LitElement) {
     const activeState = this.selected ?? this.report;
     const data = stateData(activeState);
     const rows = this.#rows(data);
-    const loading = activeState.status === "idle" || activeState.status === "loading";
+    const loading = isInitialLoading(activeState);
     const unavailable = activeState.status === "error" ? activeState.message : undefined;
     const selectedKey = data?.flagKey;
     const maximum = Math.max(...rows.map(({ pageViews }) => pageViews), 1);
@@ -57,12 +57,12 @@ export class WebAnalyticsFlagCardElement extends UmbElementMixin(LitElement) {
           <a href=${FLAGS_SETUP_URL} target="_blank" rel="noopener noreferrer">Set up flag tracking <uui-icon name="icon-out" aria-hidden="true"></uui-icon></a>
         </div>
       ` : html`
-        <div class="rows">
+        <div class="rows" aria-busy=${activeState.status === "loading" ? "true" : "false"}>
           ${rows.map((row) => html`
             <div class="row">
               <span class="bar" style=${`--bar-width:${(row.pageViews / maximum) * 100}%`}></span>
               ${selectedKey
-                ? html`<strong class="value">${row.value}</strong>`
+                ? html`<span class="value">${row.value}</span>`
                 : html`<button class="value select" type="button" @click=${() => this.#select(row.value)}>${row.value}</button>`}
               <strong>${this.localize.number(row.visitors)}</strong>
               <strong>${this.localize.number(row.pageViews)}</strong>
@@ -90,7 +90,7 @@ export class WebAnalyticsFlagCardElement extends UmbElementMixin(LitElement) {
     .bar { inset-block: var(--uui-size-space-1); inset-inline: var(--uui-size-space-3); position: absolute; }
     .bar::before { background: color-mix(in srgb, var(--uui-color-interactive) 4%, var(--uui-color-surface)); border-radius: var(--uui-border-radius); block-size: 100%; content: ""; display: block; inline-size: max(4px, var(--bar-width)); }
     .value { overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-    .select { appearance: none; background: transparent; border: 0; color: var(--uui-color-text); cursor: pointer; font: inherit; font-weight: 600; padding: 0; }
+    .select { appearance: none; background: transparent; border: 0; color: var(--uui-color-text); cursor: pointer; font: inherit; font-weight: 500; padding: 0; }
     .select:hover { text-decoration: underline; text-underline-offset: .18em; }
     .empty { align-items: center; display: flex; flex: 1; flex-direction: column; gap: var(--uui-size-space-3); justify-content: center; padding: var(--uui-size-layout-1); text-align: center; }
     .empty-icon { align-items: center; border: 1px solid var(--uui-color-border); border-radius: 50%; color: var(--uui-color-text-alt); display: inline-flex; font-size: 1.5rem; height: 3rem; justify-content: center; width: 3rem; }

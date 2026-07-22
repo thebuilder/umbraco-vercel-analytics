@@ -226,7 +226,8 @@ export class WebAnalyticsBreakdownGridElement extends UmbElementMixin(LitElement
   static styles = [UmbTextStyles, css`
     .grid { display: grid; gap: var(--uui-size-layout-1); }
     .grid + .grid { margin-block-start: var(--uui-size-layout-1); }
-    .primary-grid, .feature-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr)); }
+    .primary-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr)); }
+    .feature-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 28rem), 1fr)); }
     .detail-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
     .breakdown-card { --uui-box-default-padding: 0; min-inline-size: 0; overflow: hidden; position: relative; }
     .flags-card { --uui-box-default-padding: 0; }

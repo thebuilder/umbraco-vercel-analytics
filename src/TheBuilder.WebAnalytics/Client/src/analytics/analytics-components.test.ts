@@ -244,7 +244,7 @@ describe("analytics presentation components", () => {
     expect(cards[0]?.querySelector("web-analytics-event-table")).not.toBeNull();
   });
 
-  it("lets a lone optional report occupy its feature grid", async () => {
+  it("keeps a lone optional report in one feature-grid track", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(true, "unavailable");
     element.supportsEvents = false;
@@ -253,9 +253,13 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    const cards = [...element.shadowRoot?.querySelectorAll(".feature-grid > uui-box") ?? []];
+    const featureGrid = element.shadowRoot?.querySelector<HTMLElement>(".feature-grid");
+    const cards = [...featureGrid?.querySelectorAll("uui-box") ?? []];
     expect(cards).toHaveLength(1);
     expect(cards[0]?.querySelector("web-analytics-flag-card")).not.toBeNull();
+    const styles = [...element.shadowRoot?.querySelectorAll("style") ?? []].map((style) => style.textContent).join("\n");
+    expect(styles).toContain(".feature-grid");
+    expect(styles).toContain("repeat(auto-fill");
   });
 
   it("merges valid UTM reports into the referrers card with five parameter tabs", async () => {

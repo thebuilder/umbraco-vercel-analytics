@@ -12,7 +12,6 @@ vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
 
 import type { WebAnalyticsBreakdownDialogElement } from "./breakdown-dialog.element.js";
 import type { WebAnalyticsBreakdownTableElement } from "./breakdown-table.element.js";
-import { UTM_OPTIONS } from "./dashboard-cards.js";
 import "./breakdown-dialog.element.js";
 
 beforeEach(() => { HTMLDialogElement.prototype.showModal = vi.fn(); });
@@ -23,13 +22,8 @@ describe("breakdown dialog", () => {
     const dialog = document.createElement("web-analytics-breakdown-dialog") as WebAnalyticsBreakdownDialogElement;
     dialog.headline = "UTM media";
     dialog.dimension = "UtmMedium";
-    dialog.context = {
-      kind: "acquisition",
-      title: "Traffic sources",
-      referrer: { dimension: "ReferrerHostname", headline: "Referrers", label: "Referrers" },
-      utmDimension: "UtmMedium",
-      utmOptions: UTM_OPTIONS,
-    };
+    dialog.availableDimensions = ["ReferrerHostname", "UtmSource", "UtmMedium", "UtmCampaign", "UtmTerm", "UtmContent"];
+    dialog.preferredUtmDimension = "UtmMedium";
     dialog.rows = [{ value: "email", visitors: 8, pageViews: 11 }];
     const onDimensionChange = vi.fn();
     dialog.addEventListener("breakdown-dimension-change", onDimensionChange);
@@ -37,7 +31,11 @@ describe("breakdown dialog", () => {
     await dialog.updateComplete;
 
     expect(dialog.shadowRoot?.querySelector("dialog")?.getAttribute("aria-label")).toBe("Traffic sources");
-    expect(dialog.shadowRoot?.querySelector("uui-dialog-layout")?.getAttribute("headline")).toBe("Traffic sources");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.textContent).toBe("Traffic sources");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-close")?.getAttribute("aria-label")).toBe("Close Traffic sources");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-headline-controls uui-input")?.getAttribute("label")).toBe("Search UTM media");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-controls")).toBeNull();
+    expect(dialog.shadowRoot?.querySelector('[slot="actions"]')).toBeNull();
     const table = dialog.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table")!;
     await table.updateComplete;
     expect([...table.shadowRoot?.querySelectorAll<HTMLButtonElement>('.report-tabs.primary [role="tab"]') ?? []]
@@ -63,25 +61,47 @@ describe("breakdown dialog", () => {
     document.body.append(dialog);
     await dialog.updateComplete;
 
-    expect(dialog.shadowRoot?.querySelector("uui-dialog-layout")?.getAttribute("headline")).toBe("Countries");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.textContent).toBe("Countries");
     const table = dialog.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table")!;
     await table.updateComplete;
     expect(table.rowLabel).toBe("Country");
     expect(table.shadowRoot?.querySelector(".report-tabs")).toBeNull();
+    expect([...table.shadowRoot?.querySelectorAll("thead th") ?? []].map((header) => header.textContent?.trim())).toEqual([
+      "Country",
+      "Visitors",
+      "Page views",
+    ]);
+  });
+
+  it("keeps percentage-dimension visitor share beside the visitor count", async () => {
+    const dialog = document.createElement("web-analytics-breakdown-dialog") as WebAnalyticsBreakdownDialogElement;
+    dialog.headline = "Countries";
+    dialog.dimension = "Country";
+    dialog.metric = "pageViews";
+    dialog.rows = [
+      { value: "DK", visitors: 10, pageViews: 30 },
+      { value: "US", visitors: 10, pageViews: 10 },
+    ];
+    document.body.append(dialog);
+    await dialog.updateComplete;
+    const table = dialog.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table")!;
+    await table.updateComplete;
+
+    const shares = [...table.shadowRoot?.querySelectorAll<HTMLElement>(".metric-share") ?? []];
+    expect(shares.map((share) => share.textContent)).toEqual(["50%", "50%"]);
+    expect(shares.every((share) => share.closest("td")?.cellIndex === 1)).toBe(true);
+    expect([...shares[0].parentElement?.children ?? []].map((element) => element.className)).toEqual([
+      "filter-action",
+      "metric-share",
+      "metric-number",
+    ]);
   });
 
   it("keeps audience tabs inside the table header", async () => {
     const dialog = document.createElement("web-analytics-breakdown-dialog") as WebAnalyticsBreakdownDialogElement;
     dialog.headline = "Devices";
     dialog.dimension = "DeviceType";
-    dialog.context = {
-      kind: "audience",
-      title: "Audience",
-      options: [
-        { dimension: "DeviceType", headline: "Devices", label: "Devices" },
-        { dimension: "BrowserName", headline: "Browsers", label: "Browsers" },
-      ],
-    };
+    dialog.availableDimensions = ["DeviceType", "BrowserName"];
     const onDimensionChange = vi.fn();
     dialog.addEventListener("breakdown-dimension-change", onDimensionChange);
     document.body.append(dialog);
@@ -89,7 +109,7 @@ describe("breakdown dialog", () => {
     const table = dialog.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table")!;
     await table.updateComplete;
 
-    expect(dialog.shadowRoot?.querySelector("uui-dialog-layout")?.getAttribute("headline")).toBe("Audience");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.textContent).toBe("Audience");
     const tabs = [...table.shadowRoot?.querySelectorAll<HTMLButtonElement>('.report-tabs.primary [role="tab"]') ?? []];
     expect(tabs.map((tab) => tab.textContent?.trim())).toEqual(["Devices", "Browsers"]);
     expect(tabs[0]?.getAttribute("aria-controls")).toBe("breakdown-report-panel");
@@ -101,5 +121,20 @@ describe("breakdown dialog", () => {
       headline: "Browsers",
     });
     expect(table.shadowRoot?.activeElement).toBe(tabs[1]);
+  });
+
+  it("does not render unsupported grouped dimensions", async () => {
+    const dialog = document.createElement("web-analytics-breakdown-dialog") as WebAnalyticsBreakdownDialogElement;
+    dialog.headline = "Referrers";
+    dialog.dimension = "ReferrerHostname";
+    dialog.availableDimensions = ["ReferrerHostname"];
+    document.body.append(dialog);
+    await dialog.updateComplete;
+    const table = dialog.shadowRoot?.querySelector<WebAnalyticsBreakdownTableElement>("web-analytics-breakdown-table")!;
+    await table.updateComplete;
+
+    expect([...table.shadowRoot?.querySelectorAll<HTMLButtonElement>('.report-tabs.primary [role="tab"]') ?? []]
+      .map((tab) => tab.textContent?.trim())).toEqual(["Referrers"]);
+    expect(table.shadowRoot?.querySelector('.report-tabs.secondary')).toBeNull();
   });
 });

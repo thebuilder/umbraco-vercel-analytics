@@ -3,6 +3,7 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventRow } from "../api/types.gen.js";
+import { renderAnalyticsDialogHeadline } from "./analytics-dialog-headline.js";
 import { analyticsDialogStyles } from "./analytics-dialog.styles.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import "./event-table.element.js";
@@ -29,10 +30,12 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
   render() {
     return html`
       <dialog aria-label="Events" @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
-        <uui-dialog-layout headline="Events">
-          <uui-input type="search" label="Search events" maxlength="200" placeholder="Search" .value=${this._search} @input=${this.#onSearch}>
-            <uui-icon name="icon-search" slot="prepend"></uui-icon>
-          </uui-input>
+        <div class="analytics-dialog-layout">
+          ${renderAnalyticsDialogHeadline("Events", "Close events", () => this.#close(), html`
+            <uui-input type="search" label="Search events" maxlength="200" placeholder="Search" .value=${this._search} @input=${this.#onSearch}>
+              <uui-icon name="icon-search" slot="prepend"></uui-icon>
+            </uui-input>
+          `)}
           <div class="results analytics-dialog-body" aria-busy=${this.loading} aria-live="polite">
             ${!this.loading && this.unavailable ? html`<umb-empty-state headline="Events unavailable"><p>${this.unavailable}</p></umb-empty-state>` : ""}
             ${!this.loading && !this.unavailable && this._search && this.rows.length === 0 ? html`<umb-empty-state headline="No matching events"><p>Try a different search.</p></umb-empty-state>` : ""}
@@ -40,8 +43,7 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
               <web-analytics-event-table .rows=${this.rows} .filters=${this.filters} .loading=${this.loading} .detailsEnabled=${this.detailsEnabled} .filteringEnabled=${this.filteringEnabled}></web-analytics-event-table>
             ` : ""}
           </div>
-          <uui-button slot="actions" look="secondary" label="Close events" @click=${this.#close}>Close</uui-button>
-        </uui-dialog-layout>
+        </div>
       </dialog>
     `;
   }
@@ -50,7 +52,7 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
     dialog { --analytics-dialog-max-width: 58rem; }
     uui-input { box-sizing: border-box; width: 100%; }
     uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
-    .results { margin-top: var(--uui-size-space-4); overflow: auto; scrollbar-gutter: stable; }
+    .results { overflow: auto; scrollbar-gutter: stable; }
   `];
 }
 

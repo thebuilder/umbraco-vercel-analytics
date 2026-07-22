@@ -147,5 +147,8 @@ describe("analytics settings model", () => {
 
     connection.eventPropertyNames = Array.from({ length: 21 }, (_, index) => `property-${index}`);
     expect(validateConnection(connection, providerDescriptor(model, connection.provider)).eventPropertyNames).toBe("Add no more than 20 event properties.");
+
+    connection.enableEvents = false;
+    expect(validateConnection(connection, providerDescriptor(model, connection.provider))).toEqual({});
   });
 });

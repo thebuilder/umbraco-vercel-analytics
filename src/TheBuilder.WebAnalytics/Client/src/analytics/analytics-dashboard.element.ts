@@ -4,9 +4,9 @@ import type { AnalyticsDimension } from "../api/types.gen.js";
 import { countryDisplayName, normalizeCountryCode } from "./country-display.js";
 import type { AnalyticsDateRangeChangeDetail } from "./date-range-picker.element.js";
 import type { AnalyticsFilter, AudienceDimension, DashboardMetric, UtmDimension } from "./dashboard-url-state.js";
-import type { AcquisitionView, BreakdownDialogContext } from "./dashboard-cards.js";
-import { AnalyticsDashboardController } from "./analytics-dashboard.controller.js";
-import { stateData, type AsyncState } from "./async-state.js";
+import type { AcquisitionView } from "./dashboard-cards.js";
+import { AnalyticsDashboardController, type DashboardState } from "./analytics-dashboard.controller.js";
+import { isInitialLoading, stateData, type AsyncState } from "./async-state.js";
 import { analyticsDashboardStyles } from "./analytics-dashboard.styles.js";
 import "./analytics-dashboard-header.element.js";
 import "./analytics-summary.element.js";
@@ -73,6 +73,21 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
     return state.status === "error" ? state.message : undefined;
   }
 
+  #renderHeader(state: DashboardState) {
+    return html`
+      <web-analytics-dashboard-header
+        .connections=${state.connections}
+        .connection=${state.connection}
+        .route=${state.route}
+        .range=${state.range}
+        .preset=${state.preset}
+        .siteUrl=${this.#controller.linkBaseUrl()}
+        .documentScoped=${Boolean(this.documentId)}
+        @connection-change=${(event: CustomEvent<{ connection: string }>) => this.#controller.setConnection(event.detail.connection)}
+        @analytics-date-range-change=${(event: CustomEvent<AnalyticsDateRangeChangeDetail>) => this.#controller.setDateRange(event.detail.preset, event.detail.range)}></web-analytics-dashboard-header>
+    `;
+  }
+
   render() {
     void this._revision;
     const state = this.#controller.state;
@@ -92,22 +107,34 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
         </umb-empty-state>
       </main>
     `;
+    const activeConnection = state.connections.find(({ key }) => key === state.connection);
+    if (activeConnection?.isConfigured === false) return html`
+      <main>
+        ${this.#renderHeader(state)}
+        <div class="connection-setup-region">
+          <section class="connection-setup" role="status" aria-labelledby="connection-setup-title">
+            <uui-icon name="icon-alert" aria-hidden="true"></uui-icon>
+            <div class="connection-setup-content">
+              <h2 id="connection-setup-title">Connection credentials required</h2>
+              <p>Add server-side credentials for this connection to load analytics reports.</p>
+              <uui-button
+                href="/umbraco/section/settings/dashboard/web-analytics"
+                look="primary"
+                label="Open Web Analytics connection settings">
+                Open settings
+              </uui-button>
+            </div>
+          </section>
+        </div>
+      </main>
+    `;
     const expanded = state.expandedBreakdown;
     const expandedEvents = state.expandedEvents;
     const selected = state.selectedEvent;
     const capabilities = state.capabilities;
     return html`
       <main @toggle-filter=${(event: CustomEvent<{ dimension?: AnalyticsDimension; value: string }>) => this.#controller.toggleFilter(event.detail.dimension, event.detail.value)}>
-        <web-analytics-dashboard-header
-          .connections=${state.connections}
-          .connection=${state.connection}
-          .route=${state.route}
-          .range=${state.range}
-          .preset=${state.preset}
-          .siteUrl=${this.#controller.linkBaseUrl()}
-          .documentScoped=${Boolean(this.documentId)}
-          @connection-change=${(event: CustomEvent<{ connection: string }>) => this.#controller.setConnection(event.detail.connection)}
-          @analytics-date-range-change=${(event: CustomEvent<AnalyticsDateRangeChangeDetail>) => this.#controller.setDateRange(event.detail.preset, event.detail.range)}></web-analytics-dashboard-header>
+        ${this.#renderHeader(state)}
         ${this.#renderFilters(state.filters)}
         <web-analytics-summary
           .report=${state.summary}
@@ -131,7 +158,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
           .supportsEventDetails=${capabilities?.eventDetails ?? false}
           .supportsGlobalEventFiltering=${capabilities?.globalEventFiltering ?? false}
           .supportsFlags=${capabilities?.flags ?? false}
-          @view-breakdown=${(event: CustomEvent<{ context?: BreakdownDialogContext; dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline, { context: event.detail.context })}
+          @view-breakdown=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
           @view-events=${() => this.#controller.openEvents()}
           @select-event=${(event: CustomEvent<{ eventName: string }>) => this.#controller.selectEvent(event.detail.eventName)}
           @select-flag=${(event: CustomEvent<{ flagKey: string }>) => this.#controller.selectFlag(event.detail.flagKey)}
@@ -143,17 +170,19 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
         ${expanded ? html`
           <web-analytics-breakdown-dialog
             .headline=${expanded.headline}
-            .context=${expanded.context}
             .dimension=${expanded.dimension}
+            .availableDimensions=${capabilities?.dimensions ?? []}
+            .preferredUtmDimension=${state.utmDimension}
             .rows=${stateData(expanded.report) ?? []}
             .filters=${state.filters}
-            .loading=${expanded.report.status === "loading"}
+            .loading=${isInitialLoading(expanded.report)}
+            aria-busy=${expanded.report.status === "loading" ? "true" : "false"}
             .unavailable=${this.#error(expanded.report)}
             .metric=${state.metric}
             .baseUrl=${this.#controller.linkBaseUrl()}
             .linkValues=${expanded.dimension === "RequestPath" || expanded.dimension === "Route"}
             @search-breakdown=${(event: CustomEvent<{ search: string }>) => this.#controller.searchBreakdown(event.detail.search)}
-            @breakdown-dimension-change=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline, { context: expanded.context })}
+            @breakdown-dimension-change=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
             @close-breakdown=${() => this.#controller.closeBreakdown()}></web-analytics-breakdown-dialog>
         ` : ""}
         ${expandedEvents ? html`
@@ -162,7 +191,8 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
             .filters=${state.filters}
             .detailsEnabled=${capabilities?.eventDetails ?? false}
             .filteringEnabled=${capabilities?.globalEventFiltering ?? false}
-            .loading=${expandedEvents.status === "loading"}
+            .loading=${isInitialLoading(expandedEvents)}
+            aria-busy=${expandedEvents.status === "loading" ? "true" : "false"}
             .unavailable=${this.#error(expandedEvents)}
             @search-events=${(event: CustomEvent<{ search: string }>) => this.#controller.openEvents(event.detail.search, true)}
             @select-event=${(event: CustomEvent<{ eventName: string }>) => this.#controller.selectEvent(event.detail.eventName)}
@@ -173,13 +203,14 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
             .eventName=${selected.eventName}
             .propertiesEnabled=${capabilities?.eventProperties ?? false}
             .details=${stateData(selected.details)}
-            .loading=${selected.details.status === "loading"}
+            .loading=${isInitialLoading(selected.details)}
             .unavailable=${this.#error(selected.details)}
             .filterProperty=${selected.eventProperty}
             .filterValue=${selected.eventValue}
             .searchedProperty=${stateData(selected.property)}
             .searchedTerm=${selected.propertySearch}
-            .searchLoading=${selected.property.status === "loading"}
+            .searchLoading=${isInitialLoading(selected.property)}
+            aria-busy=${selected.details.status === "loading" || selected.property.status === "loading" ? "true" : "false"}
             .searchUnavailable=${this.#error(selected.property)}
             @search-event-property=${(event: CustomEvent<{ propertyName: string; search: string }>) => this.#controller.searchEventProperty(event.detail.propertyName, event.detail.search)}
             @toggle-event-property-filter=${(event: CustomEvent<{ property: string; value: string }>) => this.#controller.toggleEventPropertyFilter(event.detail.property, event.detail.value)}

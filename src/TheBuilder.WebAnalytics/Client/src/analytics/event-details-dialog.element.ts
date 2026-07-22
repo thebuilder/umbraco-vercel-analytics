@@ -3,6 +3,7 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventDetails, AnalyticsEventProperty } from "../api/types.gen.js";
+import { renderAnalyticsDialogHeadline } from "./analytics-dialog-headline.js";
 import { analyticsDialogStyles } from "./analytics-dialog.styles.js";
 import { renderReportTabs, reportTabsStyles } from "./report-tabs.js";
 
@@ -161,7 +162,8 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     const activeProperty = this.#activeProperty();
     return html`
       <dialog aria-label=${`${this.eventName} event details`} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
-        <uui-dialog-layout headline=${`${this.eventName} event`}>
+        <div class="analytics-dialog-layout">
+          ${renderAnalyticsDialogHeadline(`${this.eventName} event`, "Close event details", () => this.#close())}
           <div class="dialog-content analytics-dialog-body" aria-busy=${this.loading}>
             ${this.details ? html`
               ${this.propertiesEnabled ? activeProperty ? html`
@@ -172,19 +174,18 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
               ${this.unavailable ? html`<div class="error-overlay" role="alert">${this.unavailable}</div>` : ""}
             ` : this.loading ? html`<div class="loading" role="status">Loading event details…</div>` : this.unavailable ? html`<div class="state-message"><umb-empty-state headline="Event details unavailable"><p>${this.unavailable}</p></umb-empty-state></div>` : ""}
           </div>
-          <uui-button slot="actions" look="secondary" label="Close event details" @click=${this.#close}>Close</uui-button>
-        </uui-dialog-layout>
+        </div>
       </dialog>
     `;
   }
 
   static styles = [UmbTextStyles, analyticsDialogStyles, reportTabsStyles, css`
     .dialog-content { --analytics-dialog-body-height: min(28rem, 52dvh); display: flex; flex-direction: column; position: relative; }
-    .property-controls { display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding-block-end: var(--uui-size-space-4); }
+    .property-controls { border-bottom: 1px solid var(--uui-color-border); display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding: 0 var(--analytics-dialog-inline-padding) var(--uui-size-space-4); }
     .property-controls uui-input { box-sizing: border-box; width: 100%; }
     .property-controls uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
     #event-property-panel { display: flex; flex: 1; flex-direction: column; min-block-size: 0; }
-    .property-table { flex: 1; margin-inline: calc(-1 * var(--uui-size-space-5)); min-block-size: 0; overflow: auto; scrollbar-gutter: stable; }
+    .property-table { flex: 1; min-block-size: 0; overflow: auto; scrollbar-gutter: stable; }
     table { --bar-inset: var(--uui-size-space-3); border-collapse: separate; border-spacing: 0; min-inline-size: 34rem; table-layout: fixed; width: 100%; }
     caption { clip: rect(0 0 0 0); height: 1px; overflow: hidden; position: absolute; width: 1px; }
     th, td { box-sizing: border-box; padding: var(--uui-size-space-3) var(--uui-size-space-5); text-align: left; }

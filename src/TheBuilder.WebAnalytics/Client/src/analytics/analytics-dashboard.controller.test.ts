@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { AnalyticsCapabilities, AnalyticsDocumentRoute } from "../api/types.gen.js";
 import { AnalyticsDashboardController, type DashboardEnvironment } from "./analytics-dashboard.controller.js";
 import type { DashboardApi } from "./dashboard-api.js";
-import { UTM_OPTIONS } from "./dashboard-cards.js";
 import { dateRangeForPreset } from "./date-range.js";
 
 const fullCapabilities: AnalyticsCapabilities = {
@@ -34,7 +33,7 @@ describe("AnalyticsDashboardController", () => {
     expect(controller.state.connection).toBe("11111111-1111-1111-1111-111111111111");
   });
 
-  it("does not retain reports from the previous connection when the next one fails", async () => {
+  it("does not request or retain reports for an unconfigured connection", async () => {
     const api = dashboardApi();
     api.connections.mockResolvedValue(ok({
       enabled: true,
@@ -44,25 +43,20 @@ describe("AnalyticsDashboardController", () => {
         { key: "22222222-2222-2222-2222-222222222222", displayName: "Unconfigured", provider: "Vercel", capabilities: fullCapabilities, isDefault: false, isConfigured: false, baseUrl: undefined, warnings: ["No server-side access token is configured for this connection."] },
       ],
     }));
-    const nextEvents = deferred<Awaited<ReturnType<DashboardApi["events"]>>>();
-    api.events
-      .mockResolvedValueOnce(ok({ rows: [{ eventName: "Demo event", visitors: 10, count: 12 }] }))
-      .mockReturnValueOnce(nextEvents.promise);
+    api.events.mockResolvedValueOnce(ok({ rows: [{ eventName: "Demo event", visitors: 10, count: 12 }] }));
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
 
     controller.connect();
     await vi.waitFor(() => expect(controller.state.events.status).toBe("success"));
     controller.setConnection("22222222-2222-2222-2222-222222222222");
 
-    expect(controller.state.events).toEqual({ status: "loading" });
-
-    nextEvents.resolve({
-      data: undefined,
-      error: new Error("No access token"),
-      response: new Response(null, { status: 401 }),
-    });
-    await vi.waitFor(() => expect(controller.state.events.status).toBe("error"));
-    expect("previous" in controller.state.events).toBe(false);
+    expect(controller.state.summary).toEqual({ status: "idle" });
+    expect(controller.state.breakdowns).toEqual({});
+    expect(controller.state.events).toEqual({ status: "idle" });
+    expect(controller.state.flags).toEqual({ status: "idle" });
+    expect(api.summary).toHaveBeenCalledTimes(1);
+    expect(api.events).toHaveBeenCalledTimes(1);
+    expect(api.flags).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the newest document scope when an older route request finishes last", async () => {
@@ -116,26 +110,82 @@ describe("AnalyticsDashboardController", () => {
     expect(controller.state.expandedBreakdown).toBeUndefined();
   });
 
-  it("preserves grouped dialog context and updates its selected UTM dimension", async () => {
+  it("stores only canonical breakdown query state for a grouped dialog", async () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
     controller.connect();
     await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
-    const context = {
-      kind: "acquisition" as const,
-      title: "Traffic sources" as const,
-      referrer: { dimension: "ReferrerHostname" as const, headline: "Referrers", label: "Referrers" },
-      utmDimension: "UtmMedium" as const,
-      utmOptions: UTM_OPTIONS,
-    };
+    await controller.openBreakdown("UtmCampaign", "UTM campaigns");
 
-    await controller.openBreakdown("UtmCampaign", "UTM campaigns", { context });
-
-    expect(controller.state.expandedBreakdown?.context).toMatchObject({
-      kind: "acquisition",
-      title: "Traffic sources",
-      utmDimension: "UtmCampaign",
+    expect(controller.state.expandedBreakdown).toMatchObject({
+      dimension: "UtmCampaign",
+      headline: "UTM campaigns",
+      search: "",
+      report: { status: "success" },
     });
+  });
+
+  it("does not reuse rows from a different breakdown query", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    api.breakdown.mockResolvedValueOnce(ok({
+      dimension: "ReferrerHostname",
+      rows: [{ value: "example.com", visitors: 12, pageViews: 18 }],
+    }));
+    await controller.openBreakdown("ReferrerHostname", "Referrers");
+    const pending = deferred<ReturnType<typeof ok<{ dimension: "UtmSource"; rows: never[] }>>>();
+    api.breakdown.mockReturnValueOnce(pending.promise);
+
+    const switching = controller.openBreakdown("UtmSource", "UTM sources");
+
+    expect(controller.state.expandedBreakdown?.report).toEqual({ status: "loading" });
+    pending.resolve(ok({ dimension: "UtmSource", rows: [] }));
+    await switching;
+  });
+
+  it("retains rows while the same breakdown query refreshes", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    api.breakdown.mockResolvedValueOnce(ok({
+      dimension: "Country",
+      rows: [{ value: "DK", visitors: 12, pageViews: 18 }],
+    }));
+    await controller.openBreakdown("Country", "Countries");
+    const pending = deferred<ReturnType<typeof ok<{ dimension: "Country"; rows: never[] }>>>();
+    api.breakdown.mockReturnValueOnce(pending.promise);
+
+    const refreshing = controller.openBreakdown("Country", "Countries");
+
+    expect(controller.state.expandedBreakdown?.report).toEqual({
+      status: "loading",
+      previous: [{ value: "DK", visitors: 12, pageViews: 18 }],
+    });
+    pending.resolve(ok({ dimension: "Country", rows: [] }));
+    await refreshing;
+  });
+
+  it("does not reuse unfiltered rows for a searched breakdown", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    api.breakdown.mockResolvedValueOnce(ok({
+      dimension: "Country",
+      rows: [{ value: "DK", visitors: 12, pageViews: 18 }],
+    }));
+    await controller.openBreakdown("Country", "Countries");
+    const pending = deferred<ReturnType<typeof ok<{ dimension: "Country"; rows: never[] }>>>();
+    api.breakdown.mockReturnValueOnce(pending.promise);
+
+    const searching = controller.openBreakdown("Country", "Countries", { search: "denmark" });
+
+    expect(controller.state.expandedBreakdown?.report).toEqual({ status: "loading" });
+    pending.resolve(ok({ dimension: "Country", rows: [] }));
+    await searching;
   });
 
   it("does not restore event details after the dialog closes during a request", async () => {

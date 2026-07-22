@@ -15,7 +15,7 @@ import type {
 import { dashboardApi, type DashboardApi } from "./dashboard-api.js";
 import { activeDocumentRoute } from "./document-route.js";
 import { countrySearchValue } from "./country-display.js";
-import { dashboardReportPlan, type AcquisitionView, type BreakdownDialogContext, type DashboardCard, type DashboardReportPlan } from "./dashboard-cards.js";
+import { dashboardReportPlan, type AcquisitionView, type DashboardCard, type DashboardReportPlan } from "./dashboard-cards.js";
 import { dateRangeForPreset, type AnalyticsDateRange, type DatePreset } from "./date-range.js";
 import {
   parseDashboardUrlState,
@@ -30,15 +30,15 @@ import { loadDashboardBreakdown, loadDashboardBreakdowns, loadDashboardReports, 
 import { visibleEventRows } from "./event-rows.js";
 import { reportErrorMessage } from "./report-error.js";
 import { DebouncedRequest, RequestCoordinator } from "./request-coordinator.js";
-import { detectUtmCapability, isUtmDimension, type UtmCapability } from "./utm-capability.js";
+import { detectUtmCapability, type UtmCapability } from "./utm-capability.js";
 import { errorState, idleState, loadingState, successState, type AsyncState } from "./async-state.js";
 import { normalizeDashboardSelection, supportsDimension, unavailableCapabilities } from "./dashboard-capabilities.js";
 
 type ReportScope = { documentId?: string; culture?: string; path?: string };
 export type ExpandedBreakdown = {
-  context?: BreakdownDialogContext;
   dimension: AnalyticsDimension;
   headline: string;
+  search: string;
   report: AsyncState<AnalyticsBreakdown["rows"]>;
 };
 export type SelectedEvent = {
@@ -200,6 +200,20 @@ export class AnalyticsDashboardController {
   async loadReports(): Promise<void> {
     const connection = this.state.connection;
     if (!connection) return;
+    const selectedConnection = this.state.connections.find(({ key }) => key === connection);
+    if (selectedConnection?.isConfigured === false) {
+      this.#reportRequest.cancel();
+      this.#closeDialogs();
+      this.#utmRequest.cancel();
+      this.#set({
+        summary: idleState(),
+        breakdowns: {},
+        events: idleState(),
+        flags: idleState(),
+        utmCapability: "unknown",
+      });
+      return;
+    }
     this.#closeDialogs();
     this.#utmRequest.cancel();
     const capabilities = this.#capabilities();
@@ -321,30 +335,30 @@ export class AnalyticsDashboardController {
   async openBreakdown(
     dimension: AnalyticsDimension,
     headline: string,
-    options: { context?: BreakdownDialogContext; search?: string; debounce?: boolean } = {},
+    options: { search?: string; debounce?: boolean } = {},
   ): Promise<void> {
     if (!supportsDimension(this.#capabilities(), dimension)) return;
     const connection = this.state.connection;
     if (!connection) return;
     const search = options.search ?? "";
-    const context = options.context?.kind === "acquisition" && isUtmDimension(dimension)
-      ? { ...options.context, utmDimension: dimension }
-      : options.context;
-    const previous = this.state.expandedBreakdown?.dimension === dimension ? this.state.expandedBreakdown.report : undefined;
-    this.#set({ expandedBreakdown: { context, dimension, headline, report: loadingState(previous) } });
+    const current = this.state.expandedBreakdown;
+    const previous = current?.dimension === dimension && current.search === search ? current.report : undefined;
+    this.#set({ expandedBreakdown: { dimension, headline, search, report: loadingState(previous) } });
     const run = (signal: AbortSignal) => this.#api.breakdown({
       path: { dimension },
       query: { ...this.#reportQuery(connection, this.#visitFilterQuery()), limit: 100, search: search || undefined },
       signal,
     });
     const result = await (options.debounce ? this.#expandedRequest.schedule(run) : this.#expandedRequest.run(run));
-    if (result.status === "cancelled" || result.status === "stale" || this.state.expandedBreakdown?.dimension !== dimension) return;
+    if (result.status === "cancelled" || result.status === "stale"
+      || this.state.expandedBreakdown?.dimension !== dimension
+      || this.state.expandedBreakdown.search !== search) return;
     if (result.status === "error") {
-      this.#set({ expandedBreakdown: { context, dimension, headline, report: errorState(reportErrorMessage(result.error), previous) } });
+      this.#set({ expandedBreakdown: { dimension, headline, search, report: errorState(reportErrorMessage(result.error), previous) } });
       return;
     }
     const { data, error, response } = result.value;
-    this.#set({ expandedBreakdown: { context, dimension, headline, report: error
+    this.#set({ expandedBreakdown: { dimension, headline, search, report: error
       ? errorState(apiErrorMessage(error, response?.status ?? 0), previous)
       : successState(data?.rows ?? []) } });
   }
@@ -354,7 +368,6 @@ export class AnalyticsDashboardController {
     if (!expanded) return;
     const value = expanded.dimension === "Country" ? countrySearchValue(search, this.#environment.languages) : search;
     void this.openBreakdown(expanded.dimension, expanded.headline, {
-      context: expanded.context,
       search: value,
       debounce: true,
     });

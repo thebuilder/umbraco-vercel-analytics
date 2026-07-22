@@ -5,7 +5,7 @@ import type { AnalyticsSummary } from "../api/types.gen.js";
 import { inclusiveRangeDays, type AnalyticsDateRange } from "./date-range.js";
 import { metricComparison } from "./metric-comparison.js";
 import type { DashboardMetric } from "./dashboard-url-state.js";
-import { stateData, type AsyncState } from "./async-state.js";
+import { isInitialLoading, stateData, type AsyncState } from "./async-state.js";
 import "./history-chart.element.js";
 
 @customElement("web-analytics-summary")
@@ -76,7 +76,7 @@ export class WebAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
         @click=${() => this.#selectMetric(metric)}
         @keydown=${this.#onTabKeydown}>
         <span class="eyebrow">${label}</span>
-        ${this.report.status === "loading"
+        ${isInitialLoading(this.report)
           ? html`<span class="metric-skeleton" aria-hidden="true"></span>`
           : html`<span class="metric-value">
               <strong>${this.localize.number(stateData(this.report)?.totals[metric] ?? 0)}</strong>
@@ -110,7 +110,7 @@ export class WebAnalyticsSummaryElement extends UmbElementMixin(LitElement) {
           class="history-panel"
           role="tabpanel"
           aria-labelledby=${`metric-${this.metric}-tab`}>
-          ${this.report.status === "loading" ? html`
+          ${isInitialLoading(this.report) ? html`
             <span class="visually-hidden" role="status">Loading traffic summary and history</span>
             <div class="chart-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
           ` : stateData(this.report)?.points.length

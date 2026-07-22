@@ -1,6 +1,6 @@
 import type { AnalyticsDimension } from "../api/types.gen.js";
 import type { AudienceDimension, UtmDimension } from "./dashboard-url-state.js";
-import type { UtmCapability } from "./utm-capability.js";
+import { isUtmDimension, type UtmCapability } from "./utm-capability.js";
 
 export type DimensionOption<TDimension extends AnalyticsDimension = AnalyticsDimension> = {
   dimension: TDimension;
@@ -8,19 +8,7 @@ export type DimensionOption<TDimension extends AnalyticsDimension = AnalyticsDim
   label: string;
 };
 
-export type BreakdownDialogContext =
-  | {
-      kind: "audience";
-      title: "Audience";
-      options: ReadonlyArray<DimensionOption>;
-    }
-  | {
-      kind: "acquisition";
-      title: "Traffic sources";
-      referrer: DimensionOption;
-      utmDimension: UtmDimension;
-      utmOptions: ReadonlyArray<DimensionOption<UtmDimension>>;
-    };
+export type BreakdownDialogGroup = "audience" | "acquisition";
 
 export type DashboardCard =
   | {
@@ -44,7 +32,7 @@ export type DashboardReportPlan = {
   dimensions: ReadonlyArray<AnalyticsDimension>;
 };
 
-const AUDIENCE_OPTIONS: ReadonlyArray<DimensionOption<AudienceDimension>> = [
+export const AUDIENCE_OPTIONS: ReadonlyArray<DimensionOption<AudienceDimension>> = [
   { dimension: "DeviceType", headline: "Devices", label: "Devices" },
   { dimension: "BrowserName", headline: "Browsers", label: "Browsers" },
 ];
@@ -56,6 +44,16 @@ export const UTM_OPTIONS: ReadonlyArray<DimensionOption<UtmDimension>> = [
   { dimension: "UtmTerm", headline: "UTM terms", label: "Term" },
   { dimension: "UtmContent", headline: "UTM content", label: "Content" },
 ];
+
+export function breakdownDialogGroup(dimension?: AnalyticsDimension): BreakdownDialogGroup | undefined {
+  if (dimension === "DeviceType" || dimension === "BrowserName") return "audience";
+  if (dimension === "ReferrerHostname" || dimension === "Referrer" || (dimension && isUtmDimension(dimension))) return "acquisition";
+  return undefined;
+}
+
+export function referrerDimensionOption(dimension: "ReferrerHostname" | "Referrer"): DimensionOption {
+  return { dimension, headline: "Referrers", label: "Referrers" };
+}
 
 const SHARED_CARDS: ReadonlyArray<DashboardCard> = [
   { kind: "breakdown", dimension: "Country", headline: "Countries", span: "normal" },
@@ -79,7 +77,7 @@ export function dashboardCards(
 ): ReadonlyArray<DashboardCard> {
   const cards: DashboardCard[] = [
     ...(documentScoped ? [] : [{ kind: "breakdown" as const, dimension: "RequestPath" as const, headline: "Pages", span: "wide" as const }]),
-    { kind: "breakdown", dimension: referrerDimension, headline: "Referrers", span: "wide" },
+    { kind: "breakdown", ...referrerDimensionOption(referrerDimension), span: "wide" },
     ...SHARED_CARDS,
   ];
   if (utmCapability === "available") cards.push(UTM_CARD);

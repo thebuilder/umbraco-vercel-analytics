@@ -62,7 +62,10 @@ export const reportTabsStyles = css`
   .report-tabs {
     align-items: stretch;
     display: flex;
-    margin: var(--analytics-report-tabs-margin, calc(-1 * var(--uui-size-space-3)));
+    margin: var(
+      --analytics-report-tabs-margin,
+      calc(-1 * var(--uui-size-space-3)) calc(-1 * var(--uui-size-space-5))
+    );
     min-inline-size: 0;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
@@ -72,36 +75,34 @@ export const reportTabsStyles = css`
     appearance: none;
     background: transparent;
     border: 0;
-    border-bottom: 3px solid transparent;
+    box-sizing: border-box;
     color: var(--uui-color-text-alt);
     cursor: pointer;
     flex: 0 0 auto;
     font: inherit;
-    min-block-size: 2.75rem;
-    padding: var(--uui-size-space-3) var(--uui-size-space-4);
+    min-block-size: calc(2.5rem - 0.5px);
+    padding: var(--uui-size-space-3) var(--uui-size-space-5);
     white-space: nowrap;
   }
   .report-tabs button:hover { background: color-mix(in srgb, var(--uui-color-selected) 7%, transparent); color: var(--uui-color-text); }
-  .report-tabs button[aria-selected="true"] { border-bottom-color: var(--uui-color-selected); color: var(--uui-color-text); font-weight: 700; }
+  .report-tabs button[aria-selected="true"] { box-shadow: inset 0 -3px var(--uui-color-selected); color: var(--uui-color-text); font-weight: 700; }
   .report-tabs button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: -3px; }
   .report-tabs.secondary {
-    align-items: center;
-    gap: var(--uui-size-space-1);
+    align-items: stretch;
+    gap: 0;
     margin: var(--analytics-report-tabs-secondary-margin, 0 calc(-1 * var(--uui-size-space-3)));
-    padding-block: var(--uui-size-space-2);
+    padding-block: 0;
   }
   .report-tabs.secondary button {
-    border-bottom: 0;
-    border-radius: var(--uui-border-radius);
     min-block-size: 2.5rem;
-    padding: var(--uui-size-space-2) var(--uui-size-space-3);
+    padding: var(--uui-size-space-3);
   }
-  .report-tabs.secondary button[aria-selected="true"] { background: var(--uui-color-surface-alt); }
+  .report-tabs.secondary button[aria-selected="true"] { background: transparent; box-shadow: inset 0 -2px var(--uui-color-selected); }
   @media (pointer: coarse) {
     .report-tabs.secondary button { min-block-size: 2.75rem; }
   }
   @media (forced-colors: active) {
-    .report-tabs button[aria-selected="true"] { border-bottom-color: Highlight; }
+    .report-tabs button[aria-selected="true"] { box-shadow: inset 0 -3px Highlight; }
     .report-tabs.secondary button[aria-selected="true"] { outline: 2px solid Highlight; }
   }
 `;

@@ -6,6 +6,7 @@ import {
   state,
 } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
+import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement, UUIToggleElement } from "@umbraco-cms/backoffice/external/uui";
 import { WebAnalyticsService } from "../api/sdk.gen.js";
@@ -35,10 +36,18 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
   @state() private _dirty = false;
   @state() private _showValidation = false;
   @state() private _testingKey?: string;
-  @state() private _status?: { type: "success" | "error"; message: string };
+  @state() private _status?: { type: "error"; message: string };
   @state() private _loadError?: SettingsError;
   @state() private _connectionStatuses: Record<string, ConnectionActionStatus> = {};
   @state() private _showProviderPicker = false;
+  #notificationContext?: typeof UMB_NOTIFICATION_CONTEXT.TYPE;
+
+  constructor() {
+    super();
+    this.consumeContext(UMB_NOTIFICATION_CONTEXT, (context) => {
+      this.#notificationContext = context;
+    });
+  }
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -70,7 +79,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     this._settings = { ...this._settings, ...patch };
     if (markDirty) {
       this._dirty = true;
-      if (this._status?.type === "success") this._status = undefined;
     }
   }
 
@@ -206,7 +214,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
       this._dirty = false;
       this._showValidation = false;
       announceAnalyticsAvailability(data.enabled);
-      if (successMessage) this._status = { type: "success", message: successMessage };
+      if (successMessage) this.#notificationContext?.peek("positive", { data: { message: successMessage } });
       return true;
     } catch (error) {
       this._status = { type: "error", message: settingsError("save", error).message };
@@ -357,7 +365,7 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
           </div>
         ` : ""}
 
-        ${this._status ? html`<div class=${`status ${this._status.type}`} role=${this._status.type === "error" ? "alert" : "status"} aria-live="polite"><uui-icon name=${this._status.type === "success" ? "icon-check" : "icon-alert"}></uui-icon><span>${this._status.message}</span></div>` : ""}
+        ${this._status ? html`<div class="status error" role="alert" aria-live="polite"><uui-icon name="icon-alert"></uui-icon><span>${this._status.message}</span></div>` : ""}
 
         <section class="connections-section" aria-labelledby="connections-heading">
           <div class="section-heading">
@@ -456,7 +464,6 @@ export class WebAnalyticsSettingsDashboardElement extends UmbElementMixin(LitEle
     h2 { margin: 0; }
     .section-heading p { color: var(--uui-color-text-alt); margin-block: var(--uui-size-space-2) 0; text-wrap: pretty; }
     .status { align-items: flex-start; border: 1px solid var(--uui-color-border); display: flex; gap: var(--uui-size-space-2); margin-block: var(--uui-size-space-5); overflow-wrap: anywhere; padding: var(--uui-size-space-3) var(--uui-size-space-4); }
-    .status.success { background: color-mix(in srgb, var(--uui-color-positive) 8%, var(--uui-color-surface)); border-color: color-mix(in srgb, var(--uui-color-positive) 35%, var(--uui-color-border)); }
     .status.error { background: color-mix(in srgb, var(--uui-color-danger) 7%, var(--uui-color-surface)); border-color: color-mix(in srgb, var(--uui-color-danger) 35%, var(--uui-color-border)); }
     .connections-section { margin-block-start: 0; }
     .general, .mock-settings { margin-block-start: var(--uui-size-layout-2); }

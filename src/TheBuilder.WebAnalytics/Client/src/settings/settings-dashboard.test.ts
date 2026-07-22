@@ -6,10 +6,18 @@ const sdk = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   testConnection: vi.fn(),
 }));
+const notifications = vi.hoisted(() => ({
+  peek: vi.fn(),
+}));
 
 vi.mock("../api/sdk.gen.js", () => ({ WebAnalyticsService: sdk }));
+vi.mock("@umbraco-cms/backoffice/notification", () => ({ UMB_NOTIFICATION_CONTEXT: { TYPE: {} } }));
 vi.mock("@umbraco-cms/backoffice/element-api", () => ({
-  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => base,
+  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => class extends base {
+    consumeContext(_token: unknown, callback: (context: typeof notifications) => void) {
+      callback(notifications);
+    }
+  },
 }));
 vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
 vi.mock("@umbraco-cms/backoffice/document", () => ({}));
@@ -23,6 +31,7 @@ beforeEach(() => {
   sdk.settings.mockReset();
   sdk.saveSettings.mockReset();
   sdk.testConnection.mockReset();
+  notifications.peek.mockReset();
   Element.prototype.scrollIntoView = vi.fn();
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -134,8 +143,11 @@ describe("analytics settings network recovery", () => {
     sdk.saveSettings.mockResolvedValueOnce(apiOk(settings({ defaultRangeDays: 31 })));
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true, composed: true }));
 
-    await vi.waitFor(() => expect(dashboard.shadowRoot?.textContent).toContain("Web Analytics settings saved."));
+    await vi.waitFor(() => expect(notifications.peek).toHaveBeenCalledWith("positive", {
+      data: { message: "Web Analytics settings saved." },
+    }));
     expect(dashboard.shadowRoot?.querySelector(".settings-actions")).toBeNull();
+    expect(dashboard.shadowRoot?.querySelector(".status")).toBeNull();
     expect(sdk.saveSettings).toHaveBeenCalledTimes(2);
   });
 

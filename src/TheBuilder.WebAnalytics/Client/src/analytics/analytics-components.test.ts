@@ -624,6 +624,18 @@ describe("analytics presentation components", () => {
     await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector(".active-filters")).toBeNull());
     expect(new URL(window.location.href).searchParams.has("filter")).toBe(false);
   });
+
+  it("renders relevant identity icons for active filters", async () => {
+    window.history.replaceState({}, "", "/umbraco/section/analytics?filter=Country%3ADK&filter=OsName%3AmacOS&filter=DeviceType%3ADesktop");
+    const dashboard = document.createElement("web-analytics-dashboard") as WebAnalyticsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelectorAll(".filter-badge")).toHaveLength(3));
+
+    const badges = [...dashboard.shadowRoot?.querySelectorAll(".filter-badge") ?? []];
+    expect((badges[0]?.querySelector(".filter-icon") as HTMLImageElement | null)?.getAttribute("src")).toBe("https://flag.vercel.app/s/DK.svg");
+    expect((badges[1]?.querySelector(".filter-icon") as HTMLImageElement | null)?.getAttribute("src")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/apple.svg");
+    expect(badges[2]?.querySelector(".filter-icon")?.getAttribute("name")).toBe("icon-desktop");
+  });
 });
 
 function apiOk<T>(data: T) {

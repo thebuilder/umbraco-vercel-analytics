@@ -241,6 +241,7 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
     .country-flag { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: cover; }
     .referrer-favicon { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: contain; }
     .breakdown-value-icon { block-size: 1.25rem; flex: 0 0 auto; font-size: var(--uui-size-5); inline-size: 1.25rem; object-fit: contain; }
+    img.breakdown-value-icon[src$="/operating-systems/ios.svg"] { box-shadow: var(--uui-shadow-depth-1); }
     .breakdown-value-icon-fallback { color: var(--uui-color-text-alt); }
     .percentage-value { display: inline-block; font-weight: 700; outline: none; position: relative; }
     .percentage-value:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }

@@ -342,6 +342,21 @@ describe("analytics presentation components", () => {
     expect(icons?.[1]?.getAttribute("name")).toBe("icon-globe");
   });
 
+  it("renders native Umbraco icons for device categories", async () => {
+    const element = document.createElement("web-analytics-breakdown-table") as WebAnalyticsBreakdownTableElement;
+    element.dimension = "DeviceType";
+    element.rows = [
+      { value: "Desktop", visitors: 22_304, pageViews: 30_000 },
+      { value: "Mobile", visitors: 1_204, pageViews: 2_000 },
+      { value: "Tablet", visitors: 304, pageViews: 500 },
+    ];
+    document.body.append(element);
+    await element.updateComplete;
+
+    const icons = [...element.shadowRoot?.querySelectorAll(".breakdown-value-icon") ?? []];
+    expect(icons.map((icon) => icon.getAttribute("name"))).toEqual(["icon-desktop", "icon-mobile", "icon-ipad"]);
+  });
+
   it("keeps document traffic breakdowns ahead of optional reports", async () => {
     const element = document.createElement("web-analytics-breakdown-grid") as WebAnalyticsBreakdownGridElement;
     element.cards = dashboardCards(true, "unavailable");

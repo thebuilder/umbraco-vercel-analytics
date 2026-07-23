@@ -52,9 +52,23 @@ const ICON_PATHS_BY_DIMENSION: Partial<Record<AnalyticsDimension, ReadonlyMap<st
   OsName: OPERATING_SYSTEM_ICON_PATHS,
 };
 
+const NATIVE_ICON_NAMES = new Map<string, string>([
+  ["desktop", "icon-desktop"],
+  ["mobile", "icon-mobile"],
+  ["tablet", "icon-ipad"],
+]);
+
 const BREAKDOWN_ICON_ROOT = "/App_Plugins/TheBuilder.WebAnalytics/icons/";
 
-export function breakdownValueIconPath(dimension: AnalyticsDimension | undefined, value: string): string | undefined {
-  const icon = dimension ? ICON_PATHS_BY_DIMENSION[dimension]?.get(value.trim().toLowerCase()) : undefined;
-  return icon ? `${BREAKDOWN_ICON_ROOT}${icon}` : undefined;
+export type BreakdownValueIcon =
+  | { kind: "asset"; src: string }
+  | { kind: "native"; name: string };
+
+export function breakdownValueIcon(dimension: AnalyticsDimension | undefined, value: string): BreakdownValueIcon | undefined {
+  const normalizedValue = value.trim().toLowerCase();
+  const asset = dimension ? ICON_PATHS_BY_DIMENSION[dimension]?.get(normalizedValue) : undefined;
+  if (asset) return { kind: "asset", src: `${BREAKDOWN_ICON_ROOT}${asset}` };
+
+  const nativeIcon = dimension === "DeviceType" ? NATIVE_ICON_NAMES.get(normalizedValue) : undefined;
+  return nativeIcon ? { kind: "native", name: nativeIcon } : undefined;
 }

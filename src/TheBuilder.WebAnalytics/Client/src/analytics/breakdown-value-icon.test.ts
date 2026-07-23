@@ -1,24 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { breakdownValueIconPath } from "./breakdown-value-icon.js";
+import { breakdownValueIcon } from "./breakdown-value-icon.js";
 
-describe("breakdownValueIconPath", () => {
+describe("breakdownValueIcon", () => {
   it("uses local coloured marks for recognised browser values", () => {
-    expect(breakdownValueIconPath("BrowserName", "Chrome")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/chrome.svg");
-    expect(breakdownValueIconPath("BrowserName", "Microsoft Edge")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/edge.svg");
-    expect(breakdownValueIconPath("BrowserName", "Opera GX")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/opera-gx.svg");
-    expect(breakdownValueIconPath("BrowserName", "SberBrowser")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/sberbank.svg");
+    expect(breakdownValueIcon("BrowserName", "Chrome")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/chrome.svg" });
+    expect(breakdownValueIcon("BrowserName", "Microsoft Edge")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/edge.svg" });
+    expect(breakdownValueIcon("BrowserName", "Opera GX")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/opera-gx.svg" });
+    expect(breakdownValueIcon("BrowserName", "SberBrowser")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/sberbank.svg" });
   });
 
   it("uses local platform marks for recognised operating systems", () => {
-    expect(breakdownValueIconPath("OsName", "Mac OS X")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/apple.svg");
-    expect(breakdownValueIconPath("OsName", "iOS")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/ios.svg");
-    expect(breakdownValueIconPath("OsName", "Windows")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/windows.svg");
-    expect(breakdownValueIconPath("OsName", "GNU/Linux")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/linux.svg");
-    expect(breakdownValueIconPath("OsName", "Chrome OS")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/chrome.svg");
+    expect(breakdownValueIcon("OsName", "Mac OS X")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/apple.svg" });
+    expect(breakdownValueIcon("OsName", "iOS")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/ios.svg" });
+    expect(breakdownValueIcon("OsName", "Windows")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/windows.svg" });
+    expect(breakdownValueIcon("OsName", "GNU/Linux")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/linux.svg" });
+    expect(breakdownValueIcon("OsName", "Chrome OS")).toEqual({ kind: "asset", src: "/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/chrome.svg" });
+  });
+
+  it("uses native Umbraco marks for recognised device values", () => {
+    expect(breakdownValueIcon("DeviceType", "Desktop")).toEqual({ kind: "native", name: "icon-desktop" });
+    expect(breakdownValueIcon("DeviceType", "Mobile")).toEqual({ kind: "native", name: "icon-mobile" });
+    expect(breakdownValueIcon("DeviceType", "Tablet")).toEqual({ kind: "native", name: "icon-ipad" });
   });
 
   it("leaves unrecognised values for the generic fallback", () => {
-    expect(breakdownValueIconPath("BrowserName", "Mobile App")).toBeUndefined();
-    expect(breakdownValueIconPath("OsName", "(not set)")).toBeUndefined();
+    expect(breakdownValueIcon("BrowserName", "Mobile App")).toBeUndefined();
+    expect(breakdownValueIcon("OsName", "(not set)")).toBeUndefined();
+    expect(breakdownValueIcon("DeviceType", "Unknown")).toBeUndefined();
   });
 });

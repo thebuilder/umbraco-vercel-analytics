@@ -615,6 +615,35 @@ describe("analytics presentation components", () => {
     expect(summary?.metric).toBe("pageViews");
   });
 
+  it("replaces the Events dialog with event details while preserving back navigation", async () => {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: vi.fn() });
+    sdk.events.mockResolvedValue(apiOk({ rows: [{ eventName: "Signup completed", visitors: 12, count: 18 }] }));
+    sdk.eventDetails.mockResolvedValue(apiOk({
+      eventName: "Signup completed",
+      totals: { visitors: 12, count: 18 },
+      properties: [],
+    }));
+    const dashboard = document.createElement("web-analytics-dashboard") as WebAnalyticsDashboardElement;
+    document.body.append(dashboard);
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector<WebAnalyticsBreakdownGridElement>("web-analytics-breakdown-grid")?.events.status).toBe("success"));
+
+    dashboard.shadowRoot?.querySelector<WebAnalyticsBreakdownGridElement>("web-analytics-breakdown-grid")?.dispatchEvent(new CustomEvent("view-events", { bubbles: true, composed: true }));
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("web-analytics-event-dialog")).not.toBeNull());
+    const eventsDialog = dashboard.shadowRoot?.querySelector<HTMLElement>("web-analytics-event-dialog");
+    eventsDialog?.dispatchEvent(new CustomEvent("select-event", {
+      bubbles: true,
+      composed: true,
+      detail: { eventName: "Signup completed" },
+    }));
+
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("web-analytics-event-details-dialog")).not.toBeNull());
+    expect(dashboard.shadowRoot?.querySelector("web-analytics-event-dialog")).toBeNull();
+
+    dashboard.shadowRoot?.querySelector<HTMLElement>("web-analytics-event-details-dialog")?.dispatchEvent(new CustomEvent("back-to-events", { bubbles: true, composed: true }));
+    await vi.waitFor(() => expect(dashboard.shadowRoot?.querySelector("web-analytics-event-dialog")).not.toBeNull());
+    expect(dashboard.shadowRoot?.querySelector("web-analytics-event-details-dialog")).toBeNull();
+  });
+
   it("clears every active filter from the mounted dashboard and URL", async () => {
     window.history.replaceState({}, "", "/umbraco/section/analytics?filter=RequestPath%3A%2F&filter=Country%3ADK");
     const dashboard = document.createElement("web-analytics-dashboard") as WebAnalyticsDashboardElement;

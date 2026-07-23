@@ -203,7 +203,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
             @breakdown-dimension-change=${(event: CustomEvent<{ dimension: AnalyticsDimension; headline: string }>) => this.#controller.openBreakdown(event.detail.dimension, event.detail.headline)}
             @close-breakdown=${() => this.#controller.closeBreakdown()}></web-analytics-breakdown-dialog>
         ` : ""}
-        ${expandedEvents ? html`
+        ${expandedEvents && !selected ? html`
           <web-analytics-event-dialog
             .rows=${stateData(expandedEvents) ?? []}
             .filters=${state.filters}

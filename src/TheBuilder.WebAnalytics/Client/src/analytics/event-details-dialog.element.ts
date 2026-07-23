@@ -205,7 +205,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     tr:hover .filter-button, .filter-button:focus-visible, .filter-button[aria-pressed="true"] { opacity: 1; }
     .filter-button:hover { background: var(--uui-color-surface-emphasis); }
     .filter-button:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 1px; }
-    .value-label { overflow-wrap: anywhere; position: relative; z-index: 1; }
+    .value-label { font-weight: 700; overflow-wrap: anywhere; position: relative; z-index: 1; }
     .bar { inset-block: var(--uui-size-space-1); inset-inline-start: var(--bar-inset); inline-size: calc(100% + 16rem - 2 * var(--bar-inset)); position: absolute; }
     .bar::before { background: color-mix(in srgb, var(--uui-color-interactive) 4%, var(--uui-color-surface)); block-size: 100%; border-radius: var(--uui-border-radius); content: ""; display: block; inline-size: max(var(--bar-minimum), var(--bar-width)); }
     .loading, .state-message { box-sizing: border-box; flex: 1; padding: var(--uui-size-space-5); }

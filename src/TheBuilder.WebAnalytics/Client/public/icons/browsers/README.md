@@ -1,4 +1,3 @@
 # Browser icon sources
 
-The coloured browser marks in this directory are local copies from [theSVG](https://thesvg.org/), which publishes these SVG assets under the MIT License.
-
+The coloured browser marks in this directory are local copies from [theSVG](https://thesvg.org/). Refer to each source icon's page for its licence and trademark notice.

@@ -318,11 +318,27 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    const icons = element.shadowRoot?.querySelectorAll<HTMLElement>(".browser-icon");
+    const icons = element.shadowRoot?.querySelectorAll<HTMLElement>(".breakdown-value-icon");
     expect(icons).toHaveLength(2);
     expect(icons?.[0]?.tagName).toBe("IMG");
     expect((icons?.[0] as HTMLImageElement | undefined)?.getAttribute("src")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/chrome.svg");
     expect(icons?.[1]?.tagName).toBe("UUI-ICON");
+    expect(icons?.[1]?.getAttribute("name")).toBe("icon-globe");
+  });
+
+  it("renders local operating system marks and a globe for unrecognised values", async () => {
+    const element = document.createElement("web-analytics-breakdown-table") as WebAnalyticsBreakdownTableElement;
+    element.dimension = "OsName";
+    element.rows = [
+      { value: "Windows", visitors: 22_304, pageViews: 30_000 },
+      { value: "(not set)", visitors: 1, pageViews: 1 },
+    ];
+    document.body.append(element);
+    await element.updateComplete;
+
+    const icons = element.shadowRoot?.querySelectorAll<HTMLElement>(".breakdown-value-icon");
+    expect(icons).toHaveLength(2);
+    expect((icons?.[0] as HTMLImageElement | undefined)?.getAttribute("src")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/windows.svg");
     expect(icons?.[1]?.getAttribute("name")).toBe("icon-globe");
   });
 

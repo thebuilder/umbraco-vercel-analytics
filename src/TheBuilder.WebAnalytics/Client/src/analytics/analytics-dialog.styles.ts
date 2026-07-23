@@ -30,6 +30,8 @@ export const analyticsDialogStyles = css`
   }
   .analytics-dialog-headline.has-controls { grid-template-columns: max-content minmax(11rem, 16rem) minmax(0, 1fr) 2.75rem; }
   .analytics-dialog-headline.has-controls .analytics-dialog-close { grid-column: 4; }
+  .analytics-dialog-headline.has-controls.no-headline { grid-template-columns: minmax(11rem, 16rem) minmax(0, 1fr) 2.75rem; }
+  .analytics-dialog-headline.has-controls.no-headline .analytics-dialog-close { grid-column: 3; }
   .analytics-dialog-headline h2 {
     font-size: var(--uui-type-default-size);
     font-weight: 700;

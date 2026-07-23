@@ -32,7 +32,6 @@ export const analyticsDialogStyles = css`
   .analytics-dialog-headline.has-controls .analytics-dialog-close { grid-column: 4; }
   .analytics-dialog-headline.has-controls.no-headline { grid-template-columns: minmax(11rem, 16rem) minmax(0, 1fr) 2.75rem; }
   .analytics-dialog-headline.has-controls.no-headline .analytics-dialog-close { grid-column: 3; }
-  .analytics-dialog-headline.has-leading-action { grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem; }
   .analytics-dialog-headline h2 {
     font-size: var(--uui-type-default-size);
     font-weight: 700;
@@ -76,18 +75,22 @@ export const analyticsDialogStyles = css`
     align-items: center;
     appearance: none;
     background: transparent;
-    block-size: 2.75rem;
     border: 0;
-    border-radius: var(--uui-border-radius);
     color: var(--uui-color-text);
     cursor: pointer;
     display: inline-flex;
     font: inherit;
-    inline-size: 2.75rem;
-    justify-content: center;
+    font-weight: inherit;
+    gap: var(--uui-size-space-2);
+    margin: 0;
+    max-inline-size: 100%;
+    min-inline-size: 0;
     padding: 0;
+    text-align: start;
   }
-  .analytics-dialog-back:hover { background: var(--uui-color-surface-alt); color: var(--uui-color-text); }
+  .analytics-dialog-back uui-icon { flex: 0 0 auto; font-size: var(--uui-type-h4-size); }
+  .analytics-dialog-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .analytics-dialog-back:hover span { text-decoration: underline; text-underline-offset: .18em; }
   .analytics-dialog-back:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }
   .analytics-dialog-body {
     block-size: var(--analytics-dialog-body-height, min(30rem, 52dvh));

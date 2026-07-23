@@ -21,10 +21,12 @@ describe("event details dialog layout", () => {
     document.body.append(dialog);
     await dialog.updateComplete;
 
-    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.textContent).toBe("Signup completed");
-    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-back")?.getAttribute("aria-label")).toBe("Back to all events");
+    const back = dialog.shadowRoot?.querySelector<HTMLButtonElement>(".analytics-dialog-back");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.contains(back ?? null)).toBe(true);
+    expect(back?.textContent).toContain("Signup completed");
+    expect(back?.getAttribute("aria-label")).toBe("Back to all events from Signup completed");
     expect(dialog.shadowRoot?.querySelector(".analytics-dialog-back uui-icon")?.getAttribute("name")).toBe("icon-navigation-left");
-    (dialog.shadowRoot?.querySelector(".analytics-dialog-back") as HTMLButtonElement).click();
+    back?.click();
     expect(onBack).toHaveBeenCalledOnce();
   });
 

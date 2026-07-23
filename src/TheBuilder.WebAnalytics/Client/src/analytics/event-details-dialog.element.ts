@@ -166,10 +166,9 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     return html`
       <dialog aria-label=${`${this.eventName} event details`} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
         <div class="analytics-dialog-layout">
-          ${renderAnalyticsDialogHeadline(`${this.eventName} event`, "Close event details", () => this.#close(), undefined, true, html`
-            <button type="button" class="analytics-dialog-back" @click=${this.#backToEvents}>
-              <uui-icon name="icon-arrow-left"></uui-icon>
-              <span>All events</span>
+          ${renderAnalyticsDialogHeadline(this.eventName, "Close event details", () => this.#close(), undefined, true, html`
+            <button type="button" class="analytics-dialog-back" aria-label="Back to all events" title="Back to all events" @click=${this.#backToEvents}>
+              <uui-icon name="icon-navigation-left" aria-hidden="true"></uui-icon>
             </button>
           `)}
           <div class="dialog-content analytics-dialog-body" aria-busy=${this.loading}>

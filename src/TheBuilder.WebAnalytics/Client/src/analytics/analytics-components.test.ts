@@ -495,7 +495,7 @@ describe("analytics presentation components", () => {
     document.body.append(element);
     await element.updateComplete;
 
-    expect(element.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.textContent).toBe("Read article event");
+    expect(element.shadowRoot?.querySelector(".analytics-dialog-headline h2")?.textContent).toBe("Read article");
     expect(element.shadowRoot?.querySelector(".analytics-dialog-close")?.getAttribute("aria-label")).toBe("Close event details");
     expect(element.shadowRoot?.querySelector(".event-totals")).toBeNull();
     expect(element.shadowRoot?.querySelector(".dialog-content")?.classList.contains("no-properties")).toBe(false);

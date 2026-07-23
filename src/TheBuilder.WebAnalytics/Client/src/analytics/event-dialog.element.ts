@@ -35,7 +35,7 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
             <uui-input type="search" label="Search events" maxlength="200" placeholder="Search" .value=${this._search} @input=${this.#onSearch}>
               <uui-icon name="icon-search" slot="prepend"></uui-icon>
             </uui-input>
-          `)}
+          `, false)}
           <div class="results analytics-dialog-body" aria-busy=${this.loading} aria-live="polite">
             ${!this.loading && this.unavailable ? html`<umb-empty-state headline="Events unavailable"><p>${this.unavailable}</p></umb-empty-state>` : ""}
             ${!this.loading && !this.unavailable && this._search && this.rows.length === 0 ? html`<umb-empty-state headline="No matching events"><p>Try a different search.</p></umb-empty-state>` : ""}

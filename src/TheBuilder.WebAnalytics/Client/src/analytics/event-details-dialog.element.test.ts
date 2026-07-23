@@ -58,6 +58,22 @@ describe("event details dialog layout", () => {
     expect(dialog.shadowRoot?.querySelector("thead")?.textContent?.match(/title/g)).toHaveLength(1);
   });
 
+  it("does not leave an empty search area when the active property has no values", async () => {
+    const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
+    dialog.eventName = "Signup completed";
+    dialog.propertiesEnabled = true;
+    dialog.details = {
+      eventName: "Signup completed",
+      totals: { count: 15, visitors: 12 },
+      properties: [{ name: "plan", values: [] }],
+    };
+    document.body.append(dialog);
+    await dialog.updateComplete;
+
+    expect(dialog.shadowRoot?.querySelector(".property-controls")).toBeNull();
+    expect(dialog.shadowRoot?.querySelector('uui-input[type="search"]')).toBeNull();
+  });
+
   it("does not render property controls when properties are unavailable", async () => {
     const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
     dialog.eventName = "Read case";

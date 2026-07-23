@@ -82,8 +82,9 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     const maximum = Math.max(...values.map((value) => value.count), 1);
     return html`
       <div id="event-property-panel" role="tabpanel" aria-labelledby=${`event-property-tab-${this.details?.properties.indexOf(property) ?? 0}`}>
-        <div class="property-controls">
-          ${property.values.length ? html`
+        ${property.values.length || (this.filterProperty !== undefined && this.filterValue !== undefined) ? html`
+          <div class="property-controls">
+            ${property.values.length ? html`
             <uui-input
               type="search"
               label=${`Search ${property.name} values`}
@@ -93,15 +94,16 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
               @input=${this.#onSearch}>
               <uui-icon name="icon-search" slot="prepend"></uui-icon>
             </uui-input>
-          ` : ""}
-          ${this.filterProperty !== undefined && this.filterValue !== undefined ? html`
-            <button type="button" class="active-filter" @click=${() => this.#toggleFilter(this.filterProperty!, this.filterValue!)}>
-              <uui-icon name="icon-filter"></uui-icon>
-              <span>${this.filterProperty}: ${this.filterValue || "(empty)"}</span>
-              <uui-icon name="icon-delete"></uui-icon>
-            </button>
-          ` : ""}
-        </div>
+            ` : ""}
+            ${this.filterProperty !== undefined && this.filterValue !== undefined ? html`
+              <button type="button" class="active-filter" @click=${() => this.#toggleFilter(this.filterProperty!, this.filterValue!)}>
+                <uui-icon name="icon-filter"></uui-icon>
+                <span>${this.filterProperty}: ${this.filterValue || "(empty)"}</span>
+                <uui-icon name="icon-delete"></uui-icon>
+              </button>
+            ` : ""}
+          </div>
+        ` : ""}
         <div class="property-table">
           <table>
             <caption>${property.name} values for ${this.eventName}</caption>

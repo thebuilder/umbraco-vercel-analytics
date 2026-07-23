@@ -40,6 +40,7 @@ export type ExpandedBreakdown = {
   headline: string;
   search: string;
   report: AsyncState<AnalyticsBreakdown["rows"]>;
+  cache: Readonly<Record<string, AnalyticsBreakdown["rows"]>>;
 };
 export type SelectedEvent = {
   eventName: string;
@@ -342,26 +343,32 @@ export class AnalyticsDashboardController {
     const connection = this.state.connection;
     if (!connection) return;
     const search = options.search ?? "";
-    const current = this.state.expandedBreakdown;
-    const previous = current?.report;
-    this.#set({ expandedBreakdown: { dimension, headline, search, report: loadingState(previous) } });
+    const query = { ...this.#reportQuery(connection, this.#visitFilterQuery()), limit: 100, search: search || undefined };
+    const cacheKey = breakdownCacheKey(dimension, search);
+    const cache = this.state.expandedBreakdown?.cache ?? {};
+    const previousRows = cache[cacheKey];
+    const previous = previousRows === undefined ? undefined : successState(previousRows);
+    this.#set({ expandedBreakdown: { dimension, headline, search, cache, report: loadingState(previous) } });
     const run = (signal: AbortSignal) => this.#api.breakdown({
       path: { dimension },
-      query: { ...this.#reportQuery(connection, this.#visitFilterQuery()), limit: 100, search: search || undefined },
+      query,
       signal,
     });
     const result = await (options.debounce ? this.#expandedRequest.schedule(run) : this.#expandedRequest.run(run));
+    const active = this.state.expandedBreakdown;
     if (result.status === "cancelled" || result.status === "stale"
-      || this.state.expandedBreakdown?.dimension !== dimension
-      || this.state.expandedBreakdown.search !== search) return;
+      || active?.dimension !== dimension
+      || active.search !== search) return;
     if (result.status === "error") {
-      this.#set({ expandedBreakdown: { dimension, headline, search, report: errorState(reportErrorMessage(result.error), previous) } });
+      this.#set({ expandedBreakdown: { dimension, headline, search, cache: active.cache, report: errorState(reportErrorMessage(result.error), previous) } });
       return;
     }
     const { data, error, response } = result.value;
-    this.#set({ expandedBreakdown: { dimension, headline, search, report: error
+    const rows = data?.rows ?? [];
+    const nextCache = error ? active.cache : { ...active.cache, [cacheKey]: rows };
+    this.#set({ expandedBreakdown: { dimension, headline, search, cache: nextCache, report: error
       ? errorState(apiErrorMessage(error, response?.status ?? 0), previous)
-      : successState(data?.rows ?? []) } });
+      : successState(rows) } });
   }
 
   searchBreakdown(search: string): void {
@@ -748,6 +755,10 @@ export class AnalyticsDashboardController {
 
 function eventPropertyCacheKey(propertyName: string, search: string): string {
   return JSON.stringify([propertyName, search]);
+}
+
+function breakdownCacheKey(dimension: AnalyticsDimension, search: string): string {
+  return JSON.stringify([dimension, search]);
 }
 
 function apiErrorMessage(error: unknown, status: number): string {

@@ -98,7 +98,8 @@ describe("AnalyticsDashboardController", () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
     controller.connect();
-    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    await vi.waitFor(() => expect(controller.state.utmCapability).toBe("available"));
+    api.breakdown.mockClear();
     const pending = deferred<ReturnType<typeof ok<{ dimension: "Country"; rows: never[] }>>>();
     api.breakdown.mockReturnValueOnce(pending.promise);
 
@@ -115,7 +116,8 @@ describe("AnalyticsDashboardController", () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
     controller.connect();
-    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    await vi.waitFor(() => expect(controller.state.utmCapability).toBe("available"));
+    api.breakdown.mockClear();
     await controller.openBreakdown("UtmCampaign", "UTM campaigns");
 
     expect(controller.state.expandedBreakdown).toMatchObject({
@@ -126,11 +128,12 @@ describe("AnalyticsDashboardController", () => {
     });
   });
 
-  it("retains rows while switching breakdown tabs", async () => {
+  it("does not reuse rows from a different breakdown query", async () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
     controller.connect();
-    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    await vi.waitFor(() => expect(controller.state.utmCapability).toBe("available"));
+    api.breakdown.mockClear();
     api.breakdown.mockResolvedValueOnce(ok({
       dimension: "ReferrerHostname",
       rows: [{ value: "example.com", visitors: 12, pageViews: 18 }],
@@ -141,24 +144,48 @@ describe("AnalyticsDashboardController", () => {
 
     const switching = controller.openBreakdown("UtmSource", "UTM sources");
 
-    expect(controller.state.expandedBreakdown?.report).toEqual({
-      status: "loading",
-      previous: [{ value: "example.com", visitors: 12, pageViews: 18 }],
-    });
+    expect(controller.state.expandedBreakdown?.report).toEqual({ status: "loading" });
     pending.resolve(ok({ dimension: "UtmSource", rows: [] }));
     await switching;
+  });
+
+  it("retains cached rows when returning to a breakdown tab", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.utmCapability).toBe("available"));
+    api.breakdown.mockClear();
+    const referrerRows = [{ value: "example.com", visitors: 12, pageViews: 18 }];
+    api.breakdown.mockResolvedValueOnce(ok({ dimension: "ReferrerHostname", rows: referrerRows }));
+    await controller.openBreakdown("ReferrerHostname", "Referrers");
+    expect(controller.state.expandedBreakdown?.report).toEqual({ status: "success", data: referrerRows });
+    api.breakdown.mockResolvedValueOnce(ok({ dimension: "UtmSource", rows: [] }));
+    await controller.openBreakdown("UtmSource", "UTM sources");
+    const pending = deferred<ReturnType<typeof ok<{ dimension: "ReferrerHostname"; rows: never[] }>>>();
+    api.breakdown.mockReturnValueOnce(pending.promise);
+
+    const returning = controller.openBreakdown("ReferrerHostname", "Referrers");
+
+    expect(controller.state.expandedBreakdown?.report).toEqual({ status: "loading", previous: referrerRows });
+    pending.resolve(ok({ dimension: "ReferrerHostname", rows: [] }));
+    await returning;
   });
 
   it("retains rows while the same breakdown query refreshes", async () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
     controller.connect();
-    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    await vi.waitFor(() => expect(controller.state.utmCapability).toBe("available"));
+    api.breakdown.mockClear();
     api.breakdown.mockResolvedValueOnce(ok({
       dimension: "Country",
       rows: [{ value: "DK", visitors: 12, pageViews: 18 }],
     }));
     await controller.openBreakdown("Country", "Countries");
+    expect(controller.state.expandedBreakdown?.report).toEqual({
+      status: "success",
+      data: [{ value: "DK", visitors: 12, pageViews: 18 }],
+    });
     const pending = deferred<ReturnType<typeof ok<{ dimension: "Country"; rows: never[] }>>>();
     api.breakdown.mockReturnValueOnce(pending.promise);
 
@@ -172,11 +199,12 @@ describe("AnalyticsDashboardController", () => {
     await refreshing;
   });
 
-  it("retains rows while filtering a breakdown", async () => {
+  it("does not reuse rows from a different breakdown search", async () => {
     const api = dashboardApi();
     const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
     controller.connect();
-    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    await vi.waitFor(() => expect(controller.state.utmCapability).toBe("available"));
+    api.breakdown.mockClear();
     api.breakdown.mockResolvedValueOnce(ok({
       dimension: "Country",
       rows: [{ value: "DK", visitors: 12, pageViews: 18 }],
@@ -187,10 +215,7 @@ describe("AnalyticsDashboardController", () => {
 
     const searching = controller.openBreakdown("Country", "Countries", { search: "denmark" });
 
-    expect(controller.state.expandedBreakdown?.report).toEqual({
-      status: "loading",
-      previous: [{ value: "DK", visitors: 12, pageViews: 18 }],
-    });
+    expect(controller.state.expandedBreakdown?.report).toEqual({ status: "loading" });
     pending.resolve(ok({ dimension: "Country", rows: [] }));
     await searching;
   });

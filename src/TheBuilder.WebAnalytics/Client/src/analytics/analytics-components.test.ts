@@ -340,7 +340,7 @@ describe("analytics presentation components", () => {
     const icons = element.shadowRoot?.querySelectorAll<HTMLElement>(".breakdown-value-icon");
     expect(icons).toHaveLength(3);
     expect((icons?.[0] as HTMLImageElement | undefined)?.getAttribute("src")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/windows.svg");
-    expect(icons?.[1]?.classList.contains("ios-icon")).toBe(true);
+    expect((icons?.[1] as HTMLImageElement | undefined)?.getAttribute("src")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/ios.svg");
     expect(icons?.[2]?.getAttribute("name")).toBe("icon-globe");
   });
 

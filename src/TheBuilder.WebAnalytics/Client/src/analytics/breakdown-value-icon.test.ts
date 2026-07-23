@@ -11,6 +11,7 @@ describe("breakdownValueIconPath", () => {
 
   it("uses local platform marks for recognised operating systems", () => {
     expect(breakdownValueIconPath("OsName", "Mac OS X")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/apple.svg");
+    expect(breakdownValueIconPath("OsName", "iOS")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/ios.svg");
     expect(breakdownValueIconPath("OsName", "Windows")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/windows.svg");
     expect(breakdownValueIconPath("OsName", "GNU/Linux")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/linux.svg");
     expect(breakdownValueIconPath("OsName", "Chrome OS")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/browsers/chrome.svg");

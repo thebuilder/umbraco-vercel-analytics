@@ -34,7 +34,7 @@ const OPERATING_SYSTEM_ICON_PATHS = new Map<string, string>([
   ["chrome os", "browsers/chrome.svg"],
   ["chromeos", "browsers/chrome.svg"],
   ["gnu/linux", "operating-systems/linux.svg"],
-  ["ios", "operating-systems/apple.svg"],
+  ["ios", "operating-systems/ios.svg"],
   ["ipados", "operating-systems/apple.svg"],
   ["linux", "operating-systems/linux.svg"],
   ["mac", "operating-systems/apple.svg"],

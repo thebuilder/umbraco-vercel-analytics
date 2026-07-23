@@ -129,7 +129,7 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
                 ${countryCode ? html`<img class="country-flag" src=${countryFlagUrl(countryCode)} alt="" width="20" height="15" loading="lazy" referrerpolicy="no-referrer" @error=${(event: Event) => ((event.currentTarget as HTMLImageElement).style.visibility = "hidden")}>` : ""}
                 ${faviconUrl ? html`<img class="referrer-favicon" src=${faviconUrl} alt="" width="20" height="20" loading="lazy" referrerpolicy="no-referrer" @error=${(event: Event) => ((event.currentTarget as HTMLImageElement).hidden = true)}>` : ""}
                 ${valueIcon?.kind === "asset"
-                  ? html`<img class="breakdown-value-icon" src=${valueIcon.src} alt="" width="20" height="20" loading="lazy">`
+                  ? html`<img class=${`breakdown-value-icon${valueIcon.src.endsWith("/operating-systems/ios.svg") ? " ios-icon" : ""}`} src=${valueIcon.src} alt="" width="20" height="20" loading="lazy">`
                   : valueIcon?.kind === "native"
                     ? html`<uui-icon class="breakdown-value-icon" name=${valueIcon.name} aria-hidden="true"></uui-icon>`
                   : hasValueIconFallback
@@ -241,7 +241,7 @@ export class WebAnalyticsBreakdownTableElement extends UmbElementMixin(LitElemen
     .country-flag { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: cover; }
     .referrer-favicon { border-radius: var(--uui-border-radius); flex: 0 0 auto; object-fit: contain; }
     .breakdown-value-icon { block-size: 1.25rem; flex: 0 0 auto; font-size: var(--uui-size-5); inline-size: 1.25rem; object-fit: contain; }
-    img.breakdown-value-icon[src$="/operating-systems/ios.svg"] { box-shadow: var(--uui-shadow-depth-1); }
+    .ios-icon { filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--uui-color-text) 15%, transparent)); }
     .breakdown-value-icon-fallback { color: var(--uui-color-text-alt); }
     .percentage-value { display: inline-block; font-weight: 700; outline: none; position: relative; }
     .percentage-value:focus-visible { outline: 2px solid var(--uui-color-selected); outline-offset: 2px; }

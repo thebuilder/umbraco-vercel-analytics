@@ -20,7 +20,7 @@ export const analyticsDashboardStyles = [UmbTextStyles, css`
   .filter-icon { flex: 0 0 auto; }
   img.filter-icon { object-fit: contain; }
   img.filter-flag { border-radius: var(--uui-border-radius); object-fit: cover; }
-  img.filter-icon[src$="/operating-systems/ios.svg"] { box-shadow: var(--uui-shadow-depth-1); }
+  .ios-icon { filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--uui-color-text) 15%, transparent)); }
   uui-icon.filter-icon { font-size: var(--uui-type-default-size); }
   .filter-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .filter-remove { color: var(--uui-color-text-alt); flex: 0 0 auto; font-size: 1.1em; line-height: 1; }

@@ -57,7 +57,7 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
 
     const valueIcon = breakdownValueIcon(filter.dimension, filter.value);
     if (valueIcon?.kind === "asset") {
-      return html`<img class="filter-icon" src=${valueIcon.src} alt="" width="16" height="16" loading="lazy">`;
+      return html`<img class=${`filter-icon${valueIcon.src.endsWith("/operating-systems/ios.svg") ? " ios-icon" : ""}`} src=${valueIcon.src} alt="" width="16" height="16" loading="lazy">`;
     }
     if (valueIcon?.kind === "native") {
       return html`<uui-icon class="filter-icon" name=${valueIcon.name} aria-hidden="true"></uui-icon>`;

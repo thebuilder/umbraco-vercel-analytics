@@ -331,15 +331,17 @@ describe("analytics presentation components", () => {
     element.dimension = "OsName";
     element.rows = [
       { value: "Windows", visitors: 22_304, pageViews: 30_000 },
+      { value: "iOS", visitors: 2_304, pageViews: 3_000 },
       { value: "(not set)", visitors: 1, pageViews: 1 },
     ];
     document.body.append(element);
     await element.updateComplete;
 
     const icons = element.shadowRoot?.querySelectorAll<HTMLElement>(".breakdown-value-icon");
-    expect(icons).toHaveLength(2);
+    expect(icons).toHaveLength(3);
     expect((icons?.[0] as HTMLImageElement | undefined)?.getAttribute("src")).toBe("/App_Plugins/TheBuilder.WebAnalytics/icons/operating-systems/windows.svg");
-    expect(icons?.[1]?.getAttribute("name")).toBe("icon-globe");
+    expect(icons?.[1]?.classList.contains("ios-icon")).toBe(true);
+    expect(icons?.[2]?.getAttribute("name")).toBe("icon-globe");
   });
 
   it("renders native Umbraco icons for device categories", async () => {

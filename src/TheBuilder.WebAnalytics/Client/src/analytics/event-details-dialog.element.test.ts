@@ -93,6 +93,23 @@ describe("event details dialog layout", () => {
     expect(dialog.shadowRoot?.querySelector('uui-input[type="search"]')).toBeNull();
   });
 
+  it("shows a table skeleton while an uncached property tab is loading", async () => {
+    const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
+    dialog.eventName = "Signup completed";
+    dialog.propertiesEnabled = true;
+    dialog.searchLoading = true;
+    dialog.details = {
+      eventName: "Signup completed",
+      totals: { count: 15, visitors: 12 },
+      properties: [{ name: "source", values: [] }],
+    };
+    document.body.append(dialog);
+    await dialog.updateComplete;
+
+    expect(dialog.shadowRoot?.querySelectorAll(".skeleton-line")).toHaveLength(6);
+    expect(dialog.shadowRoot?.textContent).not.toContain("No values were recorded");
+  });
+
   it("does not render property controls when properties are unavailable", async () => {
     const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
     dialog.eventName = "Read case";

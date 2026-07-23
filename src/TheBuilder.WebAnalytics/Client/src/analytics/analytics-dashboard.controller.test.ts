@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AnalyticsCapabilities, AnalyticsDocumentRoute } from "../api/types.gen.js";
 import { AnalyticsDashboardController, type DashboardEnvironment } from "./analytics-dashboard.controller.js";
+import { isInitialLoading, stateData } from "./async-state.js";
 import type { DashboardApi } from "./dashboard-api.js";
 import { dateRangeForPreset } from "./date-range.js";
 
@@ -256,6 +257,35 @@ describe("AnalyticsDashboardController", () => {
 
     expect(api.eventPropertyValues).not.toHaveBeenCalled();
     expect(controller.state.selectedEvent?.details.status).toBe("success");
+  });
+
+  it("keeps cached property values visible while refreshing a previously viewed tab", async () => {
+    const api = dashboardApi();
+    const sourceValues = deferred<ReturnType<typeof ok<{ name: string; values: { value: string; count: number; visitors: number }[] }>>>();
+    api.eventDetails.mockResolvedValue(ok({
+      eventName: "Signup",
+      totals: { count: 20, visitors: 10 },
+      properties: [{ name: "plan", values: [] }, { name: "source", values: [] }],
+    }));
+    api.eventPropertyValues
+      .mockResolvedValueOnce(ok({ name: "plan", values: [{ value: "Pro", count: 20, visitors: 10 }] }))
+      .mockReturnValueOnce(sourceValues.promise)
+      .mockResolvedValueOnce(ok({ name: "plan", values: [{ value: "Pro", count: 20, visitors: 10 }] }));
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+
+    await controller.selectEvent("Signup");
+    await vi.waitFor(() => expect(stateData(controller.state.selectedEvent!.property)?.name).toBe("plan"));
+
+    controller.searchEventProperty("source", "");
+    expect(isInitialLoading(controller.state.selectedEvent?.property)).toBe(true);
+    sourceValues.resolve(ok({ name: "source", values: [{ value: "Newsletter", count: 9, visitors: 8 }] }));
+    await vi.waitFor(() => expect(stateData(controller.state.selectedEvent!.property)?.name).toBe("source"));
+
+    controller.searchEventProperty("plan", "");
+    expect(isInitialLoading(controller.state.selectedEvent?.property)).toBe(false);
+    expect(stateData(controller.state.selectedEvent!.property)?.values).toEqual([{ value: "Pro", count: 20, visitors: 10 }]);
   });
 
   it("loads event details without fetching property values when the capability is unavailable", async () => {

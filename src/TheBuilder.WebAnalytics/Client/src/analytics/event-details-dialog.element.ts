@@ -5,6 +5,7 @@ import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventDetails, AnalyticsEventProperty } from "../api/types.gen.js";
 import { renderAnalyticsDialogHeadline } from "./analytics-dialog-headline.js";
 import { analyticsDialogStyles, analyticsEventDialogStyles } from "./analytics-dialog.styles.js";
+import { analyticsTableSkeletonStyles, renderAnalyticsTableSkeletonRows } from "./analytics-table-skeleton.js";
 import { renderReportTabs, reportTabsStyles } from "./report-tabs.js";
 
 @customElement("web-analytics-event-details-dialog")
@@ -106,7 +107,8 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
           </div>
         ` : ""}
         <div class="property-table">
-          <table>
+          ${this.searchLoading ? html`<span class="visually-hidden" role="status">Loading ${property.name} values</span>` : ""}
+          <table aria-busy=${this.searchLoading ? "true" : "false"}>
             <caption>${property.name} values for ${this.eventName}</caption>
             <thead>
               <tr class="metric-headings">
@@ -116,7 +118,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
               </tr>
             </thead>
             <tbody>${this.searchLoading ? html`
-            <tr class="empty-row"><td colspan="3"><umb-empty-state headline="Searching"><p>Looking up matching values…</p></umb-empty-state></td></tr>
+            ${renderAnalyticsTableSkeletonRows(6)}
           ` : this.searchUnavailable ? html`
             <tr class="empty-row"><td colspan="3"><umb-empty-state headline="Search unavailable"><p>${this.searchUnavailable}</p></umb-empty-state></td></tr>
           ` : values.length ? values.map((value) => {
@@ -187,7 +189,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     `;
   }
 
-  static styles = [UmbTextStyles, analyticsDialogStyles, analyticsEventDialogStyles, reportTabsStyles, css`
+  static styles = [UmbTextStyles, analyticsDialogStyles, analyticsEventDialogStyles, analyticsTableSkeletonStyles, reportTabsStyles, css`
     .dialog-content { display: flex; flex-direction: column; position: relative; }
     .property-controls { border-bottom: 1px solid var(--uui-color-border); display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding: 0 var(--analytics-dialog-inline-padding) var(--uui-size-space-4); }
     .property-controls uui-input { box-sizing: border-box; width: 100%; }

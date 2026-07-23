@@ -4,7 +4,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventRow } from "../api/types.gen.js";
 import { renderAnalyticsDialogHeadline } from "./analytics-dialog-headline.js";
-import { analyticsDialogStyles } from "./analytics-dialog.styles.js";
+import { analyticsDialogStyles, analyticsEventDialogStyles } from "./analytics-dialog.styles.js";
 import type { AnalyticsFilter } from "./dashboard-url-state.js";
 import "./event-table.element.js";
 
@@ -48,8 +48,7 @@ export class WebAnalyticsEventDialogElement extends UmbElementMixin(LitElement) 
     `;
   }
 
-  static styles = [UmbTextStyles, analyticsDialogStyles, css`
-    dialog { --analytics-dialog-max-width: 58rem; }
+  static styles = [UmbTextStyles, analyticsDialogStyles, analyticsEventDialogStyles, css`
     uui-input { box-sizing: border-box; width: 100%; }
     uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }
     .results { overflow: auto; scrollbar-gutter: stable; }

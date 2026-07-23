@@ -104,3 +104,7 @@ export const analyticsDialogStyles = css`
     .analytics-dialog-body { block-size: 48dvh; }
   }
 `;
+
+export const analyticsEventDialogStyles = css`
+  dialog { --analytics-dialog-max-width: 58rem; }
+`;

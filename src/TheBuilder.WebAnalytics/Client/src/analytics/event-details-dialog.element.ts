@@ -4,7 +4,7 @@ import { UmbTextStyles } from "@umbraco-cms/backoffice/style";
 import type { UUIInputElement } from "@umbraco-cms/backoffice/external/uui";
 import type { AnalyticsEventDetails, AnalyticsEventProperty } from "../api/types.gen.js";
 import { renderAnalyticsDialogHeadline } from "./analytics-dialog-headline.js";
-import { analyticsDialogStyles } from "./analytics-dialog.styles.js";
+import { analyticsDialogStyles, analyticsEventDialogStyles } from "./analytics-dialog.styles.js";
 import { renderReportTabs, reportTabsStyles } from "./report-tabs.js";
 
 @customElement("web-analytics-event-details-dialog")
@@ -138,10 +138,10 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
                       @click=${() => this.#toggleFilter(property.name, value.value)}>
                       <uui-icon name=${activeFilter ? "icon-delete" : "icon-filter"}></uui-icon>
                     </button>
-                    <span>${this.localize.number(value.visitors)}</span>
+                    <strong>${this.localize.number(value.visitors)}</strong>
                   </span>
                 </td>
-                <td>${this.localize.number(value.count)}</td>
+                <td><strong>${this.localize.number(value.count)}</strong></td>
               </tr>
             `;
             }) : html`<tr class="empty-row"><td colspan="3"><umb-empty-state headline=${search ? "No matching values" : "No values"}><p>${search ? "Try a different search." : "No values were recorded for this property in the selected period."}</p></umb-empty-state></td></tr>`}</tbody>
@@ -187,8 +187,8 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     `;
   }
 
-  static styles = [UmbTextStyles, analyticsDialogStyles, reportTabsStyles, css`
-    .dialog-content { --analytics-dialog-body-height: min(28rem, 52dvh); display: flex; flex-direction: column; position: relative; }
+  static styles = [UmbTextStyles, analyticsDialogStyles, analyticsEventDialogStyles, reportTabsStyles, css`
+    .dialog-content { display: flex; flex-direction: column; position: relative; }
     .property-controls { border-bottom: 1px solid var(--uui-color-border); display: grid; flex: 0 0 auto; gap: var(--uui-size-space-3); padding: 0 var(--analytics-dialog-inline-padding) var(--uui-size-space-4); }
     .property-controls uui-input { box-sizing: border-box; width: 100%; }
     .property-controls uui-input [slot="prepend"] { align-items: center; display: flex; margin-inline: var(--uui-size-space-3) var(--uui-size-space-2); }

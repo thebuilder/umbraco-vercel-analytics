@@ -2,7 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@umbraco-cms/backoffice/element-api", () => ({
-  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => base,
+  UmbElementMixin: <T extends CustomElementConstructor>(base: T) => class extends base {
+    readonly localize = { number: (value: number) => value.toLocaleString() };
+  },
 }));
 vi.mock("@umbraco-cms/backoffice/style", () => ({ UmbTextStyles: [] }));
 
@@ -108,5 +110,20 @@ describe("event details dialog layout", () => {
     expect(dialog.shadowRoot?.querySelector('uui-input[type="search"]')).toBeNull();
     expect(dialog.shadowRoot?.querySelector(".filter-button")).toBeNull();
     expect(dialog.shadowRoot?.querySelector(".active-filter")).toBeNull();
+  });
+
+  it("emphasizes both metrics for each property value", async () => {
+    const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
+    dialog.eventName = "Signup completed";
+    dialog.propertiesEnabled = true;
+    dialog.details = {
+      eventName: "Signup completed",
+      totals: { count: 15, visitors: 12 },
+      properties: [{ name: "plan", values: [{ value: "Pro", count: 15, visitors: 12 }] }],
+    };
+    document.body.append(dialog);
+    await dialog.updateComplete;
+
+    expect([...dialog.shadowRoot?.querySelectorAll("tbody td strong") ?? []].map((metric) => metric.textContent)).toEqual(["12", "15"]);
   });
 });

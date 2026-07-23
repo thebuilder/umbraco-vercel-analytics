@@ -227,6 +227,20 @@ describe("AnalyticsDashboardController", () => {
     expect(controller.state.selectedEvent).toBeUndefined();
   });
 
+  it("opens all events when backing out of details opened from the dashboard", async () => {
+    const api = dashboardApi();
+    const controller = new AnalyticsDashboardController(vi.fn(), api, environment());
+    controller.connect();
+    await vi.waitFor(() => expect(controller.state.summary.status).toBe("success"));
+    await controller.selectEvent("Signup");
+
+    expect(controller.state.expandedEvents).toBeUndefined();
+    await controller.backToEvents();
+
+    expect(controller.state.selectedEvent).toBeUndefined();
+    expect(controller.state.expandedEvents?.status).toBe("success");
+  });
+
   it("reuses property values returned with event details", async () => {
     const api = dashboardApi();
     api.eventDetails.mockResolvedValue(ok({

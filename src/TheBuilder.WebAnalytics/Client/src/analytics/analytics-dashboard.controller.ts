@@ -436,6 +436,12 @@ export class AnalyticsDashboardController {
     this.#set({ selectedEvent: undefined });
   }
 
+  async backToEvents(): Promise<void> {
+    const eventsAreOpen = this.state.expandedEvents !== undefined;
+    this.closeEventDetails();
+    if (!eventsAreOpen) await this.openEvents();
+  }
+
   closeEventFlow(): void {
     this.#eventPropertyRequest.cancel();
     this.#eventDetailsRequest.cancel();

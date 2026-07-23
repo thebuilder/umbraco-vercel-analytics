@@ -13,6 +13,20 @@ beforeEach(() => { HTMLDialogElement.prototype.showModal = vi.fn(); });
 afterEach(() => document.body.replaceChildren());
 
 describe("event details dialog layout", () => {
+  it("returns to the Events list from the header", async () => {
+    const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
+    dialog.eventName = "Signup completed";
+    const onBack = vi.fn();
+    dialog.addEventListener("back-to-events", onBack);
+    document.body.append(dialog);
+    await dialog.updateComplete;
+
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-back")?.textContent).toContain("All events");
+    expect(dialog.shadowRoot?.querySelector(".analytics-dialog-back uui-icon")?.getAttribute("name")).toBe("icon-arrow-left");
+    (dialog.shadowRoot?.querySelector(".analytics-dialog-back") as HTMLButtonElement).click();
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
   it("reserves the report height while initial details are loading", async () => {
     const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
     dialog.loading = true;

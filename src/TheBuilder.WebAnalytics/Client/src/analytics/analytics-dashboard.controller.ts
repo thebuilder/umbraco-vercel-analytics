@@ -416,7 +416,6 @@ export class AnalyticsDashboardController {
 
   async selectEvent(eventName: string): Promise<void> {
     if (!this.#capabilities().eventDetails) return;
-    this.closeEvents();
     await this.#loadEventDetails(eventName);
   }
 
@@ -435,6 +434,13 @@ export class AnalyticsDashboardController {
     this.#eventPropertyRequest.cancel();
     this.#eventDetailsRequest.cancel();
     this.#set({ selectedEvent: undefined });
+  }
+
+  closeEventFlow(): void {
+    this.#eventPropertyRequest.cancel();
+    this.#eventDetailsRequest.cancel();
+    this.#eventSearchRequest.cancel();
+    this.#set({ selectedEvent: undefined, expandedEvents: undefined });
   }
 
   #set(patch: Partial<DashboardState>): void { this.state = { ...this.state, ...patch }; this.#notify(); }

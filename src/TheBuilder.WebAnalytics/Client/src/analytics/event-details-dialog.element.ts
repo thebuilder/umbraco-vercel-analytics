@@ -27,6 +27,7 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
   #close(): void { this.shadowRoot?.querySelector("dialog")?.close(); }
   #notifyClosed(): void { this.dispatchEvent(new CustomEvent("close-event-details", { bubbles: true, composed: true })); }
   #onCancel(event: Event): void { event.preventDefault(); this.#close(); }
+  #backToEvents(): void { this.dispatchEvent(new CustomEvent("back-to-events", { bubbles: true, composed: true })); }
 
   #activeProperty(): AnalyticsEventProperty | undefined {
     return this.details?.properties.find((property) => property.name === this._propertyName)
@@ -165,7 +166,12 @@ export class WebAnalyticsEventDetailsDialogElement extends UmbElementMixin(LitEl
     return html`
       <dialog aria-label=${`${this.eventName} event details`} @cancel=${this.#onCancel} @close=${this.#notifyClosed}>
         <div class="analytics-dialog-layout">
-          ${renderAnalyticsDialogHeadline(`${this.eventName} event`, "Close event details", () => this.#close())}
+          ${renderAnalyticsDialogHeadline(`${this.eventName} event`, "Close event details", () => this.#close(), undefined, true, html`
+            <button type="button" class="analytics-dialog-back" @click=${this.#backToEvents}>
+              <uui-icon name="icon-arrow-left"></uui-icon>
+              <span>All events</span>
+            </button>
+          `)}
           <div class="dialog-content analytics-dialog-body" aria-busy=${this.loading}>
             ${this.details ? html`
               ${this.propertiesEnabled ? activeProperty ? html`

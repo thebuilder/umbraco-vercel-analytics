@@ -214,7 +214,8 @@ export class WebAnalyticsDashboardElement extends UmbElementMixin(LitElement) {
             .searchUnavailable=${this.#error(selected.property)}
             @search-event-property=${(event: CustomEvent<{ propertyName: string; search: string }>) => this.#controller.searchEventProperty(event.detail.propertyName, event.detail.search)}
             @toggle-event-property-filter=${(event: CustomEvent<{ property: string; value: string }>) => this.#controller.toggleEventPropertyFilter(event.detail.property, event.detail.value)}
-            @close-event-details=${() => this.#controller.closeEventDetails()}></web-analytics-event-details-dialog>
+            @back-to-events=${() => this.#controller.closeEventDetails()}
+            @close-event-details=${() => this.#controller.closeEventFlow()}></web-analytics-event-details-dialog>
         ` : ""}
       </main>
     `;

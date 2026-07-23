@@ -112,7 +112,7 @@ describe("event details dialog layout", () => {
     expect(dialog.shadowRoot?.querySelector(".active-filter")).toBeNull();
   });
 
-  it("emphasizes both metrics for each property value", async () => {
+  it("emphasizes metrics without emphasizing the property value", async () => {
     const dialog = document.createElement("web-analytics-event-details-dialog") as WebAnalyticsEventDetailsDialogElement;
     dialog.eventName = "Signup completed";
     dialog.propertiesEnabled = true;
@@ -124,6 +124,7 @@ describe("event details dialog layout", () => {
     document.body.append(dialog);
     await dialog.updateComplete;
 
+    expect(dialog.shadowRoot?.querySelector("tbody th strong")).toBeNull();
     expect([...dialog.shadowRoot?.querySelectorAll("tbody td strong") ?? []].map((metric) => metric.textContent)).toEqual(["12", "15"]);
   });
 });
